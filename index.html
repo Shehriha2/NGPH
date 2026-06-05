@@ -1,0 +1,2789 @@
+<!DOCTYPE html>
+<html dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Business Center Rota</title>
+
+  <style>
+    :root{
+      --primary-color:#1f4e79; --primary-dark:#163a5a;
+      --secondary-color:#2f7d57; --secondary-dark:#245f42;
+      --accent-color:#7c3aed; --accent-dark:#5b21b6;
+      --danger-color:#dc3545; --danger-dark:#b42330;
+      --warning-color:#d97706;
+      --light-bg:#f3f6fb; --panel-bg:#ffffff;
+      --muted:#6b7280; --border:#d9e2ec;
+      --shadow:0 8px 22px rgba(15,23,42,.08);
+      --hours-ok:#16a34a; --hours-warn:#d97706; --hours-over:#dc2626;
+    }
+    *{ box-sizing:border-box; }
+    body{ font-family:Arial,sans-serif; margin:0; padding:14px; background:var(--light-bg); font-size:12px; color:#1f2937; }
+
+    .staff-input,.key-input,.text-input,.number-input{
+      padding:7px 10px; border:1px solid var(--border); border-radius:8px; font-size:12px; background:#fff;
+    }
+    .staff-input{ width:80%; }
+    .staff-input:focus,.key-input:focus,.text-input:focus,.number-input:focus,select:focus,input:focus{
+      border-color:var(--primary-color); outline:none; box-shadow:0 0 0 3px rgba(31,78,121,.12);
+    }
+
+    .page-top{ background:var(--panel-bg); border-radius:16px; box-shadow:var(--shadow); border:1px solid #e7edf3; overflow:hidden; margin-bottom:16px; }
+
+    .header-banner{
+      background:linear-gradient(135deg,var(--primary-color),var(--secondary-color));
+      color:#fff; padding:12px 18px;
+      display:grid; grid-template-columns:90px 1fr auto;
+      align-items:center; gap:16px;
+    }
+    .print-only{ display:none; }
+    .logo{ width:80px; height:80px; background:#fff; border-radius:6px; padding:5px; display:flex; justify-content:center; align-items:center; flex-shrink:0; }
+    .logo img{ width:100%; height:100%; object-fit:contain; }
+    .header-text{ text-align:center; flex-grow:1; color:#fff; }
+    .header-text h1{ margin:2px 0; font-size:14px; font-weight:800; }
+    .header-text h2{ margin:2px 0; font-size:12px; font-weight:600; opacity:.93; }
+    .area-badge{
+      display:inline-flex; align-items:center; gap:5px;
+      background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3);
+      border-radius:999px; padding:4px 12px; font-weight:800; font-size:13px; margin-top:5px;
+    }
+
+    .summary-strip{ display:none; }
+    .summary-pill{
+      background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.18);
+      border-radius:999px; padding:8px 12px; font-weight:700; font-size:11px; min-width:110px; text-align:center;
+    }
+
+    .top-toolbar{ padding:14px 18px 12px; background:#fff; display:grid; gap:12px; }
+    .toolbar-grid,.button-groups,.dashboard-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+    .toolbar-card,.button-card,.dashboard-card{ background:#f9fbfd; border:1px solid var(--border); border-radius:12px; padding:12px; }
+    .toolbar-card h3,.button-card h3,.dashboard-card h3{ margin:0 0 10px; font-size:12px; color:var(--primary-dark); text-transform:uppercase; letter-spacing:.4px; }
+
+    .field-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+    .field-row:last-child{ margin-bottom:0; }
+    .field-row label{ min-width:88px; font-weight:700; color:#334155; }
+    .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
+
+    input,select,button{ padding:7px 10px; border:1px solid var(--border); border-radius:8px; font-size:12px; }
+    #rotaList{ min-width:220px; background:#fff; }
+    button{ background:var(--primary-color); color:#fff; border:none; cursor:pointer; transition:background-color .2s ease,transform .1s ease,opacity .2s ease; font-weight:700; }
+    button:hover{ background:var(--primary-dark); }
+    button:active{ transform:translateY(1px); }
+    button[disabled]{ opacity:.6; cursor:not-allowed; }
+
+    .btn-green{ background:var(--secondary-color); } .btn-green:hover{ background:var(--secondary-dark); }
+    .btn-purple{ background:var(--accent-color); }   .btn-purple:hover{ background:var(--accent-dark); }
+    .btn-orange{ background:var(--warning-color); }  .btn-orange:hover{ background:#b45309; }
+    .save-btn{ background:#16a34a; }   .save-btn:hover{ background:#15803d; }
+    .saveas-btn{ background:var(--accent-color); } .saveas-btn:hover{ background:var(--accent-dark); }
+    .ghost-link{ text-decoration:none; }
+
+    .dashboard-grid .metric{ font-size:20px; font-weight:800; color:#0f172a; margin-bottom:4px; }
+    .dashboard-grid .metric-sub{ color:var(--muted); font-size:11px; }
+
+    .table-container{ overflow-x:auto; background:#fff; border-radius:12px; box-shadow:var(--shadow); border:1px solid #e7edf3; }
+    table{ width:100%; border-collapse:collapse; }
+    th,td{ border:1px solid #ddd; padding:4px; text-align:center; min-width:10px; font-size:11px; }
+    th{ background:var(--primary-color); color:#fff; position:sticky; top:0; z-index:2; }
+    .weekend{ background:#f0f0f0; }
+
+    .delete-btn{ background:var(--danger-color); color:#fff; border:none; border-radius:6px; padding:3px 7px; font-size:10px; cursor:pointer; margin-left:5px; }
+    .delete-btn:hover{ background:var(--danger-dark); }
+
+    .legend{ display:flex; gap:15px; margin-top:12px; padding:10px; background:#fff; border-radius:12px; justify-content:center; flex-wrap:wrap; font-size:10px; box-shadow:var(--shadow); border:1px solid #e7edf3; }
+    .legend-item{ display:flex; align-items:center; gap:4px; }
+    .legend-color{ width:12px; height:12px; border-radius:2px; }
+
+    .status-message{ position:fixed; top:20px; right:20px; padding:10px 20px; border-radius:8px; color:#fff; display:none; z-index:2000; max-width:720px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:var(--shadow); }
+    .status-success{ background:#16a34a; } .status-error{ background:#dc2626; } .status-info{ background:#2563eb; }
+
+    .hint{ font-size:11px; color:#555; }
+
+    .modal{ position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:1200; padding:18px; }
+    .modal.show{ display:flex; }
+    .modal-card{ width:min(980px,100%); max-height:88vh; overflow:auto; background:#fff; border-radius:16px; box-shadow:0 16px 40px rgba(15,23,42,.25); border:1px solid #e7edf3; }
+    .modal-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 16px; background:linear-gradient(135deg,var(--primary-color),var(--accent-color)); color:#fff; }
+    .modal-header h2{ margin:0; font-size:16px; }
+    .modal-body{ padding:16px; }
+
+    .abbr-table,.stats-table{ width:100%; border-collapse:collapse; }
+    .abbr-table th,.abbr-table td,.stats-table th,.stats-table td{ border:1px solid var(--border); padding:8px; text-align:left; font-size:12px; }
+    .abbr-table th,.stats-table th{ background:#edf4fb; color:#12324d; }
+
+    .hours-ok{ color:var(--hours-ok); font-weight:800; }
+    .hours-warn{ color:var(--hours-warn); font-weight:800; }
+    .hours-over{ color:var(--hours-over); font-weight:800; }
+    .row-over td:last-child{ background:#fff1f2; }
+    .row-under td:last-child{ background:#fffbeb; }
+    .row-target .hours-cell{ background:#f0fdf4; }
+
+    .pattern-indicator{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:11px; border:1px solid #c7d2fe; }
+
+    @media (max-width:980px){ .toolbar-grid,.button-groups,.dashboard-grid{ grid-template-columns:1fr; } .header-banner{ grid-template-columns:70px 1fr; } .header-right{ grid-column:1/-1; } }
+
+    .sched-cell{ white-space:nowrap; }
+    .sched-cell select{ font-size:11px; padding:2px 4px; border-radius:4px; border:1px solid var(--border); background:#fff; width:100%; min-width:72px; }
+    /* Locked state — all duties are 12h, override not allowed */
+    .sched-cell select:disabled{
+      background:#dcfce7; color:#15803d; font-weight:700;
+      border-color:#86efac; cursor:not-allowed; opacity:1;
+    }
+
+    /* Duty cell font scaling for longer codes */
+    td[data-dlen="4"]{ font-size:10px; }
+    td[data-dlen="5"]{ font-size:9px; }
+    td[data-dlen="6"]{ font-size:8px; }
+    td[data-dlen="7"]{ font-size:7.5px; }
+    td[data-dlen="8"]{ font-size:7px; }
+    @media print{
+      td[data-dlen="4"]{ font-size:5.5pt; }
+      td[data-dlen="5"]{ font-size:5pt; }
+      td[data-dlen="6"]{ font-size:4.5pt; }
+      td[data-dlen="7"]{ font-size:4pt; }
+      td[data-dlen="8"]{ font-size:3.5pt; }
+    }
+
+    .ot-cell{ white-space:nowrap; font-weight:700; }
+    .ot-val{ font-size:11px; }
+    .ot-positive{ color:var(--hours-over); }
+    .ot-negative{ color:var(--hours-warn); }
+    .ot-override{ color:var(--accent-color); }
+    .ot-lock-btn{ font-size:10px; padding:1px 5px; margin-left:3px; background:var(--muted); border-radius:4px; border:none; cursor:pointer; color:#fff; }
+    .ot-lock-btn:hover{ background:#374151; }
+
+    .holiday-row{ display:flex; gap:6px; align-items:center; margin-bottom:5px; flex-wrap:wrap; font-size:11px; }
+    .holiday-row input[type="text"]{ width:110px; font-size:11px; padding:3px 6px; }
+    .holiday-row input[type="number"]{ width:46px; font-size:11px; padding:3px 5px; }
+    .holiday-row label{ white-space:nowrap; font-size:11px; color:#374151; }
+
+    /* ── Active row highlight — name cell only ───────────────────────────────── */
+    #rotaTable tbody tr.active-editing-row > td:first-child {
+      background:#fef3c7 !important;
+      box-shadow:inset 4px 0 0 #d97706;   /* thick amber left stripe */
+    }
+    #rotaTable tbody tr.active-editing-row > td:first-child input {
+      font-weight:800; color:#92400e;
+    }
+
+    /* ── Active staff banner (fixed at top of viewport) ─────────────────────── */
+    #activeStaffBanner{
+      position:fixed; top:0; left:50%; transform:translateX(-50%);
+      z-index:9999; display:none; align-items:center; gap:10px;
+      background:rgba(15,40,80,.97); color:#fff;
+      padding:6px 24px; border-radius:0 0 16px 16px;
+      border:2px solid rgba(255,255,255,.55);
+      border-top:none;
+      box-shadow:0 6px 24px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35);
+      backdrop-filter:blur(8px); pointer-events:none;
+    }
+    #activeStaffBanner .asb-label{ font-size:10px; opacity:.75; white-space:nowrap; }
+    #activeStaffBanner .asb-name { font-size:15px; font-weight:800; letter-spacing:.3px; white-space:nowrap; }
+
+    /* ── Banner budget tag ───────────────────────────────────────────────────── */
+    .budget-tag{
+      display:inline-flex; align-items:center; gap:5px;
+      padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700;
+      white-space:nowrap;
+    }
+    .budget-tag.ok    { background:rgba(34,197,94,.25); border:1px solid rgba(34,197,94,.6); color:#bbf7d0; }
+    .budget-tag.warn  { background:rgba(234,179, 8,.25); border:1px solid rgba(234,179,8,.6);  color:#fef08a; }
+    .budget-tag.over  { background:rgba(239, 68,68,.3);  border:1px solid rgba(239,68,68,.7);  color:#fecaca; }
+
+    /* ── Duties / Leave help popup ───────────────────────────────────────────── */
+    #dutiesHelpPopup{
+      position:fixed; top:46px; left:50%; transform:translateX(-50%);
+      z-index:9998; display:none;
+      background:rgba(15,40,80,.97); color:#fff;
+      border:1.5px solid rgba(255,255,255,.3); border-radius:12px;
+      padding:12px 16px; box-shadow:0 8px 32px rgba(0,0,0,.55);
+      backdrop-filter:blur(10px);
+      max-height:62vh; overflow-y:auto; min-width:270px;
+    }
+    #dutiesHelpPopup .dhp-title{
+      font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+      opacity:.65; padding-bottom:7px; margin-bottom:6px;
+      border-bottom:1px solid rgba(255,255,255,.18);
+    }
+    #dutiesHelpPopup .dhp-item{
+      display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px;
+    }
+    #dutiesHelpPopup .dhp-swatch{
+      width:14px; height:14px; border-radius:3px; flex-shrink:0;
+      border:1px solid rgba(255,255,255,.18);
+    }
+    #dutiesHelpPopup .dhp-code{ font-weight:800; font-size:11px; min-width:38px; letter-spacing:.3px; }
+    #dutiesHelpPopup .dhp-label{ opacity:.85; flex:1; }
+    #dutiesHelpPopup .dhp-hrs{ opacity:.5; font-size:10px; white-space:nowrap; }
+
+    /* ── Coverage Panel ─────────────────────────────────────────────────────── */
+    .coverage-wrap{
+      background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(15,23,42,.08);
+      border:1px solid #e7edf3; padding:8px 14px; margin-top:10px;
+    }
+    .cov-summary-bar{
+      display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; flex-wrap:wrap;
+    }
+    .cov-chip{
+      display:inline-flex; align-items:center; gap:3px;
+      padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; color:#fff;
+    }
+    .cov-chip.exact    { background:#16a34a; }
+    .cov-chip.over     { background:#1d4ed8; }
+    .cov-chip.short1   { background:#d97706; }
+    .cov-chip.critical { background:#dc2626; }
+    .cov-scroll{ overflow-x:auto; margin-top:8px; }
+    .cov-table{ border-collapse:collapse; width:max-content; }
+    .cov-table th{
+      background:#1f4e79; color:#fff; font-size:10px; padding:3px 2px;
+      text-align:center; border:1px solid #2d6098; position:sticky; top:0; z-index:1;
+    }
+    .cov-table td{
+      border:1px solid #e5e7eb; padding:2px 1px;
+      text-align:center; font-size:10px; font-weight:700;
+    }
+    .cov-table th.cov-th-lbl{ text-align:left; padding:3px 8px; position:sticky; left:0; z-index:3; }
+    .cov-table td.cov-td-lbl{
+      text-align:left; padding:2px 8px; background:#f8fafc; color:#1f4e79;
+      font-weight:700; font-size:10px; position:sticky; left:0; z-index:2;
+      border-right:2px solid #c7d2fe;
+    }
+    /* cell status colours */
+    .cov-exact    { background:#16a34a; color:#fff; }
+    .cov-over     { background:#1d4ed8; color:#fff; }
+    .cov-short1   { background:#f59e0b; color:#1c1917; }
+    .cov-critical { background:#dc2626; color:#fff; }
+    .cov-none     { background:#f1f5f9; color:#94a3b8; font-weight:400; }
+
+    @media print{
+      @page{ size:landscape; margin:10mm; }
+      body{ padding:0; background:#fff; font-size:8pt; }
+      .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,.print-only{ display:none !important; }
+      .print-area-box{ border:1.5pt solid #000; border-radius:6pt; padding:6pt 10pt; background:#f5f5f5; font-size:9pt; color:#000; min-width:90pt; }
+      .print-area-box .pab-label{ font-size:7pt; color:#555; margin-bottom:3pt; text-transform:uppercase; letter-spacing:.4pt; }
+      .print-area-box .pab-value{ font-size:12pt; font-weight:800; color:#1a4f8b; }
+      .page-top{ box-shadow:none; border:none; }
+      .header-banner{ background:#fff !important; color:#000 !important; border-bottom:2px solid #000; padding:6px 10px; grid-template-columns:90px 1fr 110px; }
+      .header-text h1,.header-text h2{ color:#000 !important; }
+      .logo{ border:1px solid #ccc; }
+      .area-badge{ background:#eee !important; color:#000 !important; border:1px solid #999 !important; }
+      .summary-strip{ display:none; }
+      .summary-pill{ color:#000 !important; border:1px solid #000; background:#fff !important; }
+      .table-container{ overflow:visible !important; box-shadow:none; border:none; }
+      .sched-cell, th.sched-th{ display:none !important; }
+      .ot-cell,    th.ot-th  { display:none !important; }
+      table{ font-size:7pt; }
+      th,td{ padding:2px; border:.5pt solid #000; }
+      .legend{ font-size:7pt; padding:2px; margin-top:5px; box-shadow:none; border:1px solid #000; }
+      .legend-color{ width:8px; height:8px; }
+      *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-top">
+    <div class="header-banner">
+      <div class="logo">
+        <img src="MNGHA-Logo.png" alt="MNGHA Logo"
+          onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;80&quot; height=&quot;80&quot;><rect width=&quot;80&quot; height=&quot;80&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;12&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
+      </div>
+      <div class="header-text" style="position:relative;">
+        <!-- Print-only rota name — tiny, top-right of header text block -->
+        <div class="print-only" style="position:absolute;top:0;right:0;font-size:7pt;color:#555;text-align:right;line-height:1.3;" id="printRotaName"></div>
+        <h1>الشؤون الصحية – وزارة الحرس الوطني</h1>
+        <h1>Ministry of National Guard Health Affairs</h1>
+        <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+        <h2 id="pageMainTitle">Pharmaceutical Care — Staff Rota</h2>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:5px;">
+          <div class="area-badge">Filter: <span id="headerAreaLabel">All Areas</span></div>
+          <div class="area-badge no-print" id="rotaNameLabel" style="background:rgba(255,255,255,.25);font-size:11px;font-weight:700;letter-spacing:.3px;">—</div>
+          <button type="button" class="no-print" onclick="newRelease()"
+            style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:10px;padding:4px 10px;border-radius:999px;cursor:pointer;font-weight:700;">
+            🔄 New Release
+          </button>
+        </div>
+      </div>
+      <div class="header-right">
+        <!-- Screen: action buttons -->
+        <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
+          <button type="button" onclick="openSettingsModal()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:13px;padding:9px 20px;border-radius:10px;font-weight:800;letter-spacing:.3px;">⚙ Settings &amp; Tools</button>
+          <button onclick="addNewRow()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">+ Row</button>
+          <button onclick="populateStaff()" title="Load staff assigned to the current area filter into the rota" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">👥 Load Staff</button>
+          <button onclick="saveToCloud()" style="background:#16a34a;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">💾 Save</button>
+          <button onclick="openLoadPicker()" style="background:#d97706;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">📂 Load</button>
+          <a href="Staff.html" style="text-decoration:none;"><button type="button" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">👥 Staff</button></a>
+          <button onclick="reloadDutiesFromStorage()" title="Load duties for the current area" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">📋 Load Duties</button>
+          <button onclick="clearAllTable()" style="background:#dc2626;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">🗑 Clear All</button>
+          <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">🖨 Print</button>
+        </div>
+        <!-- Print: area filter info -->
+        <div class="print-only">
+          <div class="print-area-box">
+            <div class="pab-label">Area Filter</div>
+            <div class="pab-value" id="printAreaLabel">All Areas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Settings & Tools Modal ─────────────────────────────────────── -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-card" style="width:min(1100px,96%);max-height:92vh;">
+      <div class="modal-header">
+        <h2>⚙ Settings &amp; Tools</h2>
+        <button type="button" class="btn-orange" onclick="closeSettingsModal()">✕ Close</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="toolbar-grid" style="margin-bottom:14px;">
+          <div class="toolbar-card">
+            <h3>Schedule Setup</h3>
+            <div class="field-row">
+              <label>Area Filter</label>
+              <select id="areaFilter" style="min-width:130px;flex:1" onchange="setArea()">
+                <option value="ALL">All Areas</option>
+              </select>
+            </div>
+            <div class="field-row" style="padding-left:96px;margin-top:-4px;">
+              <input id="newAreaInput" type="text" placeholder="New area…"
+                class="text-input" style="width:110px;text-transform:uppercase"/>
+              <button type="button" class="btn-green" onclick="addNewArea()">+ Add</button>
+              <button type="button" onclick="deleteCurrentArea()"
+                style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;" title="Delete selected area and its staff records">🗑 Delete</button>
+            </div>
+            <div class="field-row">
+              <label>Month</label>
+              <select id="monthSelect">
+                <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+                <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label>Name Width</label>
+              <input type="number" id="nameWidth" class="number-input" value="220" min="120"/>
+            </div>
+            <div class="field-row">
+              <label>Day Width</label>
+              <input type="number" id="dayWidth" class="number-input" value="34" min="10"/>
+            </div>
+            <div class="field-row">
+              <label>Monthly Target</label>
+              <input type="number" id="monthlyTarget" class="number-input" value="180" min="0"/>
+            </div>
+            <div class="field-row">
+              <label>Mixed Std Hrs</label>
+              <input type="number" id="mixedStdHours" class="number-input" value="0" min="0" step="0.5"/>
+            </div>
+          </div>
+
+          <div class="toolbar-card">
+            <h3>Rota Title</h3>
+            <div class="field-row">
+              <label>Display Title</label>
+              <input id="rotaTitleInput" class="text-input" type="text" placeholder="Shown in page header…"/>
+            </div>
+            <!-- Legacy/local storage — hidden by default -->
+            <details style="margin-top:8px;">
+              <summary style="cursor:pointer;font-size:11px;color:#6b7280;font-weight:700;user-select:none;">⚙ Local / Legacy Storage</summary>
+              <div style="margin-top:8px;padding:8px;background:#f9fbfd;border-radius:8px;border:1px solid #e2e8f0;">
+                <div class="field-row" style="margin-bottom:6px;">
+                  <label style="min-width:78px;">Named Rota</label>
+                  <input id="saveName" class="text-input" type="text" placeholder="Rota name…" style="flex:1;"/>
+                </div>
+                <div class="field-row" style="margin-bottom:6px;">
+                  <label style="min-width:78px;">Saved Rotas</label>
+                  <select id="rotaList" onchange="selectRotaFromList()" style="flex:1;">
+                    <option value="">-- Select --</option>
+                  </select>
+                  <button type="button" class="btn-green" onclick="loadRotaList()" style="font-size:11px;padding:5px 9px;">↺</button>
+                </div>
+                <div class="btn-row" style="flex-wrap:wrap;gap:5px;">
+                  <button onclick="saveToDatabase()" class="save-btn" style="font-size:11px;padding:5px 8px;">Save Month</button>
+                  <button onclick="saveAsToDatabase()" class="saveas-btn" style="font-size:11px;padding:5px 8px;">Save Named</button>
+                  <button onclick="loadFromDatabase();closeSettingsModal()" class="btn-orange" style="font-size:11px;padding:5px 8px;">Load Month</button>
+                  <button onclick="loadNamedFromDatabase();closeSettingsModal()" class="btn-purple" style="font-size:11px;padding:5px 8px;">Open Named</button>
+                </div>
+              </div>
+            </details>
+          </div>
+
+        </div>
+
+        <div class="button-groups" style="margin-bottom:14px;">
+          <div class="button-card">
+            <h3>Records</h3>
+            <div class="btn-row">
+              <button onclick="addNewRow();closeSettingsModal()">Add New Record</button>
+              <button onclick="populateStaff();closeSettingsModal()" class="btn-green">Load All Staff</button>
+              <button onclick="reloadDutiesFromStorage()" class="btn-purple">Reload Duties</button>
+              <button onclick="autoBalanceEmptyRows();closeSettingsModal()" class="btn-orange">Auto Balance Empty</button>
+            </div>
+          </div>
+          <div class="button-card">
+            <h3>Cloud &amp; Export</h3>
+            <div class="btn-row">
+              <button onclick="saveToCloud();closeSettingsModal()" class="save-btn">💾 Save Release</button>
+              <button onclick="openLoadPicker();closeSettingsModal()" class="btn-orange">📂 Load Release</button>
+              <button onclick="exportToExcel()" class="btn-green">Export Excel</button>
+            </div>
+          </div>
+          <div class="button-card">
+            <h3>Pages &amp; Tools</h3>
+            <div class="btn-row">
+              <button onclick="window.print()" class="btn-orange">Print Table</button>
+              <button type="button" class="btn-purple" onclick="openAbbreviationsPage()">Abbreviations</button>
+              <button type="button" class="btn-green" onclick="openStatisticsPage()">Statistics</button>
+              <a href="Staff.html"         class="ghost-link"><button type="button">Open Staff</button></a>
+              <a href="Duties.html"        class="ghost-link"><button type="button" class="btn-green">Open Duties</button></a>
+              <a href="Areas.html"         class="ghost-link"><button type="button" class="btn-orange">Area Budgets</button></a>
+              <a href="BudgetReport.html"  class="ghost-link"><button type="button" class="btn-purple">Budget Report</button></a>
+              <a href="OTPreApproval.html" class="ghost-link"><button type="button" style="background:#be185d;">OT Pre-Approval</button></a>
+              <a href="MultiMonth.html"   class="ghost-link"><button type="button" style="background:#0f766e;">Multi-Month View</button></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-card">
+            <h3>Total Staff</h3>
+            <div class="metric" id="summaryRows">0</div>
+            <div class="metric-sub">Active rows in rota</div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Monthly Target</h3>
+            <div class="metric" id="summaryTarget">0</div>
+            <div class="metric-sub">Hours target per staff</div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Total Assigned Hrs</h3>
+            <div class="metric" id="summaryAssigned">0</div>
+            <div class="metric-sub">Sum of all staff hours</div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Balanced</h3>
+            <div class="metric" id="summaryBalanced">0</div>
+            <div class="metric-sub">Staff at target hours</div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Coverage</h3>
+            <div class="metric" id="metricCoverage">0%</div>
+            <div class="metric-sub">Filled duty cells out of all schedulable cells</div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Over Target</h3>
+            <div class="metric" id="metricOverTarget">0</div>
+            <div class="metric-sub">Staff members above the monthly target</div>
+          </div>
+          <div class="dashboard-card">
+            <h3>Under Target</h3>
+            <div class="metric" id="metricUnderTarget">0</div>
+            <div class="metric-sub">Staff members below the monthly target</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="status-message"></div>
+
+  <div class="modal" id="abbreviationsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Duty Abbreviations</h2>
+        <button type="button" class="btn-orange" onclick="closeAbbreviationsPage()">Close</button>
+      </div>
+      <div class="modal-body">
+        <table class="abbr-table">
+          <thead><tr><th>Code</th><th>Description</th><th>Area</th><th>Hours</th></tr></thead>
+          <tbody id="abbreviationsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="statisticsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Monthly Statistics</h2>
+        <button type="button" class="btn-orange" onclick="closeStatisticsPage()">Close</button>
+      </div>
+      <div class="modal-body">
+        <table class="stats-table">
+          <thead><tr><th>Staff</th><th>Hours</th><th>Difference vs Target</th><th>Status</th></tr></thead>
+          <tbody id="statisticsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Save Release Modal ──────────────────────────────────────────────── -->
+  <div class="modal" id="saveReleaseModal">
+    <div class="modal-card" style="width:min(440px,96%);">
+      <div class="modal-header" style="background:linear-gradient(135deg,#16a34a,#0f766e);">
+        <h2>💾 Save Release</h2>
+        <button type="button" class="btn-orange" onclick="closeSaveModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;margin:0 0 12px;color:#374151;">
+          Saving: <b id="saveModalLabel" style="color:#1f4e79;font-size:13px;"></b>
+          <span style="font-size:11px;color:#6b7280;display:block;margin-top:2px;">Overwrites this release in the cloud.</span>
+        </p>
+        <label style="font-weight:700;font-size:12px;color:#334155;display:block;margin-bottom:5px;">
+          Release note <span style="font-weight:400;color:#6b7280;">(optional — press Enter to skip)</span>
+        </label>
+        <input type="text" id="saveReleaseNote"
+          placeholder="e.g. final approved, post-holiday fix, added 2 staff…"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:Arial,sans-serif;"
+          onkeydown="if(event.key==='Enter') confirmSaveToCloud();"/>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button type="button" class="btn-green" onclick="confirmSaveToCloud()">💾 Save</button>
+          <button type="button" onclick="closeSaveModal()" style="background:#6b7280;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Load Picker Modal ────────────────────────────────────────────────── -->
+  <div class="modal" id="loadPickerModal">
+    <div class="modal-card" style="width:min(580px,96%);">
+      <div class="modal-header" style="background:linear-gradient(135deg,#d97706,#b45309);">
+        <h2>📂 Load Rota</h2>
+        <button type="button" class="btn-orange" onclick="closeLoadPicker()">✕ Close</button>
+      </div>
+      <div class="modal-body">
+        <div id="loadPickerContent" style="min-height:80px;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:12px;">
+          <button type="button" class="btn-green" id="loadPickerBtn" onclick="loadSelectedRelease()" disabled>📂 Load Selected</button>
+          <button type="button" onclick="closeLoadPicker()" style="background:#6b7280;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OT Password Modal ────────────────────────────────────────────────── -->
+  <div class="modal" id="otPwdModal">
+    <div class="modal-card" style="width:min(340px,96%);">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">
+        <h2>🔒 OT Override</h2>
+        <button type="button" class="btn-orange" onclick="_cancelOTPwd()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:#374151;margin:0 0 12px;">Enter password to override OT.</p>
+        <input type="password" id="otPwdInput" placeholder="••••"
+          style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:20px;letter-spacing:6px;font-family:Arial,sans-serif;text-align:center;"
+          onkeydown="if(event.key==='Enter')_submitOTPwd();if(event.key==='Escape')_cancelOTPwd();"/>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button type="button" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:700;cursor:pointer;font-size:12px;" onclick="_submitOTPwd()">Confirm</button>
+          <button type="button" onclick="_cancelOTPwd()" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Leave Types Help Modal ───────────────────────────────────────────── -->
+  <div class="modal" id="leaveHelpModal">
+    <div class="modal-card" style="width:min(520px,96%);">
+      <div class="modal-header" style="background:linear-gradient(135deg,#7c3aed,#a855f7);">
+        <h2>📋 Leave Types in Use</h2>
+        <button type="button" class="btn-orange" onclick="closeLeaveHelpModal()">✕ Close</button>
+      </div>
+      <div class="modal-body">
+        <div id="leaveHelpContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Full Coverage Matrix Modal ──────────────────────────────────────── -->
+  <div class="modal" id="coverageModal">
+    <div class="modal-card" style="width:min(1200px,98%);max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal-header">
+        <h2>📊 Full Coverage — All Days</h2>
+        <button type="button" class="btn-orange" onclick="closeCoverageModal()">✕ Close</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow:auto;padding:10px;">
+        <div id="coverageModalContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Holidays bar (screen only) -->
+  <div class="no-print" id="holidayBar" style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(15,23,42,.08);border:1px solid #e7edf3;padding:10px 16px;margin-bottom:8px;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-weight:800;font-size:12px;color:#1f4e79;white-space:nowrap;">📅 Holidays This Month</span>
+      <div id="holidayList" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:1;min-width:0;"></div>
+      <button type="button" class="btn-green" onclick="addHoliday()" style="white-space:nowrap;font-size:11px;padding:5px 12px;">+ Add Holiday</button>
+      <span style="color:#6b7280;font-size:11px;white-space:nowrap;">Sun–Thu holidays reduce Regular standard; all holiday days reduce 12h &amp; Mixed</span>
+    </div>
+  </div>
+
+  <!-- Pattern + Search bar (screen only) -->
+  <div class="pattern-bar no-print" style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(15,23,42,.08);border:1px solid #e7edf3;padding:8px 14px;margin-bottom:10px;flex-wrap:wrap;">
+    <button type="button" class="btn-purple" onclick="activatePatternMode()" style="font-size:12px;padding:7px 16px;">⬡ Pattern</button>
+    <span class="pattern-indicator" id="patternIndicator" style="font-size:11px;">Pattern mode: OFF</span>
+    <span style="color:#6b7280;font-size:11px;">Click Pattern → click a day cell → enter sequence (e.g. 4NC2OFF)</span>
+
+    <!-- Staff search filter -->
+    <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+      <div style="display:flex;align-items:center;background:#f3f6fb;border:1px solid #d1d5db;border-radius:8px;padding:0 8px;gap:4px;">
+        <span style="color:#6b7280;font-size:13px;">🔍</span>
+        <input type="text" id="rotaSearchInput"
+          placeholder="Name or badge…"
+          style="border:none;background:transparent;outline:none;font-size:12px;padding:5px 2px;width:160px;font-family:Arial,sans-serif;"
+          oninput="filterRota()"
+          onkeydown="if(event.key==='Escape') clearRotaFilter();"/>
+        <button type="button" id="rotaSearchClear" onclick="clearRotaFilter()"
+          style="display:none;background:none;border:none;color:#6b7280;font-size:14px;cursor:pointer;padding:0 2px;line-height:1;"
+          title="Clear filter">✕</button>
+      </div>
+      <span id="rotaFilterCount" style="font-size:11px;font-weight:700;color:#1f4e79;white-space:nowrap;"></span>
+    </div>
+
+    <!-- Leave types help button — shown only when leave codes are used in the rota -->
+    <button type="button" id="leaveHelpBtn" onclick="openLeaveHelpModal()" style="display:none;
+      background:#a855f7;color:#fff;border:none;border-radius:8px;padding:5px 12px;
+      font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+      📋 Leave Types
+    </button>
+
+    <!-- OT unlock indicator — hidden until password entered -->
+    <span id="otUnlockBar" style="display:none;align-items:center;gap:8px;">
+      <span style="background:#7c3aed;color:#fff;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px;">🔓 OT Override: ON</span>
+      <button type="button" onclick="lockOTOverride()"
+        style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;">🔒 Lock OT</button>
+    </span>
+  </div>
+
+  <div class="table-container">
+    <table id="rotaTable">
+      <thead><tr><th>Staff Name (Badge No)</th><th>Hours</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="legend" id="legendBox"></div>
+
+  <!-- ── Active staff banner ─────────────────────────────────────────────── -->
+  <div id="activeStaffBanner">
+    <span class="asb-label">✏️ Editing</span>
+    <span class="asb-name" id="activeStaffName"></span>
+    <span class="asb-name" style="opacity:.5;margin:0 4px;">·</span>
+    <span class="asb-name" id="activeStaffHours"></span>
+    <span class="asb-name" id="activeStaffOT"   style="display:none;"></span>
+    <span class="asb-name" id="activeStaffDuty" style="display:none;"></span>
+    <span id="bannerBudget" style="display:none;margin-left:6px;"></span>
+    <!-- Coverage modal trigger — needs pointer-events:all to be clickable through the none-banner -->
+    <button type="button" onclick="openCoverageModal()" title="Full coverage for all days"
+      style="pointer-events:all;margin-left:10px;background:rgba(255,255,255,.22);
+      border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:7px;
+      padding:2px 10px;font-size:16px;font-weight:700;cursor:pointer;line-height:1.4;">›</button>
+    <!-- Duties/leave reference help button -->
+    <button type="button" id="dutiesHelpBtn" onclick="toggleDutiesHelp(event)" title="Show all duty &amp; leave types"
+      style="pointer-events:all;margin-left:4px;background:rgba(255,255,255,.15);
+      border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:7px;
+      padding:2px 9px;font-size:13px;font-weight:900;cursor:pointer;line-height:1.4;letter-spacing:0;">?</button>
+  </div>
+
+  <!-- ── Duties / Leave help popup ─────────────────────────────────────────── -->
+  <div id="dutiesHelpPopup">
+    <div class="dhp-title">All Duty &amp; Leave Types</div>
+    <div id="dutiesHelpList"></div>
+  </div>
+
+  <!-- ── Coverage Panel (screen only) ──────────────────────────────────────── -->
+  <div class="coverage-wrap no-print" id="coverageWrap">
+    <div class="cov-summary-bar" onclick="toggleCoverageDetail()">
+      <span style="font-weight:800;font-size:12px;color:#1f4e79;white-space:nowrap;">📊 Daily Coverage</span>
+      <span id="coverageSummaryChips" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex:1;min-width:0;"></span>
+      <span id="coverageToggleBtn" style="margin-left:auto;font-size:11px;color:#6b7280;white-space:nowrap;border:1px solid #d1d5db;border-radius:6px;padding:2px 9px;">▶ Details</span>
+    </div>
+    <div id="coverageDetail" style="display:none;">
+      <div class="cov-scroll" id="coverageScrollWrap">
+        <table class="cov-table" id="coverageTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+      storageBucket:"bcotrota.firebasestorage.app",
+      messagingSenderId:"659421824894",
+      appId:"1:659421824894:web:f0546879df8808491ad52f"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window.FB = { db, doc, setDoc, getDoc };
+  </script>
+
+  <script>
+    // ── Storage keys ──────────────────────────────────────────────────────────
+    const AREA_KEY           = "BCOT_CURRENT_AREA_V1";
+    const AREAS_LIST_KEY     = "BCOT_AREAS_LIST_V1";
+    const TARGET_STORAGE_KEY = "BCOT_MONTHLY_TARGET_V1";
+    const STAFF_RECORDS_KEY  = "BCOT_STAFF_RECORDS_V2";   // unified pool
+    const DUTIES_ALL_KEY     = "BCOT_DUTIES_ALL_V1";      // unified pool
+
+    // Rota index is still area-scoped (ACC rota list ≠ ICU rota list)
+    function rotaIndexLocalKey() { return `BCOT_NAMED_ROTAS_LOCAL_V1_${getCurrentArea()}`; }
+
+    let patternStartCell = null;
+    let patternModeArmed = false;
+    let holidays      = [];
+    let mixedStdHours = 0;
+    let releaseNum    = 1;
+
+    // ── Release number helpers ─────────────────────────────────────────────────
+    const MONTH_NAMES_SHORT = ["","January","February","March","April","May","June",
+                               "July","August","September","October","November","December"];
+
+    function releaseKey(area){ return `BCOT_RELEASE_NUM_${area}`; }
+
+    function loadReleaseNum(area){
+      if (!area || area === "ALL") return 1;
+      return parseInt(localStorage.getItem(releaseKey(area)) || "1", 10) || 1;
+    }
+
+    function saveReleaseNum(area, n){
+      if (!area || area === "ALL") return;
+      localStorage.setItem(releaseKey(area), String(n));
+    }
+
+    function getRotaDisplayName(){
+      const area  = getCurrentArea();
+      const month = parseInt(document.getElementById("monthSelect")?.value || "1", 10);
+      if (!area || area === "ALL") return "All Areas";
+      return `${area}-${MONTH_NAMES_SHORT[month]}-R${releaseNum}`;
+    }
+
+    function updateRotaLabel(){
+      const name = getRotaDisplayName();
+      const el   = document.getElementById("rotaNameLabel");
+      if (el) el.textContent = name;
+      const pel  = document.getElementById("printRotaName");
+      if (pel) pel.textContent = name;
+    }
+
+    function newRelease(){
+      const area = getCurrentArea();
+      if (!area || area === "ALL"){ showStatusMessage("Select a specific area first.", "error"); return; }
+
+      const current = getRotaDisplayName();
+      const next    = `${area}-${MONTH_NAMES_SHORT[parseInt(document.getElementById("monthSelect")?.value||"1",10)]}-R${loadReleaseNum(area)+1}`;
+
+      const ok = confirm(
+        `Create New Release?\n\n` +
+        `▸ Current release (${current}) stays safely in the cloud — nothing is deleted.\n` +
+        `▸ All manual OT overrides will be reset to auto-calculated.\n` +
+        `▸ New release will be: ${next}\n` +
+        `▸ Press 💾 Save after this to store ${next} in the cloud.\n\n` +
+        `Continue?`
+      );
+      if (!ok) return;
+
+      releaseNum = loadReleaseNum(area) + 1;
+      saveReleaseNum(area, releaseNum);
+      updateRotaLabel();
+
+      // Reset every manual OT override back to auto-calculated
+      let resetCount = 0;
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const otCell = row.querySelector('.ot-cell');
+        if (!otCell || otCell.dataset.override !== 'true') return;
+        delete otCell.dataset.override;
+        const btn = otCell.querySelector('.ot-lock-btn');
+        if (btn){ btn.textContent='🔒'; btn.title='Override manually'; }
+        const val = otCell.querySelector('.ot-val');
+        if (val) val.className = 'ot-val';
+        calcOT(row);
+        resetCount++;
+      });
+
+      const msg = resetCount
+        ? `New release: ${getRotaDisplayName()} — ${resetCount} OT override(s) reset to auto ✅`
+        : `New release: ${getRotaDisplayName()} ✅`;
+      showStatusMessage(msg);
+    }
+
+    // ── Holiday helpers ───────────────────────────────────────────────────────
+    function getEnabledHolidays() {
+      return holidays.filter(h => h.enabled && h.fromDay && h.toDay && h.toDay >= h.fromDay);
+    }
+    function countSunThuInMonth(month, year) {
+      const days = getDaysInMonth(month); let n = 0;
+      for (let d=1;d<=days;d++) { const dow=new Date(year,month-1,d).getDay(); if(dow>=0&&dow<=4) n++; }
+      return n;
+    }
+    function countHolidaySunThu(month, year) {
+      const days = getDaysInMonth(month); let n = 0;
+      getEnabledHolidays().forEach(h => {
+        const from=Math.max(1,h.fromDay), to=Math.min(days,h.toDay);
+        for (let d=from;d<=to;d++) { const dow=new Date(year,month-1,d).getDay(); if(dow>=0&&dow<=4) n++; }
+      });
+      return n;
+    }
+    function countHolidayAllDays(month, year) {
+      const days = getDaysInMonth(month); let n = 0;
+      getEnabledHolidays().forEach(h => {
+        const from=Math.max(1,h.fromDay), to=Math.min(days,h.toDay);
+        if (to>=from) n += (to-from+1);
+      });
+      return n;
+    }
+    // Returns true if calendar day `day` (1-based) falls within any enabled holiday range
+    function isInHolidayRange(day) {
+      return getEnabledHolidays().some(h => day >= h.fromDay && day <= h.toDay);
+    }
+    // Count off-days for OT standard deduction.
+    // Rules:
+    //  • A day counts as "off" when its duty has 0 hours (L, SL, H, HOL, etc.) —
+    //    OR the cell contains the literal code "L" even if not in the duties list.
+    //  • Days that already fall inside a configured holiday range are EXCLUDED
+    //    (the holiday deduction handles them; counting twice would inflate OT).
+    //  • Completely empty cells are ignored (rota not yet filled).
+    function countLeaveDays(row, month, year) {
+      const hIdx    = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+      const maxDay  = getDaysInMonth(month);
+      let all=0, sunThu=0;
+      // Tracks Fri/Sat days added via the 12H leave-extension rule (avoids double-counting)
+      const extendedDays = new Set();
+
+      for (let i=1;i<hIdx;i++) {
+        const v = row.cells[i].textContent.trim().toUpperCase();
+        if (!v) continue;                   // empty cell — ignore
+        if (isInHolidayRange(i)) continue;  // holiday range already covers this day
+        const baseV = v.endsWith('_O') ? v.slice(0,-2) : v;
+        // Off-day = 'L' (always) OR any defined duty with hours===0 UNLESS it has
+        // noLeaveCount:true (e.g. SL — sick leave is transparent to OT standard)
+        const isOff = (baseV === 'L') ||
+          (DUTIES[baseV] && Number(DUTIES[baseV].hours) === 0 && !DUTIES[baseV].noLeaveCount);
+        if (isOff) {
+          all++;
+          const dow = new Date(year, month-1, i).getDay();
+          if (dow>=0&&dow<=4) sunThu++;
+          // 12H extension: leave on Thu(4) → extend to following Fri/Sat
+          //                leave on Sun(0) → extend to preceding Fri/Sat
+          const candidates = dow===4 ? [i+1, i+2] : dow===0 ? [i-2, i-1] : [];
+          candidates.forEach(d => {
+            if (d < 1 || d > maxDay) return;           // outside month
+            if (extendedDays.has(d)) return;           // already counted
+            if (isInHolidayRange(d)) return;           // public holiday — skip
+            if (row.cells[d]?.textContent.trim()) return; // has an assignment — skip
+            extendedDays.add(d);
+          });
+        }
+      }
+      all += extendedDays.size;   // extended Fri/Sat added to leave.all only (12H uses this)
+      return {all, sunThu};
+    }
+
+    // ── OT calculation ────────────────────────────────────────────────────────
+    function calcOT(row) {
+      const otCell = row.querySelector('.ot-cell');
+      if (!otCell) return;
+      if (otCell.dataset.override==='true') return;
+      const schedType = row.querySelector('.sched-cell select')?.value||'';
+      const val = otCell.querySelector('.ot-val');
+      if (!schedType) { val.textContent='—'; val.className='ot-val'; otCell.title=''; return; }
+      const totalHours = Number(row.querySelector('.hours-cell')?.textContent)||0;
+      const month = Number(document.getElementById('monthSelect').value);
+      const year  = new Date().getFullYear();
+      const leave = countLeaveDays(row, month, year);
+      let standard = 0;
+      let tipDetail = '';
+      if (schedType==='Regular') {
+        const totalWT   = countSunThuInMonth(month, year);
+        const holWT     = countHolidaySunThu(month, year);
+        const net       = Math.max(0, totalWT - holWT - leave.sunThu);
+        standard        = net * 9;
+        tipDetail = `Sun–Thu days: ${totalWT} | Holidays: ${holWT} | Off-days: ${leave.sunThu} | Net: ${net} × 9h = ${standard}h`;
+      } else if (schedType==='12 Hours') {
+        const totalDays = getDaysInMonth(month);
+        const holDays   = countHolidayAllDays(month, year);
+        const rem       = Math.max(0, totalDays - holDays - leave.all);
+        standard        = Math.round((rem * 15 / 28) * 12 * 10) / 10;
+        tipDetail = `Total days: ${totalDays} | Holidays: ${holDays} | Off-days: ${leave.all} | Rem: ${rem} × (15/28×12) = ${standard}h`;
+      } else if (schedType==='Mixed') {
+        const mStd      = Number(document.getElementById('mixedStdHours').value)||0;
+        const totalDays = getDaysInMonth(month);
+        const holDays   = countHolidayAllDays(month, year);
+        const denom     = Math.max(1, totalDays - holDays);
+        const rem       = Math.max(0, denom - leave.all);
+        standard        = Math.round(mStd * (rem / denom) * 10) / 10;
+        tipDetail = `Std: ${mStd}h | Holidays: ${holDays} | Off-days: ${leave.all} | Ratio: ${rem}/${denom} = ${standard}h`;
+      }
+      const ot = Math.round((totalHours - standard) * 10) / 10;
+      val.textContent = (ot>0?'+':'')+ot;
+      val.className = 'ot-val'+(ot>0?' ot-positive':ot<0?' ot-negative':'');
+      otCell.title = `Actual: ${totalHours}h | Standard: ${standard}h | OT: ${ot>0?'+':''}${ot}h\n${tipDetail}`;
+    }
+    function recalculateAllOT() {
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => calcOT(row));
+    }
+
+    // ── OT Password modal ─────────────────────────────────────────────────────
+    // _otUnlocked = true means password was entered once this session —
+    // all OT overrides are allowed without re-entering until lockOTOverride() is called.
+    let _otUnlocked = false;
+    let _otPwdCB    = null;
+
+    function _setOTUnlocked(state) {
+      _otUnlocked = state;
+      const bar = document.getElementById('otUnlockBar');
+      if (bar) bar.style.display = state ? 'flex' : 'none';
+    }
+
+    function lockOTOverride() {
+      _setOTUnlocked(false);
+      showStatusMessage('OT override locked 🔒');
+    }
+
+    function _askOTPwd(onOK, onFail) {
+      // Already unlocked this session — skip the modal entirely
+      if (_otUnlocked) { onOK?.(); return; }
+      _otPwdCB = { onOK, onFail };
+      document.getElementById('otPwdInput').value = '';
+      document.getElementById('otPwdModal').classList.add('show');
+      setTimeout(() => document.getElementById('otPwdInput').focus(), 80);
+    }
+
+    function _submitOTPwd() {
+      const entered = document.getElementById('otPwdInput').value;
+      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
+      document.getElementById('otPwdModal').classList.remove('show');
+      if (entered === pwd) {
+        _setOTUnlocked(true);   // unlock for the rest of the session
+        showStatusMessage('OT override unlocked — click 🔒 Lock OT when done.', 'info');
+        _otPwdCB?.onOK?.();
+      } else {
+        showStatusMessage('Incorrect password — override cancelled.','error');
+        _otPwdCB?.onFail?.();
+      }
+      _otPwdCB = null;
+    }
+
+    function _cancelOTPwd() {
+      document.getElementById('otPwdModal').classList.remove('show');
+      _otPwdCB?.onFail?.();
+      _otPwdCB = null;
+    }
+
+    // ── OT cell builder ───────────────────────────────────────────────────────
+    function buildOTCell(overrideVal=null, isOverride=false) {
+      const td  = document.createElement('td');
+      td.className = 'ot-cell';
+      if (isOverride) td.dataset.override = 'true';
+
+      const span = document.createElement('span');
+      span.className = 'ot-val' + (isOverride?' ot-override':'');
+      span.textContent = overrideVal !== null ? overrideVal : '—';
+      span.contentEditable = 'true';
+      span.tabIndex = -1;   // skip via Tab — click or use lock button to override
+      span.spellcheck = false;
+      span.title = 'Type a number to override, or type "auto" to reset';
+      span.style.cssText = 'min-width:28px;display:inline-block;outline:none;cursor:text;border-radius:3px;padding:0 2px;';
+
+      span.addEventListener('focus', () => {
+        span.style.background = '#fffde7';
+        span.style.outline = '1px solid #d97706';
+      });
+      span.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
+        if (e.key === 'Escape') { e.preventDefault(); span.textContent = td.dataset.savedVal || '—'; span.blur(); }
+      });
+      span.addEventListener('focus', () => { td.dataset.savedVal = span.textContent; });
+      span.addEventListener('blur', () => {
+        span.style.background = '';
+        span.style.outline = '';
+        const raw = span.textContent.trim();
+        const saved = (td.dataset.savedVal || '').trim();
+        // If nothing changed and not already 'auto', do nothing — prevents accidental overrides
+        if (raw === saved && raw.toLowerCase() !== 'auto') return;
+        if (raw.toLowerCase() === 'auto' || raw === '') {
+          // Reset to calculated
+          delete td.dataset.override;
+          span.className = 'ot-val';
+          btn.textContent = '🔒'; btn.title = 'Override manually';
+          calcOT(td.parentElement);
+          showStatusMessage('OT reset to auto-calculated ✅');
+        } else {
+          const parsed = parseFloat(raw.replace('+',''));
+          if (!Number.isFinite(parsed)) {
+            // Invalid — restore saved value
+            span.textContent = saved || '—';
+            showStatusMessage('Invalid OT value — restored previous.', 'error');
+            return;
+          }
+          // Set manual override — password required (shows masked modal)
+          const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
+          if (pwd && td.dataset.override !== 'true') {
+            span.textContent = saved || '—';  // restore while modal is open
+            _askOTPwd(
+              () => {
+                td.dataset.override = 'true';
+                span.textContent = (parsed>0?'+':'')+parsed;
+                span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
+                btn.textContent = '🔓'; btn.title = 'Reset to calculated';
+                td.dataset.savedVal = span.textContent;
+              },
+              () => { span.textContent = saved || '—'; }
+            );
+            return;
+          }
+          td.dataset.override = 'true';
+          span.textContent = (parsed>0?'+':'')+parsed;
+          span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
+          btn.textContent = '🔓'; btn.title = 'Reset to calculated';
+        }
+      });
+
+      const btn = document.createElement('button');
+      btn.className = 'ot-lock-btn'; btn.type='button';
+      btn.textContent = isOverride ? '🔓' : '🔒';
+      btn.title = isOverride ? 'Reset to calculated' : 'Override manually';
+      btn.onclick = () => handleOTLock(td);
+
+      td.appendChild(span); td.appendChild(btn);
+      return td;
+    }
+
+    function handleOTLock(otCell) {
+      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
+      if (!pwd) { showStatusMessage('OT password not set in config.js','error'); return; }
+      if (otCell.dataset.override==='true') {
+        // Reset to calculated — no password needed (user can always type "auto" too)
+        delete otCell.dataset.override;
+        otCell.querySelector('.ot-lock-btn').textContent='🔒';
+        otCell.querySelector('.ot-lock-btn').title='Override manually';
+        calcOT(otCell.parentElement);
+        showStatusMessage('OT reset to auto-calculated ✅');
+      } else {
+        // Ask password → on success, focus the OT span for direct editing
+        _askOTPwd(() => {
+          const span = otCell.querySelector('.ot-val');
+          otCell.dataset.override = 'true';
+          otCell.querySelector('.ot-lock-btn').textContent = '🔓';
+          otCell.querySelector('.ot-lock-btn').title = 'Reset to calculated';
+          span.className = 'ot-val ot-override';
+          // Select all text so user can type the new value immediately
+          span.focus();
+          const sel=window.getSelection(), rng=document.createRange();
+          rng.selectNodeContents(span); sel.removeAllRanges(); sel.addRange(rng);
+        });
+      }
+    }
+
+    // ── Holiday UI ────────────────────────────────────────────────────────────
+    function renderHolidayList() {
+      const container = document.getElementById('holidayList');
+      if (!container) return;
+      container.innerHTML='';
+      if (!holidays.length) {
+        container.innerHTML='<span style="color:#9ca3af;font-size:11px;font-style:italic;">No holidays — click + Add Holiday</span>';
+        return;
+      }
+      holidays.forEach((h, idx) => {
+        const chip = document.createElement('div');
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:3px 10px 3px 8px;font-size:11px;';
+        chip.innerHTML=`
+          <input type="checkbox" ${h.enabled?'checked':''} title="Enable/disable this holiday"
+            style="cursor:pointer;width:13px;height:13px;"
+            onchange="holidays[${idx}].enabled=this.checked;recalculateAllOT();renderHolidayList();">
+          <input type="text" value="${h.label||''}" placeholder="Label"
+            title="Holiday name"
+            style="border:none;background:transparent;width:70px;font-size:11px;font-weight:700;color:#1e40af;padding:0;outline:none;"
+            oninput="holidays[${idx}].label=this.value;">
+          <span style="color:#6b7280;">Days</span>
+          <input type="number" min="1" max="31" value="${h.fromDay||''}" placeholder="From"
+            title="From day"
+            style="border:1px solid #d1d5db;border-radius:4px;width:38px;font-size:11px;padding:1px 3px;text-align:center;"
+            onchange="holidays[${idx}].fromDay=Number(this.value);recalculateAllOT();">
+          <span style="color:#6b7280;">–</span>
+          <input type="number" min="1" max="31" value="${h.toDay||''}" placeholder="To"
+            title="To day"
+            style="border:1px solid #d1d5db;border-radius:4px;width:38px;font-size:11px;padding:1px 3px;text-align:center;"
+            onchange="holidays[${idx}].toDay=Number(this.value);recalculateAllOT();">
+          <button type="button"
+            style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:0 0 0 2px;line-height:1;"
+            title="Remove"
+            onclick="removeHoliday(${idx})">✕</button>`;
+        container.appendChild(chip);
+      });
+    }
+    function addHoliday() {
+      holidays.push({enabled:true, label:'', fromDay:null, toDay:null});
+      renderHolidayList();
+    }
+    function removeHoliday(idx) {
+      holidays.splice(idx,1); renderHolidayList(); recalculateAllOT();
+    }
+
+    // ── Area helpers ──────────────────────────────────────────────────────────
+    function getCurrentArea() {
+      // prefer live select, fall back to localStorage
+      return (document.getElementById("areaFilter")?.value
+        || localStorage.getItem(AREA_KEY)
+        || "ALL").toUpperCase();
+    }
+
+    function getAreasList() {
+      try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || []; }
+      catch { return []; }
+    }
+
+    function saveAreaToList(area) {
+      const list = getAreasList();
+      if (area && area !== "ALL" && !list.includes(area)) {
+        list.push(area); list.sort();
+        localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(list));
+      }
+    }
+
+    function rebuildAreaSelect() {
+      const sel  = document.getElementById("areaFilter");
+      const prev = sel.value || getCurrentArea();
+      sel.innerHTML = '<option value="ALL">All Areas</option>';
+      getAreasList().forEach(a => {
+        const o = document.createElement("option"); o.value = a; o.textContent = a;
+        sel.appendChild(o);
+      });
+      if (prev && (prev === "ALL" || getAreasList().includes(prev))) sel.value = prev;
+    }
+
+    function addNewArea() {
+      const raw = (document.getElementById("newAreaInput").value || "")
+        .trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
+      if (!raw) { showStatusMessage("Enter a valid area name.", 'error'); return; }
+      saveAreaToList(raw);
+      rebuildAreaSelect();
+      document.getElementById("areaFilter").value = raw;
+      document.getElementById("newAreaInput").value = "";
+      setArea();
+    }
+
+    function deleteCurrentArea() {
+      const area = getCurrentArea();
+      if (!area || area === "ALL") { showStatusMessage("Select a specific area to delete.", "error"); return; }
+      if (!confirm(`Delete area "${area}"?\n\nThis will:\n• Remove "${area}" from the area list\n• Delete all staff records tagged to "${area}"\n\nStaff in the general pool are unaffected.`)) return;
+
+      // Remove from areas list
+      const list = getAreasList().filter(a => a !== area);
+      localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(list));
+
+      // Remove staff records tagged to this area
+      try {
+        const raw = localStorage.getItem(STAFF_RECORDS_KEY);
+        if (raw) {
+          const all = JSON.parse(raw);
+          if (Array.isArray(all)) {
+            const kept = all.filter(s => (s.area || "").toUpperCase() !== area.toUpperCase());
+            localStorage.setItem(STAFF_RECORDS_KEY, JSON.stringify(kept));
+          }
+        }
+      } catch(e) { console.warn("Could not trim staff records:", e); }
+
+      // Clean up release num key
+      localStorage.removeItem(releaseKey(area));
+
+      // Reset filter to ALL
+      document.getElementById("areaFilter").value = "ALL";
+      rebuildAreaSelect();
+      setArea();
+      showStatusMessage(`Area "${area}" and its staff records deleted ✅`);
+    }
+
+    function setArea() {
+      const area = getCurrentArea();
+      localStorage.setItem(AREA_KEY, area);
+      const label = area === "ALL" ? "All Areas" : area;
+      const hdr = document.getElementById("headerAreaLabel");
+      if (hdr) hdr.textContent = label;
+      const pal = document.getElementById("printAreaLabel");
+      if (pal) pal.textContent = label;
+      // Load release number for new area
+      releaseNum = loadReleaseNum(area);
+      updateRotaLabel();
+      onAreaChanged(area);
+    }
+
+    function onAreaChanged(area) {
+      // Reload staff + duties for the new filter — do NOT clear the table
+      staffList = loadStaffList();
+      DUTIES    = loadDuties() || {};
+      injectDutyStyles();
+      buildLegend();
+      // Recalculate hours (some codes may become unknown/known after filter change)
+      document.querySelectorAll('#rotaTable tbody tr').forEach(updateHours);
+      updateDashboard();
+      showStatusMessage(`Area filter: ${area === "ALL" ? "All Areas" : '"' + area + '"'} ✅`);
+    }
+
+    function getAreaOrWarn() {
+      const a = getCurrentArea();
+      if (!a) { showStatusMessage("Select an Area filter first.", 'error'); return null; }
+      return a; // "ALL" is valid — saves under "ALL" namespace in Firestore
+    }
+
+    // ── Core helpers ──────────────────────────────────────────────────────────
+    function showStatusMessage(message, type = 'success') {
+      const el = document.querySelector('.status-message');
+      el.textContent = message;
+      el.className = 'status-message status-' + (type === 'error' ? 'error' : type === 'info' ? 'info' : 'success');
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3600);
+    }
+
+    function getMonthlyTarget() {
+      const raw = Number(document.getElementById('monthlyTarget').value || 0);
+      return Number.isFinite(raw) && raw >= 0 ? raw : 180;
+    }
+    function persistMonthlyTarget() { localStorage.setItem(TARGET_STORAGE_KEY, String(getMonthlyTarget())); updateDashboard(); }
+
+    function getKeyOrWarn() {
+      const key = (window.BCOT_APP_KEY || "").trim();
+      if (!key) { showStatusMessage("config.js not found — cloud sync disabled.", 'error'); return null; }
+      return key;
+    }
+    function setKeyFieldFromStorage() {
+      const t = Number(localStorage.getItem(TARGET_STORAGE_KEY) || 180);
+      if (Number.isFinite(t) && t >= 0) document.getElementById('monthlyTarget').value = String(t);
+    }
+
+    // ── Staff (unified pool, filtered by area) ────────────────────────────────
+    function loadStaffList() {
+      try {
+        const all  = JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY) || "[]") || [];
+        const area = getCurrentArea();
+        // When ALL: return everyone.
+        // When a specific area: return only staff explicitly tagged to that area
+        // (staff with no area assignment are excluded — they appear in ALL only).
+        const filtered = (area === "ALL")
+          ? all
+          : all.filter(s => (s.area || '').toUpperCase() === area);
+        return filtered.map(s => s.name).filter(Boolean);
+      } catch { return []; }
+    }
+    let staffList = loadStaffList();
+
+    // ── Fixed leave / holiday duties (all areas, always present) ─────────────
+    // SL has noLeaveCount:true → its days are NOT deducted from the OT standard.
+    // All others count as off-days (reduce the OT standard like a leave day).
+    const FIXED_LEAVE_DUTIES = {
+      SL:  { label:'Sick Leave',      hours:0, color:'#94a3b8', area:'', assignedSt:0, noLeaveCount:true  },
+      AL:  { label:'Annual Leave',    hours:0, color:'#c084fc', area:'', assignedSt:0, noLeaveCount:false },
+      HL:  { label:'Holiday Leave',   hours:0, color:'#a855f7', area:'', assignedSt:0, noLeaveCount:false },
+      ADL: { label:'Admin Leave',     hours:0, color:'#9333ea', area:'', assignedSt:0, noLeaveCount:false },
+      H:   { label:'Public Holiday',  hours:0, color:'#4ade80', area:'', assignedSt:0, noLeaveCount:false },
+      ND:  { label:'National Day',    hours:0, color:'#22c55e', area:'', assignedSt:0, noLeaveCount:false },
+      FD:  { label:'Founding Day',    hours:0, color:'#16a34a', area:'', assignedSt:0, noLeaveCount:false },
+    };
+
+    // ── Duties (unified pool, filtered by area) ───────────────────────────────
+    function loadDuties() {
+      try {
+        const all = JSON.parse(localStorage.getItem(DUTIES_ALL_KEY) || "{}") || {};
+        const area = getCurrentArea();
+        let filtered = {};
+        if (all && typeof all === "object" && Object.keys(all).length) {
+          if (area === "ALL") {
+            filtered = all;
+          } else {
+            Object.entries(all).forEach(([code, meta]) => {
+              const areas = (meta.area || "").split(",").map(x => x.trim().toUpperCase()).filter(Boolean);
+              if (!areas.length || areas.includes(area)) filtered[code] = meta;
+            });
+          }
+        }
+        // Fixed leave duties are always merged in (user definitions take precedence
+        // for label/color, but SL's noLeaveCount flag is always enforced)
+        const result = { ...FIXED_LEAVE_DUTIES, ...filtered };
+        if (result['SL']) result['SL'] = { ...result['SL'], noLeaveCount: true };
+        return result;
+      } catch { return { ...FIXED_LEAVE_DUTIES }; }
+    }
+    let DUTIES = loadDuties() || {};
+
+    // ── Duty styles & legend ──────────────────────────────────────────────────
+    function injectDutyStyles() {
+      const old = document.getElementById("dutiesStyleTag");
+      if (old) old.remove();
+      const style = document.createElement("style");
+      style.id = "dutiesStyleTag";
+      let css = "";
+      Object.entries(DUTIES).forEach(([code, meta]) => {
+        const color = (meta?.color || "#111827").toString();
+        css += `.D_${code}{background:${color}!important;color:#fff!important;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact;}` +
+               `.weekend.D_${code}{filter:brightness(0.95);}`;
+      });
+      style.textContent = css;
+      document.head.appendChild(style);
+    }
+
+    function buildLegend() {
+      const box = document.getElementById("legendBox");
+      if (!box) return;
+      box.innerHTML = "";
+      if (!Object.keys(DUTIES).length) {
+        box.innerHTML = '<span style="color:#6b7280;font-size:11px;">No duties for this filter. Open Duties.html to add duties.</span>';
+        renderAbbreviationsTable(); return;
+      }
+      // Collect every duty code actually present in the rota right now
+      const used = new Set();
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+        for (let i = 1; i < hIdx; i++) {
+          const v = row.cells[i].textContent.trim().toUpperCase();
+          if (v) used.add(v.endsWith('_O') ? v.slice(0, -2) : v);
+        }
+      });
+      Object.entries(DUTIES).forEach(([code, meta]) => {
+        // Skip duties not used in the rota — legend stays empty until something is typed
+        if (!used.has(code)) return;
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `<div class="legend-color" style="background:${meta.color}"></div>` +
+          `<span>${meta.label} (${code}) ${meta.area ? '['+meta.area+']' : ''} — ${Number(meta.hours)||0}h</span>`;
+        box.appendChild(item);
+      });
+      renderAbbreviationsTable();
+    }
+
+    function reloadDutiesFromStorage() {
+      DUTIES = loadDuties() || {};
+      injectDutyStyles();
+      buildLegend();
+      document.querySelectorAll("#rotaTable tbody tr").forEach(updateHours);
+      updateDashboard();
+      showStatusMessage("Duties reloaded ✅");
+    }
+
+    function renderAbbreviationsTable() {
+      const tbody = document.getElementById('abbreviationsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      Object.entries(DUTIES).forEach(([code, meta]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><b>${code}</b></td><td>${meta.label||''}</td><td>${meta.area||'—'}</td><td>${Number(meta.hours)||0}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ── Statistics ────────────────────────────────────────────────────────────
+    function getRowHoursStatus(hours) {
+      const t = getMonthlyTarget();
+      return hours > t ? 'over' : hours < t ? 'under' : 'target';
+    }
+    function renderStatisticsTable() {
+      const tbody = document.getElementById('statisticsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      Array.from(document.querySelectorAll('#rotaTable tbody tr')).forEach(row => {
+        const name = row.cells[0]?.querySelector('input')?.value?.trim();
+        if (!name) return;
+        const hours = Number(row.querySelector('.hours-cell')?.textContent || 0);
+        const diff  = hours - getMonthlyTarget();
+        const label = hours > getMonthlyTarget() ? 'Over Target' : hours < getMonthlyTarget() ? 'Under Target' : 'Balanced';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${name}</td><td>${hours}</td><td>${diff>0?'+':''}${diff}</td><td>${label}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    function openAbbreviationsPage()  { renderAbbreviationsTable(); document.getElementById('abbreviationsModal').classList.add('show'); }
+    function closeAbbreviationsPage() { document.getElementById('abbreviationsModal').classList.remove('show'); }
+    function openStatisticsPage()     { renderStatisticsTable();    document.getElementById('statisticsModal').classList.add('show'); }
+    function closeStatisticsPage()    { document.getElementById('statisticsModal').classList.remove('show'); }
+    function openSettingsModal()      { document.getElementById('settingsModal').classList.add('show'); try{ updateDashboard(); }catch(e){ console.warn('dashboard update:',e); } }
+    function closeSettingsModal()     { document.getElementById('settingsModal').classList.remove('show'); }
+
+    // ── Calendar ──────────────────────────────────────────────────────────────
+    function getDaysInMonth(month) { return new Date(new Date().getFullYear(), month, 0).getDate(); }
+    function isWeekend(year, month, day) { const d = new Date(year, month-1, day).getDay(); return d===5||d===6; }
+
+    // ── Table ─────────────────────────────────────────────────────────────────
+    function updateTable() {
+      const month = parseInt(document.getElementById('monthSelect').value, 10);
+      const year  = new Date().getFullYear();
+      const days  = getDaysInMonth(month);
+      const headerRow = document.querySelector('#rotaTable thead tr');
+      headerRow.innerHTML = '';
+      const nameTh = document.createElement('th'); nameTh.textContent = 'Staff Name (Badge No)'; headerRow.appendChild(nameTh);
+      for (let i=1; i<=days; i++) {
+        const th = document.createElement('th'); th.textContent = i;
+        if (isWeekend(year,month,i)) th.classList.add('weekend');
+        headerRow.appendChild(th);
+      }
+      const hTh  = document.createElement('th'); hTh.textContent  = 'Hours';       headerRow.appendChild(hTh);
+      const sTh  = document.createElement('th'); sTh.className='sched-th'; sTh.textContent  = 'Sched. Type'; headerRow.appendChild(sTh);
+      const otTh = document.createElement('th'); otTh.className='ot-th';   otTh.textContent = 'OT';          headerRow.appendChild(otTh);
+
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const name          = row.cells[0]?.querySelector('input')?.value || '';
+        const schedVal      = row.querySelector('.sched-cell select')?.value || '';
+        const otIsOverride  = row.querySelector('.ot-cell')?.dataset?.override === 'true';
+        const otOverrideVal = otIsOverride ? (row.querySelector('.ot-val')?.textContent || null) : null;
+        const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+        const codes = [];
+        for (let i=1; i<hIdx; i++) codes.push(row.cells[i].textContent.trim());
+        row.innerHTML = '';
+        row.appendChild(buildNameCell(row, name));
+        for (let i=1; i<=days; i++) {
+          const td = createDayCell();
+          if (isWeekend(year,month,i)) td.classList.add('weekend');
+          const code = (codes[i-1]||'').toUpperCase();
+          if (DUTIES[code]) applyDutyToCell(td, code);
+          row.appendChild(td);
+        }
+        const hc = document.createElement('td'); hc.className='hours-cell'; hc.textContent = '0'; row.appendChild(hc);
+        row.appendChild(buildSchedCell(schedVal));
+        row.appendChild(buildOTCell(otOverrideVal, otIsOverride));
+        updateHours(row);
+      });
+      applyColumnWidths();
+      updateDashboard();
+    }
+
+    function buildNameCell(rowRef, existingValue='') {
+      const nameCell = document.createElement('td');
+      const input    = document.createElement('input');
+      input.type  = 'text';
+      input.className = 'staff-input';
+      input.placeholder = 'Type to search staff...';
+
+      const datalist = document.createElement('datalist');
+      const dlId = 'staff-list-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      datalist.id = dlId;
+      input.setAttribute('list', dlId);
+
+      staffList = loadStaffList();
+      staffList.forEach(s => { const o = document.createElement('option'); o.value = s; datalist.appendChild(o); });
+
+      input.value = existingValue;
+      input.addEventListener('change', function() {
+        staffList = loadStaffList();
+        const v = this.value.trim();
+        if (v && staffList.length && !staffList.includes(v)) {
+          this.value = '';
+          showStatusMessage('Please select a valid staff member from Staff.html', 'error');
+          return;
+        }
+        if (v) {
+          const allInputs = document.querySelectorAll('#rotaTable tbody tr td:first-child input');
+          let dupCount = 0;
+          allInputs.forEach(inp => { if (inp !== this && inp.value.trim() === v) dupCount++; });
+          if (dupCount > 0) {
+            this.value = '';
+            showStatusMessage(`"${v}" is already in this rota — no duplicates allowed.`, 'error');
+            return;
+          }
+        }
+        updateDashboard();
+      });
+
+      const del = document.createElement('button');
+      del.textContent = 'X'; del.className = 'delete-btn'; del.type = 'button';
+      del.onclick = () => { if (confirm('Delete this record?')) { rowRef.remove(); updateDashboard(); } };
+
+      nameCell.appendChild(input); nameCell.appendChild(datalist); nameCell.appendChild(del);
+      return nameCell;
+    }
+
+    function addNewRow() {
+      const tbody = document.querySelector('#rotaTable tbody');
+      const tr    = document.createElement('tr');
+      tr.appendChild(buildNameCell(tr,''));
+      const month = parseInt(document.getElementById('monthSelect').value,10);
+      const year  = new Date().getFullYear();
+      const days  = getDaysInMonth(month);
+      for (let i=1; i<=days; i++) {
+        const td = createDayCell();
+        if (isWeekend(year,month,i)) td.classList.add('weekend');
+        tr.appendChild(td);
+      }
+      const hc = document.createElement('td'); hc.className='hours-cell'; hc.textContent='0'; tr.appendChild(hc);
+      tr.appendChild(buildSchedCell());
+      tr.appendChild(buildOTCell());
+      tbody.appendChild(tr);
+      applyColumnWidths(); updateDashboard(); filterRota();
+    }
+
+    function populateStaff() {
+      const area    = getCurrentArea();
+      const areaTag = area === 'ALL' ? 'All Areas' : area;
+      staffList = loadStaffList();
+      if (!staffList.length) {
+        showStatusMessage(`No staff found for "${areaTag}". Open Staff.html, assign the correct area to each staff member, then try again.`, 'error'); return;
+      }
+      // Clear existing table content first, then load all staff fresh
+      const tbody = document.querySelector('#rotaTable tbody');
+      tbody.innerHTML = '';
+      staffList.forEach(name => {
+        addNewRow();
+        tbody.lastElementChild.cells[0].querySelector('input').value = name;
+      });
+      updateDashboard();
+      showStatusMessage(`Loaded ${staffList.length} staff from "${areaTag}" ✅`, 'success');
+    }
+
+    // ── Cell editing ──────────────────────────────────────────────────────────
+    const _cellTimers = new WeakMap();
+    function scheduleCellProcess(cell) {
+      const old = _cellTimers.get(cell); if (old) clearTimeout(old);
+      _cellTimers.set(cell, setTimeout(() => processCellCommand(cell), 220));
+    }
+
+    function applyDutyToCell(cell, code) {
+      if (!cell) return;
+      const isOT = code.endsWith('_O');
+      const baseCode = isOT ? code.slice(0, -2) : code;
+      if (!DUTIES[baseCode]) return;
+      const wknd = cell.classList.contains('weekend');
+      cell.textContent = code;
+      Object.keys(DUTIES).forEach(c => cell.classList.remove('D_'+c));
+      cell.classList.add('D_'+baseCode);
+      if (wknd) cell.classList.add('weekend');
+      // Font scaling for long codes
+      const len = code.length;
+      if (len > 3) cell.setAttribute('data-dlen', String(Math.min(len, 8)));
+      else cell.removeAttribute('data-dlen');
+    }
+
+    function parsePatternSequence(raw) {
+      const cleaned = (raw||'').toUpperCase().replace(/\s+/g,'');
+      if (!cleaned) return [];
+      const parts=[]; let i=0;
+      while (i<cleaned.length) {
+        let num=''; while (i<cleaned.length&&/\d/.test(cleaned[i])) num+=cleaned[i++];
+        let code=''; while (i<cleaned.length&&/[A-Z]/.test(cleaned[i])) code+=cleaned[i++];
+        // Support _O suffix: consume _O if followed by digit or end of string
+        if (i<cleaned.length && cleaned[i]==='_' && i+1<cleaned.length && cleaned[i+1]==='O') {
+          const after=i+2;
+          if (after>=cleaned.length||/\d/.test(cleaned[after])) { code+='_O'; i+=2; }
+        }
+        if (!num||!code) return null;
+        const baseCode=code.endsWith('_O')?code.slice(0,-2):code;
+        if (!DUTIES[baseCode]) return null;
+        const count=parseInt(num,10);
+        if (!Number.isFinite(count)||count<1) return null;
+        parts.push({count,code});
+      }
+      return parts;
+    }
+
+    function applyPatternMode(startCell, patternText) {
+      if (!startCell) return false;
+      const row=startCell.parentElement; if (!row) return false;
+      const parsed=parsePatternSequence(patternText); if (parsed===null) return false;
+      const seq=[]; parsed.forEach(p=>{ for(let i=0;i<p.count;i++) seq.push(p.code); });
+      if (!seq.length) return false;
+      let cell=startCell, idx=0;
+      const hCell=row.querySelector('.hours-cell');
+      // Stop at hours cell AND guard against sched/OT cells in case hCell is null
+      while (cell && cell!==hCell &&
+             !cell.classList.contains('hours-cell') &&
+             !cell.classList.contains('sched-cell') &&
+             !cell.classList.contains('ot-cell')) {
+        applyDutyToCell(cell,seq[idx%seq.length]); idx++; cell=cell.nextElementSibling;
+      }
+      updateHours(row); return true;
+    }
+
+    function processCellCommand(cell) {
+      const row=cell.parentElement;
+      const raw=cell.textContent.trim().toUpperCase().replace(/\s+/g,'');
+      if (!raw) { updateHours(row); return; }
+      // Support CODE_O suffix: strip _O, validate base, reattach for display
+      const isOT=raw.endsWith('_O');
+      const baseRaw=isOT?raw.slice(0,-2):raw;
+      const m=baseRaw.match(/^([A-Z]{1,8})(\d+)?$|^(\d+)([A-Z]{1,8})$/);
+      if (m) {
+        const code=(m[1]||m[4]||'').toUpperCase();
+        const numStr=m[2]||m[3];
+        if (!DUTIES[code]) { updateHours(row); return; }
+        const displayCode=isOT?code+'_O':code;
+        let count=parseInt(numStr||'1',10);
+        if (!Number.isFinite(count)||count<1) count=1; if (count>31) count=31;
+        const hCellRef=row.querySelector('.hours-cell');
+        let cur=cell;
+        // Stop strictly at the hours cell — never touch hours, schedule or OT columns
+        for (let i=0;i<count&&cur&&cur!==hCellRef;i++) { applyDutyToCell(cur,displayCode); cur=cur.nextElementSibling; }
+        updateHours(row); return;
+      }
+      updateHours(row);
+    }
+
+    function buildSchedCell(value='') {
+      const td  = document.createElement('td');
+      td.className = 'sched-cell';
+      const sel = document.createElement('select');
+      sel.tabIndex = -1;   // skip via Tab — click to change schedule type
+      sel.innerHTML = '<option value="">—</option>'
+        + '<option value="Regular">Regular</option>'
+        + '<option value="12 Hours">12 Hours</option>'
+        + '<option value="Mixed">Mixed</option>';
+      sel.value = value;
+      sel.addEventListener('change', () => calcOT(td.parentElement));
+      td.appendChild(sel);
+      return td;
+    }
+
+    let _legendTimer = null;
+    function updateHours(row) {
+      const hCell = row.querySelector('.hours-cell');
+      if (!hCell) return;
+      const hIdx = Array.from(row.cells).indexOf(hCell);
+      let hours=0;
+      for (let i=1;i<hIdx;i++) { let v=row.cells[i].textContent.trim().toUpperCase(); if(v.endsWith('_O'))v=v.slice(0,-2); if(DUTIES[v]) hours+=Number(DUTIES[v].hours)||0; }
+      hCell.textContent=hours;
+      row.classList.remove('row-over','row-under','row-target');
+      const s=getRowHoursStatus(hours);
+      row.classList.add(s==='over'?'row-over':s==='under'?'row-under':'row-target');
+      hCell.classList.remove('hours-ok','hours-warn','hours-over');
+      hCell.classList.add(s==='over'?'hours-over':s==='under'?'hours-warn':'hours-ok');
+      calcOT(row);
+      autoDetectSchedType(row);  // may update sched type + re-run calcOT internally
+      updateDashboard();
+      // Refresh banner hours, OT and duty chip if this is the active row
+      if (_activeEditRow === row) {
+        _refreshBannerStats(row);
+        if (_activeDutyCell) _refreshBannerDuty(_activeDutyCell);
+      }
+      // Debounced legend refresh so it stays in sync with actual rota content
+      if (_legendTimer) clearTimeout(_legendTimer);
+      _legendTimer = setTimeout(buildLegend, 400);
+    }
+
+    // ── Auto-detect schedule type ─────────────────────────────────────────────
+    // Scans filled day cells (skips empty + zero-hour duties).
+    // All 12h → "12 Hours" | All <12h → "Regular" | Mix or nothing → leave as-is
+    function autoDetectSchedType(row) {
+      const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+      if (hIdx <= 0) return;
+      let has12 = false, hasUnder12 = false;
+      for (let i = 1; i < hIdx; i++) {
+        const v = row.cells[i].textContent.trim().toUpperCase();
+        if (!v) continue;
+        const baseV = v.endsWith('_O') ? v.slice(0,-2) : v;
+        if (!DUTIES[baseV]) continue;
+        const h = Number(DUTIES[baseV].hours) || 0;
+        if (h === 0) continue;           // zero-hour (leave) — ignore
+        if (h === 12) has12 = true;
+        else if (h < 12) hasUnder12 = true;
+        if (has12 && hasUnder12) break;  // mix found early — stop
+      }
+      if (!has12 && !hasUnder12) return; // nothing to judge by
+      if (has12 && hasUnder12) return;   // mixed — don't touch
+      const sel = row.querySelector('.sched-cell select');
+      if (!sel) return;
+      const newType = has12 ? '12 Hours' : 'Regular';
+      if (sel.value === newType) return; // already correct — no-op
+      sel.value = newType;
+      calcOT(row);                       // recalculate OT with the new type
+    }
+
+    function clearSingleCell(cell) {
+      const wknd=cell.classList.contains('weekend'); cell.textContent='';
+      Object.keys(DUTIES).forEach(c=>cell.classList.remove('D_'+c));
+      if (wknd) cell.classList.add('weekend');
+      cell.removeAttribute('data-dlen');
+    }
+    function clearCellsFromHere(cell, count) {
+      const row=cell.parentElement; let cur=cell; const n=Math.max(1,Math.min(31,count));
+      const hCell=row.querySelector('.hours-cell');
+      for (let i=0;i<n&&cur;i++) { if(cur===hCell) break; clearSingleCell(cur); cur=cur.nextElementSibling; }
+      updateHours(row);
+    }
+
+    let pendingDelete=null;
+    function setPendingDelete(cell,defaultCount=5) {
+      pendingDelete={cell,expiresAt:Date.now()+1200,count:defaultCount};
+      showStatusMessage(`Delete mode: press 1–9 (0=10), Esc to cancel. Default: ${defaultCount} cells`,'info');
+      setTimeout(()=>{ if(pendingDelete&&Date.now()>=pendingDelete.expiresAt){ clearCellsFromHere(pendingDelete.cell,pendingDelete.count); pendingDelete=null; } },1250);
+    }
+
+    function setPatternIndicator(on,msg='') {
+      document.getElementById('patternIndicator').textContent=on?('Pattern mode: READY'+(msg?' • '+msg:'')):'Pattern mode: OFF';
+    }
+    function activatePatternMode() { patternModeArmed=true; setPatternIndicator(true,'click a day cell'); showStatusMessage('Pattern mode armed. Click a day cell.','info'); }
+
+    function startSimplePatternFill(cell) {
+      if (!cell) return;
+      const userInput=window.prompt('Enter pattern (use duty codes for this filter). E.g.: 4NC2L',cell.textContent.trim()||'');
+      if (userInput===null) { patternModeArmed=false; setPatternIndicator(false); showStatusMessage('Pattern cancelled','info'); return; }
+      const cleaned=(userInput||'').toUpperCase().replace(/\s+/g,'');
+      const parsed=parsePatternSequence(cleaned);
+      if (!parsed||!parsed.length) { patternModeArmed=false; setPatternIndicator(false); showStatusMessage('Invalid pattern or unknown duty code','error'); return; }
+      const ok=applyPatternMode(cell,cleaned);
+      patternModeArmed=false; setPatternIndicator(false);
+      showStatusMessage(ok?'Pattern applied ✅':'Pattern failed',ok?'success':'error');
+    }
+
+    document.addEventListener('keydown',(e)=>{
+      if (e.key==='Escape'&&patternModeArmed) { patternModeArmed=false; setPatternIndicator(false); showStatusMessage('Pattern mode cancelled','info'); return; }
+      if (!pendingDelete) return;
+      if (Date.now()>pendingDelete.expiresAt) { pendingDelete=null; return; }
+      const k=e.key;
+      if (k>='1'&&k<='9') { e.preventDefault(); clearCellsFromHere(pendingDelete.cell,parseInt(k,10)); pendingDelete=null; return; }
+      if (k==='0') { e.preventDefault(); clearCellsFromHere(pendingDelete.cell,10); pendingDelete=null; return; }
+      if (k==='Escape') { e.preventDefault(); pendingDelete=null; showStatusMessage('Delete mode cancelled','info'); }
+    });
+
+    function createDayCell() {
+      const td=document.createElement('td'); td.contentEditable=true;
+      td.addEventListener('focus',function(){ patternStartCell=this; });
+      td.addEventListener('click',function(){ patternStartCell=this; if(patternModeArmed) startSimplePatternFill(this); });
+      td.addEventListener('input',function(e){ scheduleCellProcess(e.target); });
+      td.addEventListener('keydown',function(e){
+        // Tab on last day cell → jump to next row's first day cell (skip hours/sched/OT)
+        if (e.key==='Tab' && !e.shiftKey) {
+          const hCell=this.parentElement?.querySelector('.hours-cell');
+          if (hCell && this.nextElementSibling===hCell) {
+            e.preventDefault();
+            const nextRow=this.parentElement?.nextElementSibling;
+            const target=nextRow
+              ? nextRow.cells[1]   // first day cell of next row
+              : document.querySelector('#rotaTable tbody tr:first-child')?.cells[1];
+            target?.focus();
+            return;
+          }
+        }
+        if (e.shiftKey&&!e.altKey&&e.key==='D') { e.preventDefault(); clearCellsFromHere(this,1); return; }
+        if (e.shiftKey&&e.altKey&&e.key==='D')  { e.preventDefault(); setPendingDelete(this,5); return; }
+        if (e.ctrlKey&&e.altKey&&(e.key==='d'||e.key==='D')) {
+          e.preventDefault();
+          const row=this.parentElement; let cnt=0,cur=this;
+          while(cur&&cur!==row.lastElementChild){cnt++;cur=cur.nextElementSibling;}
+          clearCellsFromHere(this,cnt);
+        }
+      });
+      return td;
+    }
+
+    // ── Firestore paths (area-scoped for rotas) ───────────────────────────────
+    function monthDocId() {
+      const month=Number(document.getElementById('monthSelect').value);
+      return `${new Date().getFullYear()}-${String(month).padStart(2,'0')}`;
+    }
+    function getMonthDocRef(key,docId)    { return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',getCurrentArea(),'months',docId); }
+    function getNamedDocRef(key,saveName) { return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',getCurrentArea(),'named',saveName); }
+    function getNamedIndexRef(key)        { return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',getCurrentArea(),'named_index','list'); }
+
+    function getLocalRotaIndex() {
+      try { const raw=localStorage.getItem(rotaIndexLocalKey()); const arr=raw?JSON.parse(raw):[]; return Array.isArray(arr)?arr:[]; } catch { return []; }
+    }
+    function saveLocalRotaIndex(items) { localStorage.setItem(rotaIndexLocalKey(),JSON.stringify(Array.isArray(items)?items:[])); }
+    function addToLocalRotaIndex(name) { const items=getLocalRotaIndex(); if(!items.includes(name)){items.push(name);saveLocalRotaIndex(items);} }
+
+    function renderRotaList(items) {
+      const sel=document.getElementById('rotaList'); const cur=sel.value;
+      sel.innerHTML='<option value="">-- Select Rota --</option>';
+      items.filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b))).forEach(name=>{
+        const o=document.createElement('option'); o.value=name; o.textContent=name; sel.appendChild(o);
+      });
+      if (cur&&items.includes(cur)) sel.value=cur;
+    }
+
+    // ── Excel export ──────────────────────────────────────────────────────────
+    function exportToExcel() {
+      try {
+        const table=document.getElementById('rotaTable');
+        const month=Number(document.getElementById('monthSelect').value);
+        const year=new Date().getFullYear();
+        const area=getCurrentArea();
+        const defaultName=`Rota_${area}_${year}_${String(month).padStart(2,'0')}`;
+        const rotaName=(document.getElementById('saveName').value||defaultName).trim();
+        const safeFile=rotaName.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_')||defaultName;
+        const monthNames=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+        const titleText=document.getElementById('rotaTitleInput').value||'Business Center Rota';
+
+        // ── Build styled HTML table for Excel ──────────────────────────────────
+        const hdrCells=table.tHead.rows[0].cells;
+        let thHtml='';
+        for(let i=0;i<hdrCells.length;i++){
+          const w=i===0?'180pt':i===hdrCells.length-1||i===hdrCells.length-2?'36pt':'18pt';
+          thHtml+=`<th style="background:#1f4e79;color:#fff;font-weight:bold;border:1pt solid #aaa;padding:3pt 4pt;white-space:nowrap;min-width:${w};">${hdrCells[i].textContent.trim()}</th>`;
+        }
+
+        let tbodyHtml='';
+        const bRows=table.tBodies[0].rows;
+        for(let r=0;r<bRows.length;r++){
+          const inp=bRows[r].cells[0].querySelector('input');
+          const name=(inp?.value||'').trim(); if(!name) continue;
+          let rowHtml=`<td style="border:1pt solid #ccc;padding:3pt 4pt;font-weight:bold;">${name}</td>`;
+          const hIdx=Array.from(bRows[r].cells).indexOf(bRows[r].querySelector('.hours-cell'));
+          for(let c=1;c<bRows[r].cells.length;c++){
+            const cell=bRows[r].cells[c];
+            if(cell.classList.contains('sched-cell')||cell.classList.contains('ot-cell')){
+              // skip schedule/OT cells from export
+              continue;
+            }
+            if(cell.classList.contains('hours-cell')){
+              rowHtml+=`<td style="border:1pt solid #ccc;padding:3pt 4pt;text-align:center;font-weight:bold;">${cell.textContent.trim()}</td>`;
+              continue;
+            }
+            const raw=cell.textContent.trim().toUpperCase();
+            const base=raw.endsWith('_O')?raw.slice(0,-2):raw;
+            const duty=DUTIES[base];
+            if(duty){
+              const bg=duty.color||'#1a4f8b';
+              const label=raw; // show full code including _O suffix
+              const desc=duty.label?` (${duty.label})`:'';
+              rowHtml+=`<td style="background:${bg};color:#fff;font-weight:bold;border:1pt solid #aaa;padding:2pt 3pt;text-align:center;font-size:8pt;" title="${desc}">${label}</td>`;
+            } else {
+              const isWE=cell.classList.contains('weekend');
+              rowHtml+=`<td style="background:${isWE?'#f0f0f0':'#fff'};border:1pt solid #ddd;padding:2pt 3pt;text-align:center;font-size:8pt;"></td>`;
+            }
+          }
+          tbodyHtml+=`<tr>${rowHtml}</tr>`;
+        }
+
+        // ── Legend rows ────────────────────────────────────────────────────────
+        let legendHtml='';
+        Object.entries(DUTIES).forEach(([code,meta])=>{
+          const bg=meta.color||'#1a4f8b';
+          legendHtml+=`<tr>
+            <td style="background:${bg};color:#fff;font-weight:bold;border:1pt solid #aaa;padding:2pt 6pt;text-align:center;">${code}</td>
+            <td style="border:1pt solid #ddd;padding:2pt 6pt;">${meta.label||''}</td>
+            <td style="border:1pt solid #ddd;padding:2pt 6pt;text-align:center;">${meta.hours||''} hrs</td>
+            <td style="border:1pt solid #ddd;padding:2pt 6pt;">${meta.area||'All'}</td>
+          </tr>`;
+        });
+
+        const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns="http://www.w3.org/TR/REC-html40">
+          <head><meta charset="utf-8">
+          <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+            <x:ExcelWorksheet><x:Name>Rota</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>
+            <x:ExcelWorksheet><x:Name>Legend</x:Name><x:WorksheetOptions/></x:ExcelWorksheet>
+          </x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+          <style>
+            body{font-family:Arial;font-size:10pt;}
+            table{border-collapse:collapse;}
+          </style></head>
+          <body>
+          <h2 style="font-size:13pt;color:#1f4e79;">${titleText}</h2>
+          <p style="font-size:10pt;color:#555;">${monthNames[month]} ${year} &nbsp;|&nbsp; Area: ${area} &nbsp;|&nbsp; Target: ${getMonthlyTarget()} hrs</p>
+          <table><thead><tr>${thHtml}</tr></thead><tbody>${tbodyHtml}</tbody></table>
+
+          <br><br>
+          <h3 style="font-size:11pt;color:#1f4e79;">Duty Abbreviations</h3>
+          <table>
+            <thead><tr>
+              <th style="background:#1f4e79;color:#fff;padding:3pt 6pt;">Code</th>
+              <th style="background:#1f4e79;color:#fff;padding:3pt 6pt;">Label</th>
+              <th style="background:#1f4e79;color:#fff;padding:3pt 6pt;">Hours</th>
+              <th style="background:#1f4e79;color:#fff;padding:3pt 6pt;">Area</th>
+            </tr></thead>
+            <tbody>${legendHtml}</tbody>
+          </table>
+          </body></html>`;
+
+        const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download=safeFile+'.xls'; a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+        showStatusMessage('Excel exported with colors ✅');
+      } catch(err){ console.error(err); showStatusMessage('Excel export failed: '+(err?.message||err),'error'); }
+    }
+
+    // ── Firestore rota list ───────────────────────────────────────────────────
+    async function loadRotaList() {
+      const key=getKeyOrWarn(); if (!key) return;
+      const area=getAreaOrWarn(); if (!area) return;
+      try {
+        const local=getLocalRotaIndex();
+        const snap=await window.FB.getDoc(getNamedIndexRef(key));
+        const cloud=snap.exists()&&Array.isArray(snap.data().items)?snap.data().items:[];
+        const merged=Array.from(new Set([...cloud,...local]));
+        renderRotaList(merged);
+        if (merged.length&&JSON.stringify(merged)!==JSON.stringify(local)) saveLocalRotaIndex(merged);
+        if (!merged.length) showStatusMessage('No saved rotas for this filter yet.','info');
+      } catch(err){
+        console.error(err);
+        const local=getLocalRotaIndex(); renderRotaList(local);
+        showStatusMessage(local.length?'Loaded local rota list only.':'Could not load rota list.','info');
+      }
+    }
+
+    function selectRotaFromList() {
+      const v=document.getElementById('rotaList').value; if(v) document.getElementById('saveName').value=v;
+    }
+
+    async function addNameToRotaIndex(key,safeName) {
+      addToLocalRotaIndex(safeName);
+      const ref=getNamedIndexRef(key); const snap=await window.FB.getDoc(ref);
+      let items=snap.exists()&&Array.isArray(snap.data().items)?snap.data().items:[];
+      if (!items.includes(safeName)) { items.push(safeName); await window.FB.setDoc(ref,{items},{merge:true}); }
+    }
+
+    // ── Payload helpers ───────────────────────────────────────────────────────
+    function tableToPayload() {
+      const table=document.getElementById('rotaTable');
+      const rows=Array.from(table.tBodies[0].rows);
+      const month=Number(document.getElementById('monthSelect').value);
+      const year=new Date().getFullYear();
+      const area=getCurrentArea();
+      const payload={ area, month, year, savedAt:new Date().toISOString(),
+        rotaTitle:(document.getElementById('rotaTitleInput').value||'').trim(),
+        monthlyTarget:getMonthlyTarget(),
+        mixedStdHours: Number(document.getElementById('mixedStdHours').value)||0,
+        holidays: holidays.map(h=>({...h})),
+        records:[] };
+      staffList=loadStaffList();
+      for (const row of rows) {
+        const inp=row.cells[0].querySelector('input');
+        const name=(inp?.value||'').trim(); if (!name) continue;
+        if (staffList.length&&!staffList.includes(name)) throw new Error(`Invalid staff: "${name}"`);
+        const hIdx=Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+        const days={};
+        for (let i=1;i<hIdx;i++) { const v=row.cells[i].textContent.trim().toUpperCase(); const bv=v.endsWith('_O')?v.slice(0,-2):v; if(DUTIES[bv]) days[`day${i}`]=v; }
+        const schedType=row.querySelector('.sched-cell select')?.value||'';
+        const otCell=row.querySelector('.ot-cell');
+        const otOverride=otCell?.dataset?.override==='true' ? (otCell.querySelector('.ot-val')?.textContent||null) : null;
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride});
+      }
+      return payload;
+    }
+
+    function applyPayloadToTable(payload) {
+      const records=Array.isArray(payload?.records)?payload.records:[];
+      if (payload?.month) document.getElementById('monthSelect').value=String(payload.month);
+      document.getElementById('rotaTitleInput').value=(payload?.rotaTitle||'').trim();
+      if (payload?.monthlyTarget!=null) document.getElementById('monthlyTarget').value=String(payload.monthlyTarget);
+      if (payload?.mixedStdHours!=null) {
+        mixedStdHours=Number(payload.mixedStdHours)||0;
+        document.getElementById('mixedStdHours').value=String(mixedStdHours);
+      }
+      if (Array.isArray(payload?.holidays)) { holidays=payload.holidays.map(h=>({...h})); renderHolidayList(); }
+      document.querySelector('#rotaTable tbody').innerHTML='';
+      updateTable();
+      for (const rec of records) {
+        addNewRow();
+        const row=document.querySelector('#rotaTable tbody').lastElementChild;
+        row.cells[0].querySelector('input').value=rec.staffName||'';
+        const days=rec.daysData||{};
+        const hIdx=Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+        for (let i=1;i<hIdx;i++) { const v=(days[`day${i}`]||'').toUpperCase(); const bv=v.endsWith('_O')?v.slice(0,-2):v; if(DUTIES[bv]) applyDutyToCell(row.cells[i],v); }
+        const sel=row.querySelector('.sched-cell select'); if(sel&&rec.schedType) sel.value=rec.schedType;
+        updateHours(row);
+        if (rec.otOverride!=null) {
+          const otCell=row.querySelector('.ot-cell');
+          otCell.dataset.override='true';
+          const v=otCell.querySelector('.ot-val');
+          v.textContent=rec.otOverride; v.className='ot-val ot-override';
+          otCell.querySelector('.ot-lock-btn').textContent='🔓';
+          otCell.querySelector('.ot-lock-btn').title='Reset to calculated';
+        }
+      }
+      if (!records.length) addNewRow();
+      persistMonthlyTarget(); updateDashboard();
+    }
+
+    // ── Cloud Save / Load (primary workflow) ─────────────────────────────────
+    function getReleasesIndexRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'release_index',docId); }
+    function getReleaseDocRef(key,area,releaseId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'releases',releaseId); }
+
+    // Open save-note modal
+    function saveToCloud() {
+      const key=getKeyOrWarn(); if (!key) return;
+      const area=getCurrentArea();
+      if (!area||area==='ALL'){ showStatusMessage('Select a specific area first.','error'); return; }
+      const payload=tableToPayload();
+      if (!payload.records.length){ showStatusMessage('Nothing to save (no valid rows).','error'); return; }
+      document.getElementById('saveModalLabel').textContent=getRotaDisplayName();
+      document.getElementById('saveReleaseNote').value='';
+      document.getElementById('saveReleaseModal').classList.add('show');
+      setTimeout(()=>document.getElementById('saveReleaseNote').focus(),120);
+    }
+    function closeSaveModal(){ document.getElementById('saveReleaseModal').classList.remove('show'); }
+
+    // Perform the actual cloud save after note is entered
+    async function confirmSaveToCloud() {
+      const key=getKeyOrWarn(); if (!key) return;
+      const area=getCurrentArea();
+      const note=document.getElementById('saveReleaseNote').value.trim();
+      closeSaveModal();
+      const payload=tableToPayload();
+      const docId=monthDocId();
+      const releaseId=`${docId}-R${releaseNum}`;
+      showStatusMessage('Saving to cloud…','info');
+      try {
+        // 1. Monthly working copy (backward compat)
+        await window.FB.setDoc(getMonthDocRef(key,docId),payload,{merge:true});
+        // 2. Release snapshot
+        await window.FB.setDoc(getReleaseDocRef(key,area,releaseId),{...payload,releaseNum,note,savedAt:new Date().toISOString()},{merge:true});
+        // 3. Update release index
+        const idxRef=getReleasesIndexRef(key,area,docId);
+        const idxSnap=await window.FB.getDoc(idxRef);
+        let rels=idxSnap.exists()?(idxSnap.data().releases||[]):[];
+        const entry={id:releaseId,releaseNum,savedAt:new Date().toISOString(),note,staffCount:payload.records.length};
+        const ei=rels.findIndex(r=>r.id===releaseId);
+        if(ei>=0) rels[ei]=entry; else rels.push(entry);
+        rels.sort((a,b)=>a.releaseNum-b.releaseNum);
+        await window.FB.setDoc(idxRef,{releases:rels},{merge:true});
+        showStatusMessage(`${getRotaDisplayName()} saved ✅`);
+      } catch(err){ console.error(err); showStatusMessage('Save failed: '+(err?.message||err),'error'); }
+    }
+
+    // Open load-picker modal
+    async function openLoadPicker() {
+      const key=getKeyOrWarn(); if (!key) return;
+      const area=getAreaOrWarn(); if (!area) return;
+      document.getElementById('loadPickerModal').classList.add('show');
+      document.getElementById('loadPickerContent').innerHTML='<div style="padding:20px;text-align:center;color:#888;">Loading…</div>';
+      document.getElementById('loadPickerBtn').disabled=true;
+      try {
+        const docId=monthDocId();
+        const month=Number(document.getElementById('monthSelect').value);
+        const year=new Date().getFullYear();
+        const mName=new Date(year,month-1,1).toLocaleString('default',{month:'long'});
+        const idxSnap=await window.FB.getDoc(getReleasesIndexRef(key,area,docId));
+        let rels=idxSnap.exists()?[...(idxSnap.data().releases||[])].reverse():[];
+        const mSnap=await window.FB.getDoc(getMonthDocRef(key,docId));
+        const hasMonthly=mSnap.exists();
+        let html=`<p style="font-size:12px;color:#374151;margin:0 0 10px;"><b>${area}</b> · ${mName} ${year}</p>`;
+        if (!rels.length&&!hasMonthly){
+          html+='<p style="color:#888;text-align:center;padding:16px 0;">No saved rotas found for this area &amp; month.</p>';
+        } else {
+          html+='<div style="display:flex;flex-direction:column;gap:6px;">';
+          rels.forEach((r,i)=>{
+            const dt=new Date(r.savedAt);
+            const ds=dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+            const latest=i===0;
+            html+=`<label style="display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 12px;border-radius:8px;
+              border:1px solid ${latest?'#86efac':'#e5e7eb'};background:${latest?'#f0fdf4':'#fafafa'};">
+              <input type="radio" name="releaseChoice" value="${r.id}" ${latest?'checked':''}/>
+              <span style="flex:1;font-size:12px;">
+                <b style="color:#1f4e79;">R${r.releaseNum}</b>
+                <span style="color:#6b7280;"> · ${ds} · ${r.staffCount} staff</span>
+                ${r.note?`<span style="color:#374151;"> · "<i>${r.note}</i>"</span>`:''}
+                ${latest?'<span style="font-size:10px;font-weight:700;color:#16a34a;margin-left:6px;">● LATEST</span>':''}
+              </span></label>`;
+          });
+          if(hasMonthly&&!rels.length){
+            html+=`<label style="display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 12px;border-radius:8px;
+              border:1px solid #86efac;background:#f0fdf4;">
+              <input type="radio" name="releaseChoice" value="_monthly" checked/>
+              <span style="font-size:12px;"><b style="color:#1f4e79;">Monthly save</b>
+              <span style="color:#6b7280;font-size:11px;"> (legacy — no release number)</span></span></label>`;
+          }
+          html+='</div>';
+        }
+        document.getElementById('loadPickerContent').innerHTML=html;
+        document.getElementById('loadPickerBtn').disabled=(!rels.length&&!hasMonthly);
+        document.querySelectorAll('#loadPickerContent input[type="radio"]').forEach(r=>
+          r.addEventListener('change',()=>document.getElementById('loadPickerBtn').disabled=false));
+      } catch(err){ console.error(err); document.getElementById('loadPickerContent').innerHTML=`<p style="color:#dc2626;padding:12px;">Error: ${err?.message||err}</p>`; }
+    }
+    function closeLoadPicker(){ document.getElementById('loadPickerModal').classList.remove('show'); }
+
+    async function loadSelectedRelease() {
+      const key=getKeyOrWarn(); if (!key) return;
+      const area=getCurrentArea();
+      const chosen=document.querySelector('#loadPickerContent input[name="releaseChoice"]:checked')?.value;
+      if (!chosen){ showStatusMessage('Select a release first.','error'); return; }
+      closeLoadPicker();
+      showStatusMessage('Loading…','info');
+      try {
+        const snap=chosen==='_monthly'
+          ? await window.FB.getDoc(getMonthDocRef(key,monthDocId()))
+          : await window.FB.getDoc(getReleaseDocRef(key,area,chosen));
+        if (!snap.exists()){ showStatusMessage('Release not found in cloud.','error'); return; }
+        const data=snap.data();
+        if (data.releaseNum&&area!=='ALL'){ releaseNum=Number(data.releaseNum); saveReleaseNum(area,releaseNum); }
+        applyPayloadToTable(data);
+        updateRotaLabel();
+        showStatusMessage(`Loaded ${chosen==='_monthly'?'monthly save':chosen} ✅`);
+      } catch(err){ console.error(err); showStatusMessage('Load failed: '+(err?.message||err),'error'); }
+    }
+
+    // ── Legacy Save / Load (kept for Settings → Local Storage section) ────────
+    async function saveToDatabase() {
+      try {
+        const key=getKeyOrWarn(); if (!key) return;
+        const area=getAreaOrWarn(); if (!area) return;
+        const payload=tableToPayload();
+        if (!payload.records.length) { showStatusMessage('Nothing to save (no valid rows).','error'); return; }
+        await window.FB.setDoc(getMonthDocRef(key,monthDocId()),payload,{merge:true});
+        showStatusMessage(`Saved month ✅ (filter: ${area})`);
+      } catch(err){ console.error(err); showStatusMessage('Save failed: '+(err?.message||err),'error'); }
+    }
+
+    async function loadFromDatabase() {
+      try {
+        const key=getKeyOrWarn(); if (!key) return;
+        const area=getAreaOrWarn(); if (!area) return;
+        const snap=await window.FB.getDoc(getMonthDocRef(key,monthDocId()));
+        if (!snap.exists()) { document.querySelector('#rotaTable tbody').innerHTML=''; updateTable(); addNewRow(); showStatusMessage('No saved month data for this filter.','info'); return; }
+        applyPayloadToTable(snap.data());
+        showStatusMessage(`Loaded month ✅ (filter: ${area})`);
+      } catch(err){ console.error(err); showStatusMessage('Load failed: '+(err?.message||err),'error'); }
+    }
+
+    async function saveAsToDatabase() {
+      try {
+        const key=getKeyOrWarn(); if (!key) return;
+        const area=getAreaOrWarn(); if (!area) return;
+        const name=(document.getElementById('saveName').value||'').trim();
+        if (!name) { showStatusMessage('Enter Rota Name first.','error'); return; }
+        const safe=name.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_');
+        if (!safe) { showStatusMessage('Rota Name invalid.','error'); return; }
+        const payload=tableToPayload();
+        if (!payload.records.length) { showStatusMessage('Nothing to save.','error'); return; }
+        payload.saveName=name; payload.safeName=safe; payload.monthDocId=monthDocId();
+        await window.FB.setDoc(getNamedDocRef(key,safe),payload,{merge:true});
+        await addNameToRotaIndex(key,safe);
+        await loadRotaList();
+        document.getElementById('rotaList').value=safe;
+        document.getElementById('saveName').value=safe;
+        showStatusMessage(`Saved rota "${safe}" ✅ (filter: ${area})`);
+      } catch(err){ console.error(err); showStatusMessage('Save Rota failed: '+(err?.message||err),'error'); }
+    }
+
+    async function loadNamedFromDatabase() {
+      try {
+        const key=getKeyOrWarn(); if (!key) return;
+        const area=getAreaOrWarn(); if (!area) return;
+        const raw=(document.getElementById('saveName').value||document.getElementById('rotaList').value||'').trim();
+        if (!raw) { showStatusMessage('Select or enter a Rota Name.','error'); return; }
+        const safe=raw.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_');
+        if (!safe) { showStatusMessage('Rota Name invalid.','error'); return; }
+        const snap=await window.FB.getDoc(getNamedDocRef(key,safe));
+        if (!snap.exists()) { showStatusMessage(`No saved rota: ${safe} (filter: ${area})`,'error'); return; }
+        applyPayloadToTable(snap.data());
+        document.getElementById('saveName').value=safe;
+        document.getElementById('rotaList').value=safe;
+        showStatusMessage(`Opened rota "${safe}" ✅`);
+      } catch(err){ console.error(err); showStatusMessage('Open rota failed: '+(err?.message||err),'error'); }
+    }
+
+    // ── Column widths ─────────────────────────────────────────────────────────
+    function applyColumnWidths() {
+      const nw=Number(document.getElementById('nameWidth').value||220);
+      const dw=Math.max(10,Number(document.getElementById('dayWidth').value||34));
+      document.querySelectorAll('#rotaTable tr td:first-child,#rotaTable th:first-child').forEach(c=>c.style.minWidth=nw+'px');
+      document.querySelectorAll('#rotaTable td:not(:first-child):not(:last-child),#rotaTable th:not(:first-child):not(:last-child)').forEach(c=>c.style.minWidth=dw+'px');
+      // Keep coverage table columns in sync with main table widths
+      if (_covExpanded) _buildCoverageTable();
+    }
+
+    // ── Coverage Panel ───────────────────────────────────────────────────────
+    let _covExpanded = false;
+    let _covTimer    = null;
+
+    function toggleCoverageDetail() {
+      _covExpanded = !_covExpanded;
+      document.getElementById('coverageDetail').style.display = _covExpanded ? 'block' : 'none';
+      document.getElementById('coverageToggleBtn').textContent = _covExpanded ? '▼ Hide' : '▶ Details';
+      if (_covExpanded) {
+        _buildCoverageTable();
+        // Sync to current main-table scroll position
+        document.getElementById('coverageScrollWrap').scrollLeft =
+          document.querySelector('.table-container').scrollLeft;
+      }
+    }
+
+    function _scheduleCoverage() {
+      if (_covTimer) clearTimeout(_covTimer);
+      _covTimer = setTimeout(() => { _covTimer = null; _rebuildCoverage(); }, 280);
+    }
+
+    function _getCovStatus(actual, req) {
+      if (req <= 0)         return 'none';
+      if (actual === req)   return 'exact';
+      if (actual > req)     return 'over';
+      if (actual === req-1) return 'short1';
+      return 'critical';
+    }
+
+    // Duties that have a staffing target (assignedSt > 0) for the current area
+    function _getCovDuties() {
+      const area = getCurrentArea();
+      return Object.entries(DUTIES)
+        .filter(([, d]) => {
+          if (Number(d.assignedSt || 0) <= 0) return false;
+          if (area !== 'ALL') {
+            const das = (d.area || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+            if (das.length && !das.includes(area)) return false;
+          }
+          return true;
+        })
+        .map(([code, d]) => ({ code, req: Number(d.assignedSt) }))
+        .sort((a, b) => a.code.localeCompare(b.code));
+    }
+
+    // Count how many staff are assigned to each tracked duty per day
+    function _countCoverage(covDuties) {
+      const month = parseInt(document.getElementById('monthSelect').value, 10);
+      const days  = getDaysInMonth(month);
+      const rows  = Array.from(document.querySelectorAll('#rotaTable tbody tr'));
+      const counts = {};
+      covDuties.forEach(d => { counts[d.code] = {}; });
+      rows.forEach(row => {
+        const hCell = row.querySelector('.hours-cell');
+        if (!hCell) return;
+        const hIdx = Array.from(row.cells).indexOf(hCell);
+        for (let i = 1; i < hIdx; i++) {
+          let v = row.cells[i].textContent.trim().toUpperCase();
+          if (v.endsWith('_O')) v = v.slice(0, -2);
+          if (counts[v] !== undefined) counts[v][i] = (counts[v][i] || 0) + 1;
+        }
+      });
+      return { counts, days };
+    }
+
+    function _rebuildCoverage() {
+      const covDuties = _getCovDuties();
+      const wrap = document.getElementById('coverageWrap');
+      if (!wrap) return;
+      wrap.style.display = 'block';   // always visible
+
+      // No duties configured yet — show a hint and stop
+      if (!covDuties.length) {
+        const chipsEl = document.getElementById('coverageSummaryChips');
+        if (chipsEl) chipsEl.innerHTML =
+          '<span style="font-size:11px;color:#6b7280;font-style:italic;">No duty targets set — open Duties.html and fill the <b>Assigned St</b> column to enable coverage tracking.</span>';
+        return;
+      }
+
+      const { counts, days } = _countCoverage(covDuties);
+      const month = parseInt(document.getElementById('monthSelect').value, 10);
+      const year  = new Date().getFullYear();
+
+      // Tally all day×duty combinations for the summary bar
+      let nExact = 0, nOver = 0, nShort1 = 0, nCritical = 0;
+      covDuties.forEach(d => {
+        for (let day = 1; day <= days; day++) {
+          const st = _getCovStatus((counts[d.code][day] || 0), d.req);
+          if      (st === 'exact')    nExact++;
+          else if (st === 'over')     nOver++;
+          else if (st === 'short1')   nShort1++;
+          else if (st === 'critical') nCritical++;
+        }
+      });
+
+      // Update summary chips
+      const chipsEl = document.getElementById('coverageSummaryChips');
+      if (chipsEl) {
+        const allOK = !nShort1 && !nCritical;
+        chipsEl.innerHTML = [
+          nExact    ? `<span class="cov-chip exact">● ${nExact} exact</span>` : '',
+          nOver     ? `<span class="cov-chip over">▲ ${nOver} over</span>` : '',
+          nShort1   ? `<span class="cov-chip short1">⚠ ${nShort1} −1</span>` : '',
+          nCritical ? `<span class="cov-chip critical">! ${nCritical} critical</span>` : '',
+          allOK     ? '<span style="font-size:11px;font-weight:700;color:#16a34a;">✅ All duties fully covered</span>' : '',
+        ].join('');
+      }
+
+      if (_covExpanded) _buildCoverageTable(covDuties, counts, days, month, year);
+    }
+
+    function _buildCoverageTable(covDuties, counts, days, month, year) {
+      // When called from toggleCoverageDetail without pre-computed args, recalculate
+      if (!covDuties) {
+        const cd = _getCovDuties(); if (!cd.length) return;
+        const { counts: c, days: d } = _countCoverage(cd);
+        const mo = parseInt(document.getElementById('monthSelect').value, 10);
+        _buildCoverageTable(cd, c, d, mo, new Date().getFullYear());
+        return;
+      }
+      const nw = Math.max(80,  Number(document.getElementById('nameWidth').value || 220));
+      const dw = Math.max(10, Number(document.getElementById('dayWidth').value  || 34));
+      const SYM = { exact:'●', over:'▲', short1:'⚠', critical:'!', none:'–' };
+
+      let html = `<thead><tr>
+        <th class="cov-th-lbl" style="min-width:${nw}px;width:${nw}px;">
+          Duty <span style="font-weight:400;opacity:.7;">(need)</span></th>`;
+      for (let d = 1; d <= days; d++) {
+        const wk = isWeekend(year, month, d);
+        html += `<th style="min-width:${dw}px;width:${dw}px;${wk?'background:#374151;':''};">${d}</th>`;
+      }
+      html += '</tr></thead><tbody>';
+
+      covDuties.forEach(duty => {
+        html += `<tr><td class="cov-td-lbl" style="min-width:${nw}px;width:${nw}px;">
+          ${duty.code} <span style="font-weight:400;color:#6b7280;">(${duty.req})</span></td>`;
+        for (let d = 1; d <= days; d++) {
+          const actual = (counts[duty.code] || {})[d] || 0;
+          const st     = _getCovStatus(actual, duty.req);
+          const tip    = `${duty.code} · Day ${d}: ${actual} assigned, ${duty.req} required`;
+          html += `<td class="cov-${st}" style="min-width:${dw}px;width:${dw}px;" title="${tip}">${SYM[st]}${actual}</td>`;
+        }
+        html += '</tr>';
+      });
+      html += '</tbody>';
+      const tbl = document.getElementById('coverageTable');
+      if (tbl) tbl.innerHTML = html;
+    }
+
+    // ── Dashboard ─────────────────────────────────────────────────────────────
+    function updateDashboard() {
+      const rows=Array.from(document.querySelectorAll('#rotaTable tbody tr'));
+      const target=getMonthlyTarget();
+      const days=getDaysInMonth(Number(document.getElementById('monthSelect').value));
+      let assigned=0,over=0,under=0,balanced=0,filled=0,count=0;
+      rows.forEach(row=>{
+        const name=row.cells[0]?.querySelector('input')?.value?.trim(); if(!name) return;
+        count++;
+        const h=Number(row.lastElementChild?.textContent||0); assigned+=h;
+        const s=getRowHoursStatus(h);
+        if(s==='over')over++; else if(s==='under')under++; else balanced++;
+        for(let i=1;i<row.cells.length-1;i++){ let v=row.cells[i].textContent.trim().toUpperCase(); if(v.endsWith('_O'))v=v.slice(0,-2); if(DUTIES[v]) filled++; }
+      });
+      const total=count*days;
+      const cov=total?Math.round((filled/total)*100):0;
+      document.getElementById('summaryRows').textContent=String(count);
+      document.getElementById('summaryTarget').textContent=String(target);
+      document.getElementById('summaryAssigned').textContent=String(assigned);
+      document.getElementById('summaryBalanced').textContent=String(balanced);
+      document.getElementById('metricCoverage').textContent=cov+'%';
+      document.getElementById('metricOverTarget').textContent=String(over);
+      document.getElementById('metricUnderTarget').textContent=String(under);
+      document.getElementById('pageMainTitle').textContent=document.getElementById('rotaTitleInput').value.trim()||'Business Center Rota';
+      _scheduleCoverage();  // rebuild coverage panel
+      updateBannerBudget();
+    }
+
+    // ── Clear All ─────────────────────────────────────────────────────────────
+    function clearAllTable() {
+      if (!confirm('Clear everything? This will remove all rows, names and assignments.')) return;
+      document.querySelector('#rotaTable tbody').innerHTML = '';
+      updateDashboard();
+      showStatusMessage('Table cleared.', 'info');
+    }
+
+    // ── Banner budget indicator ───────────────────────────────────────────────
+    function updateBannerBudget() {
+      const el = document.getElementById('bannerBudget');
+      if (!el) return;
+      const area = getCurrentArea();
+      // Hide if no specific area selected
+      if (!area || area === 'ALL') { el.style.display = 'none'; return; }
+      // Load area budget
+      let budgets = {};
+      try { budgets = JSON.parse(localStorage.getItem('BCOT_AREA_BUDGETS_V1') || '{}') || {}; } catch {}
+      const areaBudget = Number(budgets[area]) || 0;
+      if (!areaBudget) { el.style.display = 'none'; return; }
+      // Load staff HRR lookup
+      let staffRecs = [];
+      try { staffRecs = JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2') || '[]') || []; } catch {}
+      const hrrByName = {};
+      staffRecs.forEach(s => { if (s.name && s.hrr) hrrByName[s.name.trim()] = Number(s.hrr) || 0; });
+      // Sum OT cost across all rows
+      let totalSpent = 0;
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const name = row.cells[0]?.querySelector('input')?.value?.trim();
+        if (!name) return;
+        const hrr = hrrByName[name] || 0;
+        if (!hrr) return;
+        const otText = row.querySelector('.ot-val')?.textContent || '—';
+        const ot = parseFloat(otText.replace('+', ''));
+        if (Number.isFinite(ot) && ot > 0) totalSpent += ot * hrr * 1.5;
+      });
+      const pct = (totalSpent / areaBudget) * 100;
+      const cls  = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok';
+      const dot  = pct >= 100 ? '🔴' : pct >= 75 ? '🟡' : '🟢';
+      const amt  = totalSpent.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      el.innerHTML = `<span class="budget-tag ${cls}">${dot} ${amt} SAR</span>`;
+      el.style.display = 'inline';
+    }
+
+    // ── Auto balance ──────────────────────────────────────────────────────────
+    function autoBalanceEmptyRows() {
+      const rows=Array.from(document.querySelectorAll('#rotaTable tbody tr'));
+      const target=getMonthlyTarget();
+      const codes=Object.entries(DUTIES).filter(([,m])=>Number(m.hours)>0).sort((a,b)=>Number(b[1].hours)-Number(a[1].hours));
+      if (!codes.length) { showStatusMessage('No positive-hour duties for this filter.','error'); return; }
+      let changed=0;
+      rows.forEach(row=>{
+        const name=row.cells[0]?.querySelector('input')?.value?.trim(); if(!name) return;
+        const hCell=row.querySelector('.hours-cell');
+        const hIdx=Array.from(row.cells).indexOf(hCell);
+        let h=Number(hCell?.textContent||0); if(h>=target) return;
+        for (let i=1;i<hIdx&&h<target;i++) {
+          const cell=row.cells[i]; if(cell.textContent.trim()) continue;
+          const best=codes.find(([,m])=>h+Number(m.hours)<=target); if(!best) continue;
+          applyDutyToCell(cell,best[0]); h+=Number(best[1].hours); changed++;
+        }
+        updateHours(row);
+      });
+      updateDashboard();
+      showStatusMessage(changed?`Auto balance filled ${changed} cells ✅`:'No empty cells could be balanced.',changed?'success':'info');
+    }
+
+    // ── Rota search / filter ──────────────────────────────────────────────────
+    function filterRota() {
+      const raw   = document.getElementById('rotaSearchInput')?.value || '';
+      const query = raw.trim().toLowerCase();
+      const clearBtn = document.getElementById('rotaSearchClear');
+      const countEl  = document.getElementById('rotaFilterCount');
+      if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+
+      // Build badge lookup from the staff pool (badge may not be in the name string)
+      const badgeOf = {};
+      try {
+        const recs = JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY) || '[]');
+        recs.forEach(s => {
+          if (s.name) {
+            const k = s.name.trim().toLowerCase();
+            badgeOf[k] = String(s.badge || '').toLowerCase();
+            // Also index by stripped name (without trailing badge)
+            const stripped = k.replace(/\s*\(\d+\)\s*$/, '').trim();
+            if (stripped !== k) badgeOf[stripped] = badgeOf[k];
+          }
+        });
+      } catch {}
+
+      const rows = Array.from(document.querySelectorAll('#rotaTable tbody tr'));
+      let visible = 0, total = 0;
+
+      rows.forEach(row => {
+        const rawName = (row.cells[0]?.querySelector('input')?.value || '').trim();
+        const hasName = rawName.length > 0;
+        if (hasName) total++;
+
+        if (!query) {
+          row.style.display = '';
+          if (hasName) visible++;
+          return;
+        }
+
+        if (!hasName) { row.style.display = 'none'; return; }
+
+        const nameLower   = rawName.toLowerCase();
+        const nameStripped = nameLower.replace(/\s*\(\d+\)\s*$/, '').trim();
+        // Badge: from staff pool lookup OR extracted from "(digits)" in stored name
+        const badgeLookup = badgeOf[nameLower] || badgeOf[nameStripped] || '';
+        const badgeInName = (nameLower.match(/\((\d+)\)/) || [])[1] || '';
+        const badge = badgeLookup || badgeInName;
+
+        const match = nameStripped.includes(query) ||
+                      nameLower.includes(query)    ||
+                      (badge && badge.includes(query));
+
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+
+      if (countEl) {
+        countEl.textContent = query
+          ? (visible === 0 ? 'No match' : `${visible} / ${total} staff`)
+          : '';
+        countEl.style.color = visible === 0 ? '#dc2626' : '#1f4e79';
+      }
+    }
+
+    function clearRotaFilter() {
+      const inp = document.getElementById('rotaSearchInput');
+      if (inp) inp.value = '';
+      filterRota();
+      inp?.focus();
+    }
+
+    // ── Active row highlight + staff name banner ──────────────────────────────
+    let _activeEditRow   = null;
+    let _clearRowTimer   = null;
+    let _activeDutyCell  = null;   // the specific day cell currently focused
+
+    // Update hours + OT chips in the active banner
+    function _refreshBannerStats(row) {
+      if (!row) return;
+      const hoursEl = document.getElementById('activeStaffHours');
+      const otEl    = document.getElementById('activeStaffOT');
+      if (hoursEl) {
+        const h = row.querySelector('.hours-cell')?.textContent?.trim() || '0';
+        hoursEl.textContent = h + 'h';
+      }
+      if (otEl) {
+        const rawOT = row.querySelector('.ot-val')?.textContent?.trim() || '';
+        const otNum = parseFloat(rawOT.replace('+', ''));
+        const show  = Number.isFinite(otNum) && otNum > 0;
+        otEl.textContent   = show ? ' · ' + rawOT + ' OT' : '';
+        otEl.style.display = show ? '' : 'none';
+      }
+    }
+
+    // ── Duties / Leave help popup ─────────────────────────────────────────────
+    function toggleDutiesHelp(e) {
+      e && e.stopPropagation();
+      const popup = document.getElementById('dutiesHelpPopup');
+      if (!popup) return;
+      if (popup.style.display === 'block') { popup.style.display = 'none'; return; }
+      // Rebuild list each open so it stays current
+      const list = document.getElementById('dutiesHelpList');
+      if (list) {
+        list.innerHTML = '';
+        Object.entries(DUTIES).forEach(([code, meta]) => {
+          const item = document.createElement('div');
+          item.className = 'dhp-item';
+          item.innerHTML =
+            `<div class="dhp-swatch" style="background:${meta.color}"></div>`
+            + `<span class="dhp-code">${code}</span>`
+            + `<span class="dhp-label">${meta.label||''}${meta.area?' ['+meta.area+']':''}</span>`
+            + `<span class="dhp-hrs">${Number(meta.hours)||0}h</span>`;
+          list.appendChild(item);
+        });
+      }
+      popup.style.display = 'block';
+    }
+    // Close popup on Escape key or any click outside it
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { const p=document.getElementById('dutiesHelpPopup'); if(p) p.style.display='none'; }
+    });
+    document.addEventListener('click', e => {
+      const popup = document.getElementById('dutiesHelpPopup');
+      const btn   = document.getElementById('dutiesHelpBtn');
+      if (popup && popup.style.display==='block' && !popup.contains(e.target) && e.target!==btn)
+        popup.style.display = 'none';
+    });
+
+    function setActiveRow(row) {
+      if (_activeEditRow === row) return;   // already set — nothing to do
+      // Remove from previous row
+      if (_activeEditRow) _activeEditRow.classList.remove('active-editing-row');
+      _activeEditRow = row;
+      const banner  = document.getElementById('activeStaffBanner');
+      const nameEl  = document.getElementById('activeStaffName');
+      if (row) {
+        row.classList.add('active-editing-row');
+        // Strip trailing "(badge)" from stored name for display
+        const raw  = row.cells[0]?.querySelector('input')?.value?.trim() || '—';
+        const name = raw.replace(/\s*\(\d+\)\s*$/, '').trim() || raw;
+        if (nameEl)  nameEl.textContent  = name;
+        if (banner)  banner.style.display = 'flex';
+        _refreshBannerStats(row);
+        updateBannerBudget();
+      } else {
+        if (banner) banner.style.display = 'none';
+        const budgetEl = document.getElementById('bannerBudget');
+        if (budgetEl) budgetEl.style.display = 'none';
+      }
+    }
+
+    // ── Duty count chip in banner ─────────────────────────────────────────────
+    function _refreshBannerDuty(cell) {
+      const dutyEl = document.getElementById('activeStaffDuty');
+      if (!dutyEl) return;
+      if (!cell) { dutyEl.style.display = 'none'; return; }
+
+      const row = cell.parentElement;
+      if (!row) { dutyEl.style.display = 'none'; return; }
+      const hCell = row.querySelector('.hours-cell');
+      if (!hCell) { dutyEl.style.display = 'none'; return; }
+
+      const rowCells = Array.from(row.cells);
+      const hIdx     = rowCells.indexOf(hCell);
+      const cellIdx  = rowCells.indexOf(cell);
+      if (cellIdx <= 0 || cellIdx >= hIdx) { dutyEl.style.display = 'none'; return; }
+
+      let code = cell.textContent.trim().toUpperCase();
+      if (code.endsWith('_O')) code = code.slice(0, -2);
+      if (!code || !DUTIES[code]) { dutyEl.style.display = 'none'; return; }
+
+      const req = Number(DUTIES[code].assignedSt || 0);
+
+      // Count staff assigned to this duty on this day across the whole rota
+      let count = 0;
+      document.querySelectorAll('#rotaTable tbody tr').forEach(r => {
+        const rH = r.querySelector('.hours-cell');
+        if (!rH) return;
+        const rHIdx = Array.from(r.cells).indexOf(rH);
+        if (cellIdx >= rHIdx) return;
+        let v = (r.cells[cellIdx]?.textContent || '').trim().toUpperCase();
+        if (v.endsWith('_O')) v = v.slice(0, -2);
+        if (v === code) count++;
+      });
+
+      // Colour and symbol based on coverage rules
+      const SYM_COL = {
+        exact:    { sym:'●', col:'#4ade80' },
+        over:     { sym:'▲', col:'#93c5fd' },
+        short1:   { sym:'⚠', col:'#fbbf24' },
+        critical: { sym:'!', col:'#f87171' },
+        none:     { sym:'' , col:'#cbd5e1' }
+      };
+      const st = req > 0 ? _getCovStatus(count, req) : 'none';
+      const { sym, col } = SYM_COL[st];
+      const label = req > 0 ? `${sym} ${count}/${req} ${code}` : `${count}× ${code}`;
+      dutyEl.innerHTML = ` · <span style="color:${col};font-weight:800;">${label}</span>`;
+      dutyEl.style.display = '';
+    }
+
+    // ── Coverage matrix modal ─────────────────────────────────────────────────
+    function openCoverageModal() {
+      document.getElementById('coverageModal').classList.add('show');
+      _buildCoverageModalContent();
+    }
+    function closeCoverageModal() {
+      document.getElementById('coverageModal').classList.remove('show');
+    }
+    function _buildCoverageModalContent() {
+      const el = document.getElementById('coverageModalContent');
+      if (!el) return;
+      const covDuties = _getCovDuties();
+      if (!covDuties.length) {
+        el.innerHTML = '<p style="padding:20px;text-align:center;color:#888;">No duty targets set. Add <b>Assigned St</b> values in Duties.html.</p>';
+        return;
+      }
+      const { counts, days } = _countCoverage(covDuties);
+      const month = parseInt(document.getElementById('monthSelect').value, 10);
+      const year  = new Date().getFullYear();
+      const SYM   = { exact:'●', over:'▲', short1:'⚠', critical:'!', none:'–' };
+      const STYLE = {
+        exact:    'background:#16a34a;color:#fff;',
+        over:     'background:#1d4ed8;color:#fff;',
+        short1:   'background:#f59e0b;color:#1c1917;',
+        critical: 'background:#dc2626;color:#fff;',
+        none:     'background:#f1f5f9;color:#94a3b8;'
+      };
+
+      let html = `<table style="border-collapse:collapse;width:max-content;min-width:100%;">
+        <thead><tr>
+          <th style="position:sticky;left:0;z-index:3;background:#1f4e79;color:#fff;
+            padding:6px 12px;text-align:left;font-size:11px;border:1px solid #2d6098;
+            min-width:130px;white-space:nowrap;">Duty &nbsp;<span style="font-weight:400;opacity:.7;">(need)</span></th>`;
+
+      for (let d = 1; d <= days; d++) {
+        const wk = isWeekend(year, month, d);
+        html += `<th style="background:${wk?'#374151':'#1f4e79'};color:#fff;padding:4px 5px;
+          text-align:center;font-size:10px;border:1px solid #2d6098;min-width:30px;">${d}</th>`;
+      }
+      html += '</tr></thead><tbody>';
+
+      covDuties.forEach((duty, ri) => {
+        const rowBg = ri % 2 === 0 ? '#fff' : '#f8fafc';
+        html += `<tr>
+          <td style="position:sticky;left:0;z-index:2;background:${rowBg};
+            padding:4px 12px;font-size:11px;font-weight:700;color:#1f4e79;
+            border:1px solid #e5e7eb;border-right:2px solid #c7d2fe;white-space:nowrap;">
+            ${duty.code} <span style="font-weight:400;color:#6b7280;">(${duty.req})</span></td>`;
+        for (let d = 1; d <= days; d++) {
+          const actual = (counts[duty.code] || {})[d] || 0;
+          const st     = _getCovStatus(actual, duty.req);
+          const tip    = `${duty.code} · Day ${d}: ${actual} assigned, ${duty.req} required`;
+          html += `<td title="${tip}" style="${STYLE[st]}text-align:center;font-size:10px;
+            font-weight:700;padding:3px 2px;border:1px solid rgba(0,0,0,.07);">${SYM[st]}${actual}</td>`;
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    }
+
+    // ── Wire focusin / focusout — tracks row AND specific day cell ────────────
+    (function wireActiveRow() {
+      const tbl = document.getElementById('rotaTable');
+
+      tbl.addEventListener('focusin', function(e) {
+        const row = e.target.closest('tbody tr');
+        if (!row) return;
+        clearTimeout(_clearRowTimer);
+        setActiveRow(row);
+
+        // Identify whether focused element is a day cell
+        const cell = e.target.closest('td');
+        if (cell) {
+          const hCell = row.querySelector('.hours-cell');
+          const rc    = Array.from(row.cells);
+          const hIdx  = rc.indexOf(hCell);
+          const ci    = rc.indexOf(cell);
+          if (ci > 0 && ci < hIdx) {
+            _activeDutyCell = cell;
+            _refreshBannerDuty(cell);
+          } else {
+            _activeDutyCell = null;
+            const dutyEl = document.getElementById('activeStaffDuty');
+            if (dutyEl) dutyEl.style.display = 'none';
+          }
+        }
+      });
+
+      tbl.addEventListener('focusout', function() {
+        clearTimeout(_clearRowTimer);
+        _clearRowTimer = setTimeout(() => {
+          const active = document.activeElement;
+          if (!tbl.querySelector('tbody')?.contains(active)) {
+            setActiveRow(null);
+            _activeDutyCell = null;
+            const dutyEl = document.getElementById('activeStaffDuty');
+            if (dutyEl) dutyEl.style.display = 'none';
+          }
+        }, 120);
+      });
+    })();
+
+    // ── Event listeners ───────────────────────────────────────────────────────
+    document.getElementById('nameWidth').addEventListener('input',applyColumnWidths);
+    document.getElementById('dayWidth').addEventListener('input',applyColumnWidths);
+    document.getElementById('monthSelect').addEventListener('change',()=>{ updateTable(); updateRotaLabel(); });
+    document.getElementById('monthlyTarget').addEventListener('input',persistMonthlyTarget);
+    document.getElementById('rotaTitleInput').addEventListener('input',updateDashboard);
+    document.getElementById('newAreaInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addNewArea(); });
+    document.getElementById('abbreviationsModal').addEventListener('click',function(e){ if(e.target===this) closeAbbreviationsPage(); });
+    document.getElementById('statisticsModal').addEventListener('click',function(e){ if(e.target===this) closeStatisticsPage(); });
+    document.getElementById('settingsModal').addEventListener('click',function(e){ if(e.target===this) closeSettingsModal(); });
+    document.getElementById('mixedStdHours').addEventListener('input',()=>{ mixedStdHours=Number(document.getElementById('mixedStdHours').value)||0; recalculateAllOT(); });
+
+    // Scroll sync: coverage panel ↔ main table
+    (function(){
+      const mainEl = document.querySelector('.table-container');
+      let _syncing = false;
+      mainEl.addEventListener('scroll', () => {
+        if (_syncing) return;
+        const covEl = document.getElementById('coverageScrollWrap');
+        if (covEl && _covExpanded) { _syncing=true; covEl.scrollLeft=mainEl.scrollLeft; _syncing=false; }
+      });
+      // Also sync from coverage back to main when user scrolls coverage panel directly
+      document.addEventListener('scroll', e => {
+        if (!_covExpanded) return;
+        const covEl = document.getElementById('coverageScrollWrap');
+        if (e.target === covEl) { _syncing=true; mainEl.scrollLeft=covEl.scrollLeft; _syncing=false; }
+      }, true);
+    })();
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    (function init() {
+      setKeyFieldFromStorage();
+
+      // Build area select and restore last filter
+      rebuildAreaSelect();
+      const lastArea=(localStorage.getItem(AREA_KEY)||"ALL").trim().toUpperCase();
+      const sel=document.getElementById("areaFilter");
+      if (lastArea==="ALL"||getAreasList().includes(lastArea)) sel.value=lastArea;
+      const hdr=document.getElementById("headerAreaLabel");
+      const areaLabel=sel.value==="ALL"?"All Areas":sel.value;
+      if (hdr) hdr.textContent=areaLabel;
+      const pal=document.getElementById("printAreaLabel");
+      if (pal) pal.textContent=areaLabel;
+
+      const m=new Date().getMonth()+1;
+      document.getElementById('monthSelect').value=String(m);
+
+      renderHolidayList();
+      staffList=loadStaffList();
+      DUTIES=loadDuties()||{};
+      injectDutyStyles();
+      buildLegend();
+      updateTable();
+      addNewRow();
+      applyColumnWidths();
+      setPatternIndicator(false);
+
+      if (!Object.keys(DUTIES).length) showStatusMessage('No duties found. Open Duties.html to add duties.','error');
+      else if (!staffList.length)      showStatusMessage('No staff for this filter. Open Staff.html to add staff.','error');
+
+      // Load release number for current area and show rota label
+      releaseNum = loadReleaseNum(getCurrentArea());
+      updateRotaLabel();
+
+      updateDashboard();
+    })();
+  </script>
+</body>
+</html>

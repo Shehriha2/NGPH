@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multi-Month Rota View</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --bg:#f3f6fb; --card:#fff; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; color:#1f2937; }
+
+    .header{
+      background:linear-gradient(135deg,var(--primary),var(--secondary));
+      color:#fff; padding:12px 16px; border-radius:12px;
+      box-shadow:0 2px 8px rgba(0,0,0,.12); margin-bottom:14px;
+      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    }
+    .header h1{ margin:0; font-size:14px; font-weight:800; }
+    .header h2{ margin:2px 0 0; font-size:12px; opacity:.9; }
+    .logo{ width:64px; height:64px; background:#fff; border-radius:6px; padding:4px; display:flex; justify-content:center; align-items:center; flex-shrink:0; }
+    .logo img{ width:100%; height:100%; object-fit:contain; }
+
+    .card{ background:var(--card); border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.10); padding:12px; margin-bottom:12px; border:1px solid #e7edf3; }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    label{ font-weight:700; color:#334155; }
+    input,select{ padding:6px 10px; border:1px solid #d9e2ec; border-radius:8px; font-size:12px; background:#fff; }
+    button{ padding:7px 14px; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; background:var(--primary); color:#fff; transition:background .2s; }
+    button:hover{ background:#163a5a; }
+    .btn-green{ background:#16a34a; } .btn-green:hover{ background:#15803d; }
+    .btn-orange{ background:#d97706; } .btn-orange:hover{ background:#b45309; }
+    .hint{ color:#6b7280; font-size:11px; }
+
+    .status-message{ position:fixed; top:16px; right:16px; padding:10px 18px; border-radius:8px; color:#fff; display:none; z-index:2000; max-width:600px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 12px rgba(0,0,0,.18); font-size:12px; }
+    .status-success{ background:#16a34a; } .status-error{ background:#dc2626; } .status-info{ background:#2563eb; }
+
+    /* Table */
+    .table-outer{ overflow-x:auto; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.10); border:1px solid #e7edf3; background:#fff; }
+    table{ border-collapse:collapse; min-width:100%; }
+    th,td{ border:1px solid #ddd; padding:3px 4px; text-align:center; font-size:10px; white-space:nowrap; }
+    thead th{ background:var(--primary); color:#fff; position:sticky; top:0; z-index:3; }
+    .th-month{ background:#0f3460; font-size:11px; font-weight:800; }
+    .th-day{ background:#1a4f8b; font-size:10px; font-weight:600; }
+    .th-weekend{ background:#2d6a9f; }
+    .td-name{ text-align:left; font-weight:700; background:#f9fbfd; position:sticky; left:0; z-index:2; min-width:160px; padding:3px 8px; border-right:2px solid #1a4f8b; }
+    .td-weekend{ background:#f3f3f3; }
+    .td-empty{ background:#fff; }
+    .td-duty{ color:#fff; font-weight:700; font-size:10px; }
+    td[data-dlen="4"]{ font-size:9px; }
+    td[data-dlen="5"]{ font-size:8px; }
+    td[data-dlen="6"]{ font-size:7.5px; }
+    td[data-dlen="7"]{ font-size:7px; }
+    td[data-dlen="8"]{ font-size:6.5px; }
+    .month-sep{ border-left:3px solid #0f3460 !important; }
+
+    .progress-bar{ height:6px; background:#e5e7eb; border-radius:4px; overflow:hidden; margin-top:4px; }
+    .progress-fill{ height:100%; background:var(--secondary); border-radius:4px; transition:width .3s; }
+
+    @media print{
+      @page{ size:landscape; margin:8mm; }
+      body{ padding:0; background:#fff; }
+      .no-print{ display:none !important; }
+      .card{ box-shadow:none; border:1px solid #ddd; }
+      th,td{ padding:2px; font-size:7pt; border:.5pt solid #000; }
+      .td-name{ position:static; }
+      thead th{ position:static; }
+      *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header no-print">
+    <div class="logo">
+      <img src="MNGHA-Logo.png" alt="Logo"
+        onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;64&quot; height=&quot;64&quot;><rect width=&quot;64&quot; height=&quot;64&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;10&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
+    </div>
+    <div style="flex:1;">
+      <h1>Ministry of National Guard Health Affairs</h1>
+      <h2>KAMC-WR — Pharmaceutical Care Department — Multi-Month Rota</h2>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="btn-green" onclick="window.print()">🖨 Print</button>
+      <a href="index.html" style="text-decoration:none;"><button type="button">← Rota</button></a>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card no-print">
+    <div class="row" style="gap:14px;">
+      <div class="row">
+        <label>Area:</label>
+        <select id="mmArea"></select>
+      </div>
+      <div class="row">
+        <label>Year:</label>
+        <input type="number" id="mmYear" value="2026" min="2020" max="2040" style="width:80px;"/>
+      </div>
+      <div class="row">
+        <label>From:</label>
+        <select id="mmStart">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5" selected>May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>To:</label>
+        <select id="mmEnd">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6" selected>June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <button onclick="loadMultiMonth()">📅 Load</button>
+      <button class="btn-orange" onclick="exportMultiMonthExcel()">📊 Export Excel</button>
+    </div>
+    <div class="hint" style="margin-top:6px;">Loads monthly rotas already saved from the main Rota page. Each month must be saved first using 💾 Save.</div>
+  </div>
+
+  <!-- Summary bar -->
+  <div id="summaryBar" style="display:none;" class="card no-print">
+    <div id="summaryContent" class="row" style="gap:16px;flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-outer" id="tableOuter" style="display:none;">
+    <table id="mmTable"></table>
+  </div>
+
+  <div class="status-message" id="statusBox"></div>
+
+  <script src="config.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    const app = initializeApp({
+      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+      storageBucket:"bcotrota.firebasestorage.app",
+      messagingSenderId:"659421824894",
+      appId:"1:659421824894:web:f0546879df8808491ad52f"
+    });
+    const db = getFirestore(app);
+    window.FB = { db, doc, getDoc };
+  </script>
+
+  <script>
+    const AREAS_KEY   = "BCOT_AREAS_LIST_V1";
+    const DUTIES_KEY  = "BCOT_DUTIES_ALL_V1";
+    const APP_KEY     = window.BCOT_APP_KEY || "";
+
+    const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function showStatus(msg, type="success"){
+      const el=document.getElementById("statusBox");
+      el.textContent=msg; el.className="status-message status-"+type;
+      el.style.display="block"; setTimeout(()=>el.style.display="none",3200);
+    }
+
+    function getAreasList(){ try{ return JSON.parse(localStorage.getItem(AREAS_KEY)||"[]")||[]; }catch{ return []; } }
+
+    function loadAllDuties(){
+      try{ return JSON.parse(localStorage.getItem(DUTIES_KEY)||"{}")||{}; }catch{ return {}; }
+    }
+
+    function getDutiesForArea(area){
+      const all=loadAllDuties();
+      if(area==="ALL") return all;
+      const out={};
+      Object.entries(all).forEach(([code,meta])=>{
+        const areas=(meta.area||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean);
+        if(!areas.length||areas.includes(area.toUpperCase())) out[code]=meta;
+      });
+      return out;
+    }
+
+    function isWeekend(year,month,day){ const d=new Date(year,month-1,day).getDay(); return d===5||d===6; }
+    function getDaysInMonth(year,month){ return new Date(year,month,0).getDate(); }
+
+    function getMonthDocRef(key,area,docId){
+      return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId);
+    }
+
+    // ── Populate area dropdown ─────────────────────────────────────────────────
+    function buildAreaSelect(){
+      const areas=getAreasList();
+      const sel=document.getElementById("mmArea");
+      sel.innerHTML='<option value="ALL">All Areas</option>';
+      areas.forEach(a=>{ const o=document.createElement("option"); o.value=a; o.textContent=a; sel.appendChild(o); });
+      const last=(localStorage.getItem("BCOT_CURRENT_AREA_V1")||"ALL").toUpperCase();
+      if(last==="ALL"||areas.includes(last)) sel.value=last;
+    }
+
+    // ── Load data ──────────────────────────────────────────────────────────────
+    let loadedPayloads = {}; // key = "YYYY-MM"
+
+    async function loadMultiMonth(){
+      if(!APP_KEY){ showStatus("config.js not found — cannot load from cloud.","error"); return; }
+      const area=document.getElementById("mmArea").value;
+      const year=parseInt(document.getElementById("mmYear").value)||new Date().getFullYear();
+      const start=parseInt(document.getElementById("mmStart").value);
+      const end=parseInt(document.getElementById("mmEnd").value);
+      if(start>end){ showStatus("'From' month must be ≤ 'To' month.","error"); return; }
+      if(end-start>11){ showStatus("Maximum range is 12 months.","error"); return; }
+
+      showStatus("Loading…","info");
+      loadedPayloads={};
+      const months=[];
+      for(let m=start;m<=end;m++) months.push(m);
+
+      const promises=months.map(async m=>{
+        const docId=`${year}-${String(m).padStart(2,'0')}`;
+        try{
+          const snap=await window.FB.getDoc(getMonthDocRef(APP_KEY,area,docId));
+          if(snap.exists()) loadedPayloads[docId]=snap.data();
+          else loadedPayloads[docId]=null;
+        }catch(e){
+          console.warn(`Failed to load ${docId}:`,e);
+          loadedPayloads[docId]=null;
+        }
+      });
+      await Promise.all(promises);
+
+      const loaded=Object.values(loadedPayloads).filter(Boolean).length;
+      showStatus(`Loaded ${loaded}/${months.length} months ✅`);
+      renderTable(area,year,months);
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────────
+    function renderTable(area,year,months){
+      const DUTIES=getDutiesForArea(area);
+
+      // Collect all staff names (preserve order of first appearance)
+      const staffOrder=[];
+      const staffSet=new Set();
+      months.forEach(m=>{
+        const docId=`${year}-${String(m).padStart(2,'0')}`;
+        const payload=loadedPayloads[docId];
+        if(!payload||!Array.isArray(payload.records)) return;
+        payload.records.forEach(rec=>{
+          const n=(rec.staffName||'').trim(); if(!n) return;
+          if(!staffSet.has(n)){ staffSet.add(n); staffOrder.push(n); }
+        });
+      });
+
+      if(!staffOrder.length){
+        showStatus("No staff data found for the selected range.","error");
+        document.getElementById("tableOuter").style.display="none";
+        document.getElementById("summaryBar").style.display="none";
+        return;
+      }
+
+      // Build header rows
+      // Row 1: Staff Name | [Month header spanning days] ...
+      // Row 2: (empty)   | 1 2 3 ... N | 1 2 3 ...
+      let headRow1='<tr><th rowspan="2" style="min-width:160px;text-align:left;padding:3px 8px;position:sticky;left:0;z-index:4;background:#0f3460;">Staff Name</th>';
+      let headRow2='<tr>';
+      months.forEach((m,mi)=>{
+        const days=getDaysInMonth(year,m);
+        const sepClass=mi>0?'month-sep':'';
+        headRow1+=`<th colspan="${days}" class="th-month ${sepClass}">${MONTH_NAMES[m]} ${year}</th>`;
+        for(let d=1;d<=days;d++){
+          const we=isWeekend(year,m,d);
+          headRow2+=`<th class="${we?'th-weekend':'th-day'}${d===1&&mi>0?' month-sep':''}">${d}</th>`;
+        }
+      });
+      headRow1+='</tr>';
+      headRow2+='</tr>';
+
+      // Build body rows
+      let bodyHtml='';
+      staffOrder.forEach(name=>{
+        let rowHtml=`<td class="td-name">${name}</td>`;
+        months.forEach((m,mi)=>{
+          const docId=`${year}-${String(m).padStart(2,'0')}`;
+          const payload=loadedPayloads[docId];
+          const days=getDaysInMonth(year,m);
+          // Find this staff's record in this month
+          const rec=payload&&Array.isArray(payload.records)?payload.records.find(r=>(r.staffName||'').trim()===name):null;
+
+          for(let d=1;d<=days;d++){
+            const sepClass=d===1&&mi>0?' month-sep':'';
+            const we=isWeekend(year,m,d);
+            if(!rec){
+              rowHtml+=`<td class="td-empty${we?' td-weekend':''}${sepClass}" style="min-width:18px;"></td>`;
+              continue;
+            }
+            const raw=((rec.daysData||{})[`day${d}`]||'').toUpperCase();
+            const base=raw.endsWith('_O')?raw.slice(0,-2):raw;
+            const duty=DUTIES[base];
+            if(duty){
+              const bg=duty.color||'#1a4f8b';
+              const dlen=raw.length>=4?String(raw.length):'';
+              rowHtml+=`<td class="td-duty${sepClass}" style="background:${bg};min-width:18px;"${dlen?` data-dlen="${dlen}"`:''}>${raw}</td>`;
+            } else {
+              rowHtml+=`<td class="td-empty${we?' td-weekend':''}${sepClass}" style="min-width:18px;"></td>`;
+            }
+          }
+        });
+        bodyHtml+=`<tr>${rowHtml}</tr>`;
+      });
+
+      document.getElementById("mmTable").innerHTML=`<thead>${headRow1}${headRow2}</thead><tbody>${bodyHtml}</tbody>`;
+      document.getElementById("tableOuter").style.display="block";
+
+      // Summary
+      buildSummary(area,year,months,DUTIES,staffOrder);
+    }
+
+    function buildSummary(area,year,months,DUTIES,staffOrder){
+      const bar=document.getElementById("summaryBar");
+      const content=document.getElementById("summaryContent");
+      content.innerHTML='';
+      months.forEach(m=>{
+        const docId=`${year}-${String(m).padStart(2,'0')}`;
+        const payload=loadedPayloads[docId];
+        const count=payload&&Array.isArray(payload.records)?payload.records.filter(r=>(r.staffName||'').trim()).length:0;
+        const div=document.createElement("div");
+        div.style.cssText="min-width:120px;background:#f9fbfd;border:1px solid #e7edf3;border-radius:8px;padding:8px 12px;text-align:center;";
+        div.innerHTML=`<div style="font-weight:800;font-size:13px;color:#1f4e79;">${MONTH_NAMES[m]}</div>
+          <div style="font-size:11px;color:#6b7280;">${count} staff${payload?'':' — not saved'}</div>`;
+        content.appendChild(div);
+      });
+      bar.style.display="block";
+    }
+
+    // ── Excel export ───────────────────────────────────────────────────────────
+    function exportMultiMonthExcel(){
+      const table=document.getElementById("mmTable");
+      if(!table.rows.length){ showStatus("No data to export.","error"); return; }
+      const area=document.getElementById("mmArea").value;
+      const year=document.getElementById("mmYear").value;
+      const start=MONTH_NAMES[parseInt(document.getElementById("mmStart").value)];
+      const end=MONTH_NAMES[parseInt(document.getElementById("mmEnd").value)];
+      const fname=`MultiMonth_${area}_${year}_${start}-${end}`.replace(/\s+/g,'_');
+
+      // Build styled HTML
+      let thead='', tbody='';
+      for(let ri=0;ri<table.tHead.rows.length;ri++){
+        thead+='<tr>';
+        for(let ci=0;ci<table.tHead.rows[ri].cells.length;ci++){
+          const cell=table.tHead.rows[ri].cells[ci];
+          const cs=cell.colSpan>1?` colspan="${cell.colSpan}"`:'';
+          const rs=cell.rowSpan>1?` rowspan="${cell.rowSpan}"`:'';
+          thead+=`<th${cs}${rs} style="background:#1f4e79;color:#fff;font-weight:bold;border:1pt solid #aaa;padding:2pt 3pt;font-size:8pt;">${cell.textContent}</th>`;
+        }
+        thead+='</tr>';
+      }
+      for(let ri=0;ri<table.tBodies[0].rows.length;ri++){
+        tbody+='<tr>';
+        for(let ci=0;ci<table.tBodies[0].rows[ri].cells.length;ci++){
+          const cell=table.tBodies[0].rows[ri].cells[ci];
+          const bg=cell.style.background||cell.style.backgroundColor||'';
+          const isName=cell.classList.contains('td-name');
+          const isWeek=cell.classList.contains('td-weekend');
+          const bgStyle=bg?`background:${bg};`:(isName?'background:#f9fbfd;':(isWeek?'background:#f0f0f0;':'background:#fff;'));
+          const clr=bg?'color:#fff;':'color:#000;';
+          const fw=isName||bg?'font-weight:bold;':'';
+          tbody+=`<td style="${bgStyle}${clr}${fw}border:1pt solid #ddd;padding:2pt 3pt;text-align:center;font-size:8pt;white-space:nowrap;">${cell.textContent}</td>`;
+        }
+        tbody+='</tr>';
+      }
+
+      const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office"
+        xmlns:x="urn:schemas-microsoft-com:office:excel"
+        xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="utf-8"><style>table{border-collapse:collapse;}body{font-family:Arial;}</style></head>
+        <body>
+        <h2 style="font-size:13pt;color:#1f4e79;">Multi-Month Rota — ${area} — ${start} to ${end} ${year}</h2>
+        <table><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+        </body></html>`;
+
+      const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=fname+'.xls'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      showStatus("Multi-month Excel exported ✅");
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    (function init(){
+      buildAreaSelect();
+      // Set year to current
+      document.getElementById("mmYear").value=new Date().getFullYear();
+    })();
+  </script>
+</body>
+</html>

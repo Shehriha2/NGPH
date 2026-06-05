@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Area Budgets</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --bg:#f5f5f5; --card:#fff; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; }
+
+    .header{
+      display:flex; justify-content:space-between; align-items:center;
+      background:linear-gradient(135deg,var(--primary),var(--secondary));
+      padding:10px 14px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,.1); margin-bottom:14px;
+    }
+    .header-text{ text-align:center; flex-grow:1; color:#fff; }
+    .header-text h1{ margin:3px 0; font-size:14px; }
+    .header-text h2{ margin:2px 0; font-size:12px; }
+    .logo{ width:70px; height:70px; background:#fff; border-radius:5px; padding:4px; display:flex; justify-content:center; align-items:center; margin-right:12px; }
+    .logo img{ width:100%; height:100%; object-fit:contain; }
+
+    .card{ background:var(--card); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.12); padding:12px; margin-bottom:12px; }
+    .btn-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    input,select,button{ padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+    button{ background:var(--primary); color:#fff; border:none; cursor:pointer; transition:background-color .2s; font-weight:700; }
+    button:hover{ background:var(--secondary); }
+    .btn-green{ background:#28a745; } .btn-green:hover{ background:#218838; }
+    .btn-purple{ background:#6f42c1; } .btn-purple:hover{ background:#5a35a1; }
+    .btn-orange{ background:#d97706; } .btn-orange:hover{ background:#b45309; }
+    .hint{ color:#666; font-size:11px; }
+
+    table{ width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td{ border:1px solid #e5e7eb; padding:8px 10px; text-align:left; font-size:12px; }
+    th{ background:var(--primary); color:#fff; }
+    td input[type="number"]{ width:160px; padding:5px 8px; border:1px solid #cdd5df; border-radius:5px; font-size:12px; }
+    tr:nth-child(even){ background:#f9fbfd; }
+
+    .empty-msg{ padding:20px; color:#888; text-align:center; font-size:13px; }
+
+    .status-message{
+      position:fixed; top:18px; right:18px; padding:10px 16px; border-radius:6px;
+      color:#fff; display:none; z-index:1000; max-width:520px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 12px rgba(0,0,0,.18); font-size:12px;
+    }
+    .status-success{ background:#28a745; }
+    .status-error{ background:#dc3545; }
+
+    @media print{
+      .no-print{ display:none !important; }
+      body{ background:#fff; }
+      .card{ box-shadow:none; border:1px solid #ddd; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">
+      <img src="MNGHA-Logo.png" alt="MNGHA Logo"
+        onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;70&quot; height=&quot;70&quot;><rect width=&quot;70&quot; height=&quot;70&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;11&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
+    </div>
+    <div class="header-text">
+      <h1>Ministry of National Guard Health Affairs</h1>
+      <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+      <h2>Area SAR Budget Management</h2>
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <div class="btn-row">
+      <button class="btn-green" onclick="saveBudgetsLocal()">Save Local</button>
+      <button onclick="loadBudgetsLocal()">Load Local</button>
+      <button class="btn-purple" onclick="saveBudgetsToCloud()">Save to Cloud</button>
+      <button class="btn-purple" onclick="loadBudgetsFromCloud()">Load from Cloud</button>
+      <button class="btn-orange" onclick="window.print()">Print</button>
+      <a href="index.html" style="margin-left:auto;text-decoration:none">
+        <button type="button">Back to Rota</button>
+      </a>
+    </div>
+    <div class="hint" style="margin-top:8px;">
+      Areas are read from <code>BCOT_AREAS_LIST_V1</code>. Add areas in Staff.html or index.html, then return here to assign budgets.
+    </div>
+  </div>
+
+  <div class="card">
+    <b>SAR Budgets per Area</b>
+    <div id="tableWrapper"></div>
+  </div>
+
+  <div class="status-message" id="statusBox"></div>
+
+  <script src="config.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+      storageBucket:"bcotrota.firebasestorage.app",
+      messagingSenderId:"659421824894",
+      appId:"1:659421824894:web:f0546879df8808491ad52f"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window.FB = { db, doc, setDoc, getDoc };
+  </script>
+
+  <script>
+    const AREAS_LIST_KEY   = "BCOT_AREAS_LIST_V1";
+    const AREA_BUDGETS_KEY = "BCOT_AREA_BUDGETS_V1";
+
+    function showStatus(msg, isErr = false) {
+      const el = document.getElementById("statusBox");
+      el.textContent = msg;
+      el.className = "status-message " + (isErr ? "status-error" : "status-success");
+      el.style.display = "block";
+      setTimeout(() => el.style.display = "none", 3200);
+    }
+
+    function getKeyOrWarn() {
+      const key = (window.BCOT_APP_KEY || "").trim();
+      if (!key) { showStatus("config.js not found — cloud sync disabled.", true); return null; }
+      return key;
+    }
+
+    function getAreasList() {
+      try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || []; } catch { return []; }
+    }
+
+    function getBudgets() {
+      try { return JSON.parse(localStorage.getItem(AREA_BUDGETS_KEY) || "{}") || {}; } catch { return {}; }
+    }
+
+    function readBudgetsFromTable() {
+      const out = {};
+      document.querySelectorAll("#budgetTable tbody tr").forEach(tr => {
+        const area = tr.dataset.area;
+        const val  = parseFloat(tr.querySelector("input").value || "0") || 0;
+        out[area]  = val;
+      });
+      return out;
+    }
+
+    function renderTable(budgets) {
+      const areas = getAreasList();
+      const wrapper = document.getElementById("tableWrapper");
+      if (!areas.length) {
+        wrapper.innerHTML = '<div class="empty-msg">No areas found. Add areas in Staff.html or index.html first.</div>';
+        return;
+      }
+      let html = `<table id="budgetTable">
+        <thead><tr><th>#</th><th>Area</th><th>SAR Budget</th></tr></thead>
+        <tbody>`;
+      areas.forEach((area, idx) => {
+        const val = budgets[area] != null ? Number(budgets[area]) : 0;
+        html += `<tr data-area="${area}">
+          <td>${idx + 1}</td>
+          <td><b>${area}</b></td>
+          <td><input type="number" min="0" step="0.01" value="${val}" placeholder="0.00"/></td>
+        </tr>`;
+      });
+      html += "</tbody></table>";
+      wrapper.innerHTML = html;
+    }
+
+    function saveBudgetsLocal() {
+      const budgets = readBudgetsFromTable();
+      localStorage.setItem(AREA_BUDGETS_KEY, JSON.stringify(budgets));
+      showStatus(`Saved budgets for ${Object.keys(budgets).length} area(s) locally ✅`);
+    }
+
+    function loadBudgetsLocal() {
+      const budgets = getBudgets();
+      renderTable(budgets);
+      showStatus("Loaded from local storage ✅");
+    }
+
+    function getBudgetDocRef(key) {
+      return window.FB.doc(window.FB.db, "bcot_overtime_secure", key, "area_budgets", "main");
+    }
+
+    async function saveBudgetsToCloud() {
+      const key = getKeyOrWarn(); if (!key) return;
+      try {
+        const budgets = readBudgetsFromTable();
+        await window.FB.setDoc(getBudgetDocRef(key), { budgets, savedAt: new Date().toISOString() }, { merge: true });
+        showStatus("Saved budgets to cloud ✅");
+      } catch(e) { console.error(e); showStatus("Cloud save failed: " + (e?.message||e), true); }
+    }
+
+    async function loadBudgetsFromCloud() {
+      const key = getKeyOrWarn(); if (!key) return;
+      showStatus("Loading from cloud…");
+      try {
+        const snap = await window.FB.getDoc(getBudgetDocRef(key));
+        if (!snap.exists()) { showStatus("No budget data in cloud yet.", true); return; }
+        const budgets = snap.data()?.budgets || {};
+        localStorage.setItem(AREA_BUDGETS_KEY, JSON.stringify(budgets));
+        renderTable(budgets);
+        showStatus("Loaded budgets from cloud ✅");
+      } catch(e) { console.error(e); showStatus("Cloud load failed: " + (e?.message||e), true); }
+    }
+
+    // Init
+    (function init() {
+      const budgets = getBudgets();
+      renderTable(budgets);
+      if (!getAreasList().length) showStatus("No areas found — add areas in Staff.html or index.html first.", true);
+    })();
+  </script>
+</body>
+</html>

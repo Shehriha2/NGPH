@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Budget Report</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --bg:#f5f5f5; --card:#fff; --danger:#dc3545; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; }
+
+    .header{
+      display:flex; justify-content:space-between; align-items:center;
+      background:linear-gradient(135deg,var(--primary),var(--secondary));
+      padding:10px 14px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,.1); margin-bottom:14px;
+    }
+    .header-text{ text-align:center; flex-grow:1; color:#fff; }
+    .header-text h1{ margin:3px 0; font-size:14px; }
+    .header-text h2{ margin:2px 0; font-size:12px; }
+    .logo{ width:70px; height:70px; background:#fff; border-radius:5px; padding:4px; display:flex; justify-content:center; align-items:center; margin-right:12px; }
+    .logo img{ width:100%; height:100%; object-fit:contain; }
+
+    .card{ background:var(--card); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.12); padding:12px; margin-bottom:12px; }
+    .field-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+    .field-row label{ font-weight:700; min-width:100px; color:#334155; }
+    .btn-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    input,select,button{ padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+    button{ background:var(--primary); color:#fff; border:none; cursor:pointer; font-weight:700; transition:background-color .2s; }
+    button:hover{ background:var(--secondary); }
+    .btn-green{ background:#28a745; } .btn-green:hover{ background:#218838; }
+    .btn-orange{ background:#d97706; } .btn-orange:hover{ background:#b45309; }
+    .hint{ color:#666; font-size:11px; }
+
+    /* Summary cards */
+    .area-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-top:8px; }
+    .area-card{
+      background:#fff; border-radius:10px; border:1px solid #e2e8f0;
+      box-shadow:0 1px 4px rgba(0,0,0,.08); padding:12px; position:relative;
+    }
+    .area-card h3{ margin:0 0 10px; font-size:13px; color:var(--primary); border-bottom:2px solid var(--primary); padding-bottom:4px; }
+    .area-card .metric-row{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #f1f5f9; }
+    .area-card .metric-row:last-child{ border-bottom:none; }
+    .area-card .metric-label{ color:#64748b; font-size:11px; }
+    .area-card .metric-val{ font-weight:700; font-size:13px; }
+    .area-card .remaining.positive{ color:#16a34a; }
+    .area-card .remaining.negative{ color:#dc2626; }
+    .area-card .remaining.zero{ color:#d97706; }
+
+    /* Detail table */
+    .detail-table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
+    .detail-table th,
+    .detail-table td{ border:1px solid #e5e7eb; padding:5px 8px; text-align:left; }
+    .detail-table th{ background:var(--primary); color:#fff; }
+    .detail-table tr:nth-child(even){ background:#f8fafc; }
+    .detail-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+    .detail-table .ot-row td{ background:#fff7ed; }
+
+    .no-data{ padding:30px; text-align:center; color:#888; font-size:13px; }
+
+    .status-message{
+      position:fixed; top:18px; right:18px; padding:10px 16px; border-radius:6px;
+      color:#fff; display:none; z-index:1000; max-width:520px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 12px rgba(0,0,0,.18); font-size:12px;
+    }
+    .status-success{ background:#28a745; }
+    .status-error{ background:#dc3545; }
+    .status-info{ background:#2563eb; }
+
+    @media print{
+      @page{ size:landscape; margin:10mm; }
+      .no-print{ display:none !important; }
+      body{ background:#fff; padding:0; }
+      .card{ box-shadow:none; border:1px solid #ccc; margin-bottom:8px; }
+      .header{ box-shadow:none; border-radius:0; margin-bottom:8px; }
+      .area-grid{ grid-template-columns:repeat(3,1fr); gap:8px; }
+      .area-card{ box-shadow:none; border:1px solid #999; }
+      *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <img src="MNGHA-Logo.png" alt="MNGHA Logo"
+      onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;70&quot; height=&quot;70&quot;><rect width=&quot;70&quot; height=&quot;70&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;11&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
+  </div>
+  <div class="header-text">
+    <h1>Ministry of National Guard Health Affairs</h1>
+    <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+    <h2>OT Budget Report</h2>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="card no-print">
+  <div class="field-row">
+    <label>Month</label>
+    <select id="monthSelect">
+      <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+      <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+      <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+      <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+    </select>
+    <label>Year</label>
+    <input type="number" id="yearInput" value="2026" style="width:80px"/>
+    <label>Rota Area</label>
+    <select id="areaSelect" style="min-width:130px">
+      <option value="ALL">All Areas</option>
+    </select>
+  </div>
+  <div class="field-row">
+    <label>Named Rota</label>
+    <input id="namedRota" type="text" placeholder="Leave blank to load monthly save" style="min-width:220px"/>
+    <span class="hint">If blank, loads the monthly "Save Month" rota for the selected area.</span>
+  </div>
+  <div class="btn-row" style="margin-top:6px;">
+    <button class="btn-green" onclick="generateReport()">Load &amp; Generate Report</button>
+    <button class="btn-orange" onclick="window.print()">Print Report</button>
+    <a href="index.html" style="text-decoration:none;margin-left:auto">
+      <button type="button">Back to Rota</button>
+    </a>
+  </div>
+</div>
+
+<!-- Results -->
+<div id="reportOutput">
+  <div class="card"><div class="no-data">Select month and area, then click "Load &amp; Generate Report".</div></div>
+</div>
+
+<div class="status-message" id="statusBox"></div>
+
+<script src="config.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  const firebaseConfig = {
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+    storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894",
+    appId:"1:659421824894:web:f0546879df8808491ad52f"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  window.FB = { db, doc, setDoc, getDoc };
+</script>
+
+<script>
+  const AREAS_LIST_KEY   = "BCOT_AREAS_LIST_V1";
+  const AREA_BUDGETS_KEY = "BCOT_AREA_BUDGETS_V1";
+  const STAFF_RECORDS_KEY= "BCOT_STAFF_RECORDS_V2";
+  const DUTIES_ALL_KEY   = "BCOT_DUTIES_ALL_V1";
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+  function showStatus(msg, type='success') {
+    const el = document.getElementById("statusBox");
+    el.textContent = msg;
+    el.className = "status-message status-" + type;
+    el.style.display = "block";
+    setTimeout(() => el.style.display = "none", 4000);
+  }
+
+  function getKeyOrWarn() {
+    const key = (window.BCOT_APP_KEY || "").trim();
+    if (!key) { showStatus("config.js not found — cloud sync disabled.", 'error'); return null; }
+    return key;
+  }
+
+  // ── Area select ─────────────────────────────────────────────────────────────
+  function buildAreaSelect() {
+    const sel = document.getElementById("areaSelect");
+    const list = (() => { try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY)||"[]")||[]; } catch { return []; } })();
+    sel.innerHTML = '<option value="ALL">All Areas</option>';
+    list.forEach(a => { const o=document.createElement("option"); o.value=a; o.textContent=a; sel.appendChild(o); });
+    const last = (localStorage.getItem("BCOT_CURRENT_AREA_V1")||"ALL").trim().toUpperCase();
+    if (last==="ALL"||list.includes(last)) sel.value=last;
+  }
+
+  // ── OT calculation (mirrors index.html logic) ───────────────────────────────
+  function getDaysInMonth(month, year) { return new Date(year, month, 0).getDate(); }
+
+  function getEnabledHolidays(holidays) {
+    return (holidays||[]).filter(h => h.enabled && h.fromDay && h.toDay && h.toDay >= h.fromDay);
+  }
+
+  function countSunThuInRange(month, year, fromDay, toDay) {
+    const days = getDaysInMonth(month, year);
+    const f = Math.max(1, fromDay), t = Math.min(days, toDay);
+    let n = 0;
+    for (let d=f; d<=t; d++) { const dow=new Date(year,month-1,d).getDay(); if(dow>=0&&dow<=4) n++; }
+    return n;
+  }
+
+  function countHolidaySunThu(holidays, month, year) {
+    let n=0;
+    getEnabledHolidays(holidays).forEach(h => n += countSunThuInRange(month,year,h.fromDay,h.toDay));
+    return n;
+  }
+
+  function countHolidayAllDays(holidays, month, year) {
+    const days=getDaysInMonth(month,year); let n=0;
+    getEnabledHolidays(holidays).forEach(h => {
+      const f=Math.max(1,h.fromDay), t=Math.min(days,h.toDay); if(t>=f) n+=t-f+1;
+    });
+    return n;
+  }
+
+  function countLeaveDays(daysData, month, year, duties) {
+    let all=0, sunThu=0;
+    Object.entries(daysData||{}).forEach(([key,v]) => {
+      const raw=(v||'').toUpperCase();
+      const baseV=raw.endsWith('_O')?raw.slice(0,-2):raw;
+      if (!baseV) return;
+      const d=parseInt(key.replace('day',''),10);
+      const isLeave = baseV==='L' ||
+        (duties&&duties[baseV]&&Number(duties[baseV].hours)===0&&!duties[baseV].noLeaveCount);
+      if (isLeave) {
+        all++;
+        const dow=new Date(year,month-1,d).getDay(); if(dow>=0&&dow<=4) sunThu++;
+      }
+    });
+    return {all, sunThu};
+  }
+
+  function calcOTHours(rec, payload, duties) {
+    // Use override if set
+    if (rec.otOverride != null) {
+      const v=parseFloat(String(rec.otOverride).replace('+',''));
+      return Number.isFinite(v) ? Math.max(0,v) : 0;
+    }
+    const month=payload.month, year=payload.year||new Date().getFullYear();
+    const holidays=payload.holidays||[];
+    const mixedStdHours=Number(payload.mixedStdHours)||0;
+    const totalHours=Number(rec.hours)||0;
+    const schedType=rec.schedType||'';
+    const leave=countLeaveDays(rec.daysData, month, year, duties);
+    let standard=0;
+    if (schedType==='Regular') {
+      const totalWT=countSunThuInRange(month,year,1,getDaysInMonth(month,year));
+      const net=Math.max(0, totalWT - countHolidaySunThu(holidays,month,year) - leave.sunThu);
+      standard=net*9;
+    } else if (schedType==='12 Hours') {
+      const totalDays=getDaysInMonth(month,year);
+      const rem=Math.max(0, totalDays - countHolidayAllDays(holidays,month,year) - leave.all);
+      standard=(rem*15/28)*12;
+    } else if (schedType==='Mixed') {
+      const totalDays=getDaysInMonth(month,year);
+      const denom=Math.max(1, totalDays - countHolidayAllDays(holidays,month,year));
+      const rem=Math.max(0, denom - leave.all);
+      standard=mixedStdHours*(rem/denom);
+    }
+    return Math.max(0, Math.round((totalHours-standard)*10)/10);
+  }
+
+  // ── OT cost split across areas ──────────────────────────────────────────────
+  function splitOTCost(rec, otHours, hrr, DUTIES) {
+    if (otHours <= 0 || hrr <= 0) return {};
+    const otCost = otHours * hrr * 1.5;   // OT rate = HRR × 1.5 × hours
+
+    const pureOTHByArea = {};   // from _O cells → charged directly
+    const propHByArea   = {};   // from normal cells → proportional split
+
+    Object.values(rec.daysData||{}).forEach(code => {
+      const v=(code||'').toUpperCase(); if(!v||v==='L') return;
+      const isOT=v.endsWith('_O');
+      const baseCode=isOT?v.slice(0,-2):v;
+      const duty=DUTIES[baseCode]; if(!duty) return;
+      const area=(duty.area||'UNKNOWN').toUpperCase();
+      const h=Number(duty.hours)||0;
+      if (isOT) pureOTHByArea[area]=(pureOTHByArea[area]||0)+h;
+      else       propHByArea[area]  =(propHByArea[area]  ||0)+h;
+    });
+
+    const totalPureH=Object.values(pureOTHByArea).reduce((s,v)=>s+v,0);
+    // Scale factor: cap pure OT allocation if _O cell hours exceed total OT hours
+    const scale=totalPureH>0 ? Math.min(1, otHours/totalPureH) : 0;
+
+    const result={};
+    let directTotal=0;
+    Object.entries(pureOTHByArea).forEach(([area,h]) => {
+      const cost=h*scale*hrr*1.5;   // direct OT cost for this area (×1.5 rate)
+      result[area]=(result[area]||0)+cost;
+      directTotal+=cost;
+    });
+
+    const remainingCost=Math.max(0, otCost-directTotal);
+    const totalPropH=Object.values(propHByArea).reduce((s,v)=>s+v,0);
+    if (totalPropH>0 && remainingCost>0) {
+      Object.entries(propHByArea).forEach(([area,h]) => {
+        result[area]=(result[area]||0)+remainingCost*(h/totalPropH);
+      });
+    }
+
+    return result;
+  }
+
+  // ── Firestore paths ─────────────────────────────────────────────────────────
+  function getMonthDocRef(key, area, monthDocId) {
+    return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',monthDocId);
+  }
+  function getNamedDocRef(key, area, safeName) {
+    return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'named',safeName);
+  }
+
+  // ── Generate report ─────────────────────────────────────────────────────────
+  async function generateReport() {
+    const key=getKeyOrWarn(); if(!key) return;
+    const month=Number(document.getElementById("monthSelect").value);
+    const year =Number(document.getElementById("yearInput").value)||new Date().getFullYear();
+    const area =(document.getElementById("areaSelect").value||"ALL").trim().toUpperCase();
+    const named=(document.getElementById("namedRota").value||"").trim();
+
+    showStatus("Loading rota from cloud…","info");
+
+    let payload;
+    try {
+      if (named) {
+        const safe=named.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_');
+        const snap=await window.FB.getDoc(getNamedDocRef(key, area, safe));
+        if (!snap.exists()) { showStatus(`Named rota "${safe}" not found for area ${area}.`,'error'); return; }
+        payload=snap.data();
+      } else {
+        const docId=`${year}-${String(month).padStart(2,'0')}`;
+        const snap=await window.FB.getDoc(getMonthDocRef(key, area, docId));
+        if (!snap.exists()) { showStatus(`No monthly rota saved for ${area} – ${year}/${String(month).padStart(2,'0')}.`,'error'); return; }
+        payload=snap.data();
+      }
+    } catch(e) { console.error(e); showStatus("Failed to load rota: "+(e?.message||e),'error'); return; }
+
+    showStatus("Calculating…","info");
+
+    // Load support data from localStorage
+    const DUTIES = (() => { try { return JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||"{}")||{}; } catch { return {}; } })();
+    const staffRecs = (() => { try { return JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY)||"[]")||[]; } catch { return []; } })();
+    const budgets   = (() => { try { return JSON.parse(localStorage.getItem(AREA_BUDGETS_KEY)||"{}")||{}; } catch { return {}; } })();
+
+    // Build HRR lookup by name
+    const hrrByName = {};
+    staffRecs.forEach(s => { if (s.name && s.hrr) hrrByName[s.name.trim()] = Number(s.hrr)||0; });
+
+    // Per-area totals
+    const areaCosts = {};    // area → total OT cost (SAR)
+    const staffRows = [];    // for detail table
+
+    const records = Array.isArray(payload.records) ? payload.records : [];
+    records.forEach(rec => {
+      const name = (rec.staffName||'').trim();
+      if (!name) return;
+      const hrr = hrrByName[name] || 0;
+      const otHours = calcOTHours(rec, payload, DUTIES);
+      const split = splitOTCost(rec, otHours, hrr, DUTIES);
+
+      Object.entries(split).forEach(([ar, cost]) => {
+        areaCosts[ar] = (areaCosts[ar]||0) + cost;
+      });
+
+      staffRows.push({ name, hrr, otHours, otCost: otHours*hrr*1.5, split });   // ×1.5 OT rate
+    });
+
+    renderReport({ payload, month, year, area, areaCosts, budgets, staffRows, DUTIES });
+    showStatus("Report generated ✅");
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  function sar(n) { return (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' SAR'; }
+
+  function renderReport({ payload, month, year, area, areaCosts, budgets, staffRows, DUTIES }) {
+    const allAreas = Array.from(new Set([
+      ...Object.keys(budgets),
+      ...Object.keys(areaCosts)
+    ])).sort();
+
+    let html = '';
+
+    // Header info card
+    const monthName = new Date(year,month-1,1).toLocaleString('default',{month:'long'});
+    html += `<div class="card">
+      <b>Report:</b> ${monthName} ${year} &nbsp;|&nbsp;
+      <b>Rota Area:</b> ${area} &nbsp;|&nbsp;
+      <b>Rota Title:</b> ${payload.rotaTitle||'—'} &nbsp;|&nbsp;
+      <b>Staff Records:</b> ${staffRows.length}
+    </div>`;
+
+    // Per-area summary cards
+    html += `<div class="area-grid">`;
+    if (!allAreas.length) {
+      html += `<div class="card"><div class="no-data">No area cost data. Make sure duties have area tags and staff have HRR values.</div></div>`;
+    }
+    allAreas.forEach(ar => {
+      const budget    = Number(budgets[ar])||0;
+      const consumed  = areaCosts[ar]||0;
+      const remaining = budget - consumed;
+      const remClass  = remaining > 0 ? 'positive' : remaining < 0 ? 'negative' : 'zero';
+      html += `<div class="area-card">
+        <h3>${ar}</h3>
+        <div class="metric-row"><span class="metric-label">Budget Allocated</span><span class="metric-val">${sar(budget)}</span></div>
+        <div class="metric-row"><span class="metric-label">OT Cost Consumed</span><span class="metric-val" style="color:#dc2626">${sar(consumed)}</span></div>
+        <div class="metric-row"><span class="metric-label">Remaining</span><span class="metric-val remaining ${remClass}">${sar(remaining)}</span></div>
+        ${budget>0?`<div style="margin-top:6px;background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+          <div style="background:${consumed>budget?'#dc2626':'#2e8b57'};height:6px;width:${Math.min(100,Math.round(consumed/budget*100))}%;"></div>
+        </div><div class="hint" style="margin-top:3px;text-align:right;">${Math.round(consumed/budget*100)}% used</div>`:''}
+      </div>`;
+    });
+    html += `</div>`;
+
+    // Staff detail table
+    html += `<div class="card" style="margin-top:12px;">
+      <b>Staff OT Detail</b>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Staff Name</th><th>HRR (SAR/h)</th>
+            <th class="num">OT Hours</th><th class="num">OT Cost (SAR)</th>
+            <th>Cost by Area</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    if (!staffRows.length) {
+      html += `<tr><td colspan="6" style="text-align:center;color:#888;">No staff records in rota.</td></tr>`;
+    }
+    staffRows.forEach((s, idx) => {
+      const splitStr = Object.entries(s.split)
+        .sort((a,b)=>b[1]-a[1])
+        .map(([ar,c])=>`<span style="white-space:nowrap"><b>${ar}:</b> ${sar(c)}</span>`)
+        .join(' &nbsp; ') || '—';
+      const trClass = s.otHours > 0 ? ' class="ot-row"' : '';
+      html += `<tr${trClass}>
+        <td>${idx+1}</td>
+        <td>${s.name}</td>
+        <td class="num">${s.hrr.toFixed(2)}</td>
+        <td class="num">${s.otHours > 0 ? '+'+s.otHours : s.otHours}</td>
+        <td class="num">${s.otCost > 0 ? sar(s.otCost) : '—'}</td>
+        <td style="font-size:11px;">${splitStr}</td>
+      </tr>`;
+    });
+
+    // Totals row
+    const totalOTCost = staffRows.reduce((s,r)=>s+r.otCost,0);
+    html += `<tr style="background:#edf4fb;font-weight:700;">
+      <td colspan="4" style="text-align:right;">Total OT Cost</td>
+      <td class="num">${sar(totalOTCost)}</td>
+      <td></td>
+    </tr>`;
+
+    html += `</tbody></table></div>`;
+
+    // Legend note
+    html += `<div class="card hint no-print">
+      <b>How costs are split:</b>
+      Duties ending in <code>_O</code> (e.g. <code>ACCN_O</code>) are charged 100% as direct OT to their duty's area.
+      All remaining OT cost is split proportionally by scheduled hours per area (from DUTIES area tags).
+    </div>`;
+
+    document.getElementById("reportOutput").innerHTML = html;
+  }
+
+  // Init
+  (function init() {
+    buildAreaSelect();
+    document.getElementById("monthSelect").value = String(new Date().getMonth()+1);
+    document.getElementById("yearInput").value   = String(new Date().getFullYear());
+  })();
+</script>
+</body>
+</html>
