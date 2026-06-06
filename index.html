@@ -89,6 +89,7 @@
 
     .delete-btn{ background:var(--danger-color); color:#fff; border:none; border-radius:6px; padding:3px 7px; font-size:10px; cursor:pointer; margin-left:5px; }
     .delete-btn:hover{ background:var(--danger-dark); }
+    tr.hidden-row{ display:none !important; }
 
     .legend{ display:flex; gap:15px; margin-top:12px; padding:10px; background:#fff; border-radius:12px; justify-content:center; flex-wrap:wrap; font-size:10px; box-shadow:var(--shadow); border:1px solid #e7edf3; }
     .legend-item{ display:flex; align-items:center; gap:4px; }
@@ -145,6 +146,9 @@
 
     .ot-cell{ white-space:nowrap; font-weight:700; }
     .ot-val{ font-size:11px; }
+    .ext-cell{ white-space:nowrap; text-align:center; }
+    .ext-cell .ext-prefix{ font-weight:800; font-size:10px; color:#7c3aed; }
+    .ext-cell input{ width:38px; border:1px solid #d1d5db; border-radius:4px; font-size:11px; padding:1px 3px; text-align:center; background:#faf5ff; }
     .ot-positive{ color:var(--hours-over); }
     .ot-negative{ color:var(--hours-warn); }
     .ot-override{ color:var(--accent-color); }
@@ -257,7 +261,7 @@
     @media print{
       @page{ size:landscape; margin:10mm; }
       body{ padding:0; background:#fff; font-size:8pt; }
-      .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,.print-only{ display:none !important; }
+      .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,.print-only,#activeStaffBanner{ display:none !important; }
       .print-area-box{ border:1.5pt solid #000; border-radius:6pt; padding:6pt 10pt; background:#f5f5f5; font-size:9pt; color:#000; min-width:90pt; }
       .print-area-box .pab-label{ font-size:7pt; color:#555; margin-bottom:3pt; text-transform:uppercase; letter-spacing:.4pt; }
       .print-area-box .pab-value{ font-size:12pt; font-weight:800; color:#1a4f8b; }
@@ -271,6 +275,7 @@
       .table-container{ overflow:visible !important; box-shadow:none; border:none; }
       .sched-cell, th.sched-th{ display:none !important; }
       .ot-cell,    th.ot-th  { display:none !important; }
+      .ext-cell,   th.ext-th { display:none !important; }
       table{ font-size:7pt; }
       th,td{ padding:2px; border:.5pt solid #000; }
       .legend{ font-size:7pt; padding:2px; margin-top:5px; box-shadow:none; border:1px solid #000; }
@@ -305,13 +310,21 @@
       <div class="header-right">
         <!-- Screen: action buttons -->
         <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
+          <button type="button" id="areaPickerBtn" onclick="openAreaSelectorModal()"
+            style="background:#fff;border:2px solid rgba(255,255,255,.7);color:#1a4f8b;font-size:12px;
+            padding:9px 16px;border-radius:10px;font-weight:800;cursor:pointer;
+            display:flex;align-items:center;gap:6px;min-width:120px;">
+            <span style="opacity:.6;">📍</span>
+            <span id="areaPickerLabel">All Areas</span>
+            <span style="opacity:.5;margin-left:auto;">▾</span>
+          </button>
           <button type="button" onclick="openSettingsModal()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:13px;padding:9px 20px;border-radius:10px;font-weight:800;letter-spacing:.3px;">⚙ Settings &amp; Tools</button>
           <button onclick="addNewRow()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">+ Row</button>
           <button onclick="populateStaff()" title="Load staff assigned to the current area filter into the rota" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">👥 Load Staff</button>
           <button onclick="saveToCloud()" style="background:#16a34a;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">💾 Save</button>
           <button onclick="openLoadPicker()" style="background:#d97706;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">📂 Load</button>
-          <a href="Staff.html" style="text-decoration:none;"><button type="button" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">👥 Staff</button></a>
-          <button onclick="reloadDutiesFromStorage()" title="Load duties for the current area" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">📋 Load Duties</button>
+          <button onclick="SM.open()" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">👥 Staff</button>
+          <button onclick="DM.open()" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">📋 Duties</button>
           <button onclick="clearAllTable()" style="background:#dc2626;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">🗑 Clear All</button>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;">🖨 Print</button>
         </div>
@@ -340,9 +353,8 @@
             <h3>Schedule Setup</h3>
             <div class="field-row">
               <label>Area Filter</label>
-              <select id="areaFilter" style="min-width:130px;flex:1" onchange="setArea()">
-                <option value="ALL">All Areas</option>
-              </select>
+              <input type="hidden" id="areaFilter" value="ALL"/>
+              <span style="font-size:12px;color:#6b7280;">Use the 📍 button in the toolbar</span>
             </div>
             <div class="field-row" style="padding-left:96px;margin-top:-4px;">
               <input id="newAreaInput" type="text" placeholder="New area…"
@@ -439,7 +451,8 @@
               <a href="Duties.html"        class="ghost-link"><button type="button" class="btn-green">Open Duties</button></a>
               <a href="Areas.html"         class="ghost-link"><button type="button" class="btn-orange">Area Budgets</button></a>
               <a href="BudgetReport.html"  class="ghost-link"><button type="button" class="btn-purple">Budget Report</button></a>
-              <a href="OTPreApproval.html" class="ghost-link"><button type="button" style="background:#be185d;">OT Pre-Approval</button></a>
+              <button type="button" onclick="openOTPreApproval()" style="background:#be185d;">OT Pre-Approval</button>
+              <a href="Extension.html" class="ghost-link"><button type="button" style="background:#7c3aed;">📋 Extensions</button></a>
               <a href="MultiMonth.html"   class="ghost-link"><button type="button" style="background:#0f766e;">Multi-Month View</button></a>
             </div>
           </div>
@@ -770,21 +783,21 @@
       if (pel) pel.textContent = name;
     }
 
-    function newRelease(){
+    async function newRelease(){
       const area = getCurrentArea();
       if (!area || area === "ALL"){ showStatusMessage("Select a specific area first.", "error"); return; }
 
       const current = getRotaDisplayName();
       const next    = `${area}-${MONTH_NAMES_SHORT[parseInt(document.getElementById("monthSelect")?.value||"1",10)]}-R${loadReleaseNum(area)+1}`;
 
-      const ok = confirm(
-        `Create New Release?\n\n` +
-        `▸ Current release (${current}) stays safely in the cloud — nothing is deleted.\n` +
-        `▸ All manual OT overrides will be reset to auto-calculated.\n` +
-        `▸ New release will be: ${next}\n` +
-        `▸ Press 💾 Save after this to store ${next} in the cloud.\n\n` +
-        `Continue?`
-      );
+      const ok = await showConfirmModal({
+        title: 'Create New Release?',
+        message: `Current release <b>${current}</b> stays safely in the cloud.<br>
+          All manual OT overrides will be reset to auto-calculated.<br>
+          New release will be: <b>${next}</b><br>
+          Press 💾 Save after this to store it in the cloud.`,
+        confirmLabel: 'Create Release'
+      });
       if (!ok) return;
 
       releaseNum = loadReleaseNum(area) + 1;
@@ -917,6 +930,12 @@
         const rem       = Math.max(0, denom - leave.all);
         standard        = Math.round(mStd * (rem / denom) * 10) / 10;
         tipDetail = `Std: ${mStd}h | Holidays: ${holDays} | Off-days: ${leave.all} | Ratio: ${rem}/${denom} = ${standard}h`;
+      } else if (schedType==='BC') {
+        // Business Center — all hours are overtime, no standard deduction
+        val.textContent = (totalHours>0?'+':'')+totalHours;
+        val.className   = 'ot-val'+(totalHours>0?' ot-positive':'');
+        otCell.title    = `BC — all ${totalHours}h are overtime (charged to Business Center)`;
+        return;
       }
       const ot = Math.round((totalHours - standard) * 10) / 10;
       val.textContent = (ot>0?'+':'')+ot;
@@ -1053,6 +1072,22 @@
       return td;
     }
 
+    // ── Extension hours cell builder ──────────────────────────────────────────
+    // Shows as "E{n}" — manually editable, saved separately, combined at pre-approval time.
+    function buildExtCell(value=0) {
+      const td = document.createElement('td');
+      td.className = 'ext-cell';
+      const prefix = document.createElement('span');
+      prefix.className = 'ext-prefix';
+      prefix.textContent = 'E';
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.min = '0'; inp.step = '0.5';
+      inp.value = String(Number(value)||0);
+      inp.title = 'Extension hours — added to OT on the pre-approval form';
+      td.appendChild(prefix); td.appendChild(inp);
+      return td;
+    }
+
     function handleOTLock(otCell) {
       const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
       if (!pwd) { showStatusMessage('OT password not set in config.js','error'); return; }
@@ -1146,14 +1181,119 @@
     }
 
     function rebuildAreaSelect() {
-      const sel  = document.getElementById("areaFilter");
-      const prev = sel.value || getCurrentArea();
-      sel.innerHTML = '<option value="ALL">All Areas</option>';
-      getAreasList().forEach(a => {
-        const o = document.createElement("option"); o.value = a; o.textContent = a;
-        sel.appendChild(o);
+      // Keep the hidden input value valid; update the visible button label
+      const inp  = document.getElementById("areaFilter");
+      const prev = inp?.value || "ALL";
+      const list = getAreasList();
+      const valid = (prev === "ALL" || list.includes(prev)) ? prev : "ALL";
+      if (inp) inp.value = valid;
+      const lbl = document.getElementById("areaPickerLabel");
+      if (lbl) lbl.textContent = valid === "ALL" ? "All Areas" : valid;
+    }
+
+    // ── Custom confirmation modal ─────────────────────────────────────────────
+    function showConfirmModal({ title, message, confirmLabel='Confirm', cancelLabel='Cancel', danger=false }) {
+      return new Promise(resolve => {
+        const existing = document.getElementById('appConfirmModal');
+        if (existing) existing.remove();
+        const modal = document.createElement('div');
+        modal.id = 'appConfirmModal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(2,8,23,.82);display:flex;align-items:center;justify-content:center;z-index:9000;backdrop-filter:blur(8px);';
+        const accent  = danger ? '#f87171' : '#60a5fa';
+        const okBg    = danger ? 'linear-gradient(135deg,#dc2626,#b91c1c)' : 'linear-gradient(135deg,#1d4ed8,#1e40af)';
+        const okShadow= danger ? '0 4px 18px rgba(220,38,38,.45)' : '0 4px 18px rgba(29,78,216,.45)';
+        modal.innerHTML = `
+          <div style="
+            background:linear-gradient(145deg,#0f172a 0%,#1e293b 60%,#0f172a 100%);
+            border:1px solid rgba(148,163,184,.18);
+            border-radius:22px;padding:34px 36px;
+            min-width:360px;max-width:480px;width:92%;
+            box-shadow:0 40px 100px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);">
+            <!-- accent top bar -->
+            <div style="height:3px;border-radius:99px;background:${danger?'linear-gradient(90deg,#dc2626,#f97316)':'linear-gradient(90deg,#1d4ed8,#06b6d4)'};margin-bottom:26px;"></div>
+            <!-- icon + text -->
+            <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;">
+              <div style="flex-shrink:0;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;
+                justify-content:center;font-size:22px;
+                background:${danger?'rgba(220,38,38,.15)':'rgba(29,78,216,.15)'};
+                border:1px solid ${danger?'rgba(248,113,113,.3)':'rgba(96,165,250,.3)'};">
+                ${danger ? '⚠️' : 'ℹ️'}
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:9px;letter-spacing:.1px;line-height:1.3;">${title}</div>
+                <div style="font-size:13px;color:#cbd5e1;line-height:1.75;font-weight:400;">${message}</div>
+              </div>
+            </div>
+            <!-- divider -->
+            <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.2),transparent);margin-bottom:24px;"></div>
+            <!-- buttons -->
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+              <button id="confirmModalCancel"
+                style="background:transparent;color:#94a3b8;border:1px solid rgba(148,163,184,.25);
+                border-radius:11px;padding:11px 24px;font-size:13px;font-weight:600;cursor:pointer;"
+                onmouseover="this.style.background='rgba(148,163,184,.1)';this.style.color='#e2e8f0'"
+                onmouseout="this.style.background='transparent';this.style.color='#94a3b8'">
+                ${cancelLabel}
+              </button>
+              <button id="confirmModalOk"
+                style="background:${okBg};color:#fff;border:none;border-radius:11px;
+                padding:11px 28px;font-size:13px;font-weight:800;cursor:pointer;
+                box-shadow:${okShadow};letter-spacing:.3px;"
+                onmouseover="this.style.opacity='.88'"
+                onmouseout="this.style.opacity='1'">
+                ${confirmLabel}
+              </button>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+        const cleanup = ok => { modal.remove(); resolve(ok); };
+        document.getElementById('confirmModalOk').onclick     = () => cleanup(true);
+        document.getElementById('confirmModalCancel').onclick = () => cleanup(false);
+        modal.addEventListener('click', e => { if (e.target === modal) cleanup(false); });
       });
-      if (prev && (prev === "ALL" || getAreasList().includes(prev))) sel.value = prev;
+    }
+
+    // ── Area selector modal (radio buttons) ──────────────────────────────────
+    function openAreaSelectorModal() {
+      const existing = document.getElementById("areaSelectorModal");
+      if (existing) existing.remove();
+      const areas   = getAreasList();
+      const current = getCurrentArea();
+      const modal   = document.createElement("div");
+      modal.id = "areaSelectorModal";
+      modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:5000;";
+      const options = [{ value:"ALL", label:"All Areas" }, ...areas.map(a => ({ value:a, label:a }))];
+      modal.innerHTML = `
+        <div style="background:#fff;border-radius:14px;padding:22px 26px;min-width:260px;max-width:340px;
+          width:90%;box-shadow:0 10px 40px rgba(0,0,0,.3);">
+          <h3 style="margin:0 0 16px;font-size:13px;color:#1a4f8b;font-weight:800;">Select Area</h3>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;margin-bottom:18px;">
+            ${options.map(o => `
+              <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;
+                border:1.5px solid ${o.value===current?'#818cf8':'#e5e7eb'};
+                background:${o.value===current?'#eef2ff':'#fff'};cursor:pointer;font-size:12px;font-weight:${o.value===current?'700':'400'};">
+                <input type="radio" name="areaPick" value="${o.value}" ${o.value===current?'checked':''}
+                  style="accent-color:#3730a3;width:14px;height:14px;cursor:pointer;"/>
+                ${o.label}
+              </label>`).join("")}
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="areaSelApply"  style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:12px;font-weight:700;cursor:pointer;">Select</button>
+            <button id="areaSelCancel" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;">Cancel</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      document.getElementById("areaSelCancel").onclick = () => modal.remove();
+      modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+      document.getElementById("areaSelApply").onclick = () => {
+        const picked = modal.querySelector('input[name="areaPick"]:checked')?.value || "ALL";
+        modal.remove();
+        if (picked === current) return;  // no change
+        document.getElementById("areaFilter").value = picked;
+        const lbl = document.getElementById("areaPickerLabel");
+        if (lbl) lbl.textContent = picked === "ALL" ? "All Areas" : picked;
+        setArea();
+      };
     }
 
     function addNewArea() {
@@ -1161,16 +1301,24 @@
         .trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
       if (!raw) { showStatusMessage("Enter a valid area name.", 'error'); return; }
       saveAreaToList(raw);
-      rebuildAreaSelect();
       document.getElementById("areaFilter").value = raw;
+      const lbl = document.getElementById("areaPickerLabel");
+      if (lbl) lbl.textContent = raw;
       document.getElementById("newAreaInput").value = "";
+      rebuildAreaSelect();
       setArea();
     }
 
-    function deleteCurrentArea() {
+    async function deleteCurrentArea() {
       const area = getCurrentArea();
       if (!area || area === "ALL") { showStatusMessage("Select a specific area to delete.", "error"); return; }
-      if (!confirm(`Delete area "${area}"?\n\nThis will:\n• Remove "${area}" from the area list\n• Delete all staff records tagged to "${area}"\n\nStaff in the general pool are unaffected.`)) return;
+      const ok = await showConfirmModal({
+        title: `Delete area "${area}"?`,
+        message: `This will remove <b>${area}</b> from the area list.<br>Staff assigned only to this area will have it cleared from their record.`,
+        confirmLabel: 'Delete',
+        danger: true
+      });
+      if (!ok) return;
 
       // Remove from areas list
       const list = getAreasList().filter(a => a !== area);
@@ -1182,7 +1330,12 @@
         if (raw) {
           const all = JSON.parse(raw);
           if (Array.isArray(all)) {
-            const kept = all.filter(s => (s.area || "").toUpperCase() !== area.toUpperCase());
+            const kept = all.map(s => {
+            const areas = (s.area || "").toUpperCase().split(",").map(x => x.trim()).filter(Boolean);
+            if (!areas.includes(area.toUpperCase())) return s;  // not in this area — untouched
+            const remaining = areas.filter(a => a !== area.toUpperCase()).join(",");
+            return { ...s, area: remaining };  // strip the deleted area (may become empty → appears in ALL)
+          });
             localStorage.setItem(STAFF_RECORDS_KEY, JSON.stringify(kept));
           }
         }
@@ -1193,35 +1346,51 @@
 
       // Reset filter to ALL
       document.getElementById("areaFilter").value = "ALL";
+      const lbl = document.getElementById("areaPickerLabel");
+      if (lbl) lbl.textContent = "All Areas";
       rebuildAreaSelect();
       setArea();
       showStatusMessage(`Area "${area}" and its staff records deleted ✅`);
     }
 
-    function setArea() {
-      const area = getCurrentArea();
-      localStorage.setItem(AREA_KEY, area);
+    async function setArea() {
+      const area  = getCurrentArea();
       const label = area === "ALL" ? "All Areas" : area;
+      // Confirm before clearing rota
+      const hadRows = Array.from(document.querySelectorAll('#rotaTable tbody tr'))
+        .some(r => r.cells[0]?.querySelector('input')?.value?.trim());
+      if (hadRows) {
+        const ok = await showConfirmModal({
+          title: `Switch to "${label}"?`,
+          message: `The current rota will be cleared and staff &amp; duties for <b>${label}</b> will be loaded from cloud.`,
+          confirmLabel: 'Switch Area',
+          danger: false
+        });
+        if (!ok) {
+          const prev = localStorage.getItem(AREA_KEY) || "ALL";
+          document.getElementById("areaFilter").value = prev;
+          const lbl2 = document.getElementById("areaPickerLabel");
+          if (lbl2) lbl2.textContent = prev === "ALL" ? "All Areas" : prev;
+          return;
+        }
+      }
+      localStorage.setItem(AREA_KEY, area);
       const hdr = document.getElementById("headerAreaLabel");
       if (hdr) hdr.textContent = label;
       const pal = document.getElementById("printAreaLabel");
       if (pal) pal.textContent = label;
-      // Load release number for new area
       releaseNum = loadReleaseNum(area);
       updateRotaLabel();
-      onAreaChanged(area);
+      await onAreaChanged(area);
     }
 
-    function onAreaChanged(area) {
-      // Reload staff + duties for the new filter — do NOT clear the table
-      staffList = loadStaffList();
-      DUTIES    = loadDuties() || {};
-      injectDutyStyles();
-      buildLegend();
-      // Recalculate hours (some codes may become unknown/known after filter change)
-      document.querySelectorAll('#rotaTable tbody tr').forEach(updateHours);
+    async function onAreaChanged(area) {
+      // Clear the rota table
+      document.querySelector('#rotaTable tbody').innerHTML = '';
+      // Load duties then staff from cloud for the new area
+      await reloadDutiesFromStorage();
+      await populateStaff();
       updateDashboard();
-      showStatusMessage(`Area filter: ${area === "ALL" ? "All Areas" : '"' + area + '"'} ✅`);
     }
 
     function getAreaOrWarn() {
@@ -1265,7 +1434,7 @@
         // (staff with no area assignment are excluded — they appear in ALL only).
         const filtered = (area === "ALL")
           ? all
-          : all.filter(s => (s.area || '').toUpperCase() === area);
+          : all.filter(s => (s.area || '').toUpperCase().split(',').map(x => x.trim()).includes(area));
         return filtered.map(s => s.name).filter(Boolean);
       } catch { return []; }
     }
@@ -1354,13 +1523,27 @@
       renderAbbreviationsTable();
     }
 
-    function reloadDutiesFromStorage() {
+    async function reloadDutiesFromStorage() {
+      try {
+        const key = (window.BCOT_APP_KEY || "").trim();
+        if (!key) { showStatusMessage("config.js not found — cannot load duties.", "error"); return; }
+        showStatusMessage("Loading duties from cloud…", "info");
+        const ref  = window.FB.doc(window.FB.db, "bcot_overtime_secure", key, "duties_named", "DUTIES_POOL");
+        const snap = await window.FB.getDoc(ref);
+        if (!snap.exists() || !Object.keys(snap.data()?.duties||{}).length) {
+          showStatusMessage("No duties in cloud — loaded from local cache.", "info");
+        } else {
+          const dutiesObj = snap.data().duties;
+          localStorage.setItem(DUTIES_ALL_KEY, JSON.stringify(dutiesObj));
+        }
+      } catch(e) { console.error(e); showStatusMessage("Cloud unavailable — duties loaded from local cache.", "info"); }
       DUTIES = loadDuties() || {};
       injectDutyStyles();
       buildLegend();
       document.querySelectorAll("#rotaTable tbody tr").forEach(updateHours);
       updateDashboard();
-      showStatusMessage("Duties reloaded ✅");
+      if (Object.keys(DUTIES).length) showStatusMessage("Duties loaded ✅");
+      else showStatusMessage("No duties found. Open Duties.html to add duties.", "error");
     }
 
     function renderAbbreviationsTable() {
@@ -1421,12 +1604,14 @@
       const hTh  = document.createElement('th'); hTh.textContent  = 'Hours';       headerRow.appendChild(hTh);
       const sTh  = document.createElement('th'); sTh.className='sched-th'; sTh.textContent  = 'Sched. Type'; headerRow.appendChild(sTh);
       const otTh = document.createElement('th'); otTh.className='ot-th';   otTh.textContent = 'OT';          headerRow.appendChild(otTh);
+      const exTh = document.createElement('th'); exTh.className='ext-th';  exTh.textContent = 'Ext.';        headerRow.appendChild(exTh);
 
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name          = row.cells[0]?.querySelector('input')?.value || '';
         const schedVal      = row.querySelector('.sched-cell select')?.value || '';
         const otIsOverride  = row.querySelector('.ot-cell')?.dataset?.override === 'true';
         const otOverrideVal = otIsOverride ? (row.querySelector('.ot-val')?.textContent || null) : null;
+        const extVal        = Number(row.querySelector('.ext-cell input')?.value) || 0;
         const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
         const codes = [];
         for (let i=1; i<hIdx; i++) codes.push(row.cells[i].textContent.trim());
@@ -1442,6 +1627,7 @@
         const hc = document.createElement('td'); hc.className='hours-cell'; hc.textContent = '0'; row.appendChild(hc);
         row.appendChild(buildSchedCell(schedVal));
         row.appendChild(buildOTCell(otOverrideVal, otIsOverride));
+        row.appendChild(buildExtCell(extVal));
         updateHours(row);
       });
       applyColumnWidths();
@@ -1487,7 +1673,10 @@
 
       const del = document.createElement('button');
       del.textContent = 'X'; del.className = 'delete-btn'; del.type = 'button';
-      del.onclick = () => { if (confirm('Delete this record?')) { rowRef.remove(); updateDashboard(); } };
+      del.onclick = async () => {
+        const ok = await showConfirmModal({ title:'Delete this record?', message:'This staff row will be removed from the rota.', confirmLabel:'Delete', danger:true });
+        if (ok) { rowRef.remove(); updateDashboard(); }
+      };
 
       nameCell.appendChild(input); nameCell.appendChild(datalist); nameCell.appendChild(del);
       return nameCell;
@@ -1508,26 +1697,57 @@
       const hc = document.createElement('td'); hc.className='hours-cell'; hc.textContent='0'; tr.appendChild(hc);
       tr.appendChild(buildSchedCell());
       tr.appendChild(buildOTCell());
+      tr.appendChild(buildExtCell());
       tbody.appendChild(tr);
       applyColumnWidths(); updateDashboard(); filterRota();
     }
 
-    function populateStaff() {
+    function openOTPreApproval() {
+      // Route to BC-specific form when the active area is BCOT
+      window.location.href = getCurrentArea() === 'BCOT' ? 'BCOTPreApproval.html' : 'OTPreApproval.html';
+    }
+
+    async function populateStaff() {
       const area    = getCurrentArea();
       const areaTag = area === 'ALL' ? 'All Areas' : area;
-      staffList = loadStaffList();
-      if (!staffList.length) {
-        showStatusMessage(`No staff found for "${areaTag}". Open Staff.html, assign the correct area to each staff member, then try again.`, 'error'); return;
-      }
-      // Clear existing table content first, then load all staff fresh
-      const tbody = document.querySelector('#rotaTable tbody');
-      tbody.innerHTML = '';
-      staffList.forEach(name => {
-        addNewRow();
-        tbody.lastElementChild.cells[0].querySelector('input').value = name;
-      });
-      updateDashboard();
-      showStatusMessage(`Loaded ${staffList.length} staff from "${areaTag}" ✅`, 'success');
+      try {
+        const key = (window.BCOT_APP_KEY || "").trim();
+        if (!key) { showStatusMessage("config.js not found — cannot load staff.", "error"); return; }
+        showStatusMessage("Loading staff from cloud…", "info");
+        const ref  = window.FB.doc(window.FB.db, "bcot_overtime_secure", key, "staff_named", "STAFF_POOL");
+        const snap = await window.FB.getDoc(ref);
+        if (!snap.exists()) { showStatusMessage("No staff found in cloud. Save staff from Staff.html first.", "info"); return; }
+        const records = snap.data()?.records || [];
+        const filtered = area === "ALL"
+          ? records
+          : records.filter(s => (s.area||'').toUpperCase().split(',').map(x=>x.trim()).includes(area));
+        if (!filtered.length) { showStatusMessage(`No staff found for "${areaTag}" in cloud.`, "info"); return; }
+        // Update local cache + staffList
+        localStorage.setItem(STAFF_RECORDS_KEY, JSON.stringify(records));
+        staffList = filtered.map(s => s.name).filter(Boolean);
+        // Only add staff not already present — preserve existing rows and their duties
+        const tbody = document.querySelector('#rotaTable tbody');
+        const existingNames = new Set(
+          Array.from(tbody.querySelectorAll('tr')).map(row => {
+            const inp = row.cells[0]?.querySelector('input');
+            return (inp?.value || '').trim();
+          }).filter(Boolean)
+        );
+        let addedCount = 0;
+        staffList.forEach(name => {
+          if (!existingNames.has(name)) {
+            addNewRow();
+            tbody.lastElementChild.cells[0].querySelector('input').value = name;
+            addedCount++;
+          }
+        });
+        updateDashboard();
+        if (addedCount === 0) {
+          showStatusMessage(`All staff for "${areaTag}" are already loaded ✅`, 'info');
+        } else {
+          showStatusMessage(`Added ${addedCount} new staff for "${areaTag}"${existingNames.size ? ` (${existingNames.size} already present)` : ''} ✅`, 'success');
+        }
+      } catch(e) { console.error(e); showStatusMessage("Load staff failed: " + (e?.message||e), "error"); }
     }
 
     // ── Cell editing ──────────────────────────────────────────────────────────
@@ -1625,7 +1845,8 @@
       sel.innerHTML = '<option value="">—</option>'
         + '<option value="Regular">Regular</option>'
         + '<option value="12 Hours">12 Hours</option>'
-        + '<option value="Mixed">Mixed</option>';
+        + '<option value="Mixed">Mixed</option>'
+        + '<option value="BC">BC</option>';
       sel.value = value;
       sel.addEventListener('change', () => calcOT(td.parentElement));
       td.appendChild(sel);
@@ -1641,10 +1862,13 @@
       for (let i=1;i<hIdx;i++) { let v=row.cells[i].textContent.trim().toUpperCase(); if(v.endsWith('_O'))v=v.slice(0,-2); if(DUTIES[v]) hours+=Number(DUTIES[v].hours)||0; }
       hCell.textContent=hours;
       row.classList.remove('row-over','row-under','row-target');
-      const s=getRowHoursStatus(hours);
-      row.classList.add(s==='over'?'row-over':s==='under'?'row-under':'row-target');
       hCell.classList.remove('hours-ok','hours-warn','hours-over');
-      hCell.classList.add(s==='over'?'hours-over':s==='under'?'hours-warn':'hours-ok');
+      if (row.querySelector('.sched-cell select')?.value !== 'BC') {
+        // BC rows have no monthly target — skip colour coding
+        const s=getRowHoursStatus(hours);
+        row.classList.add(s==='over'?'row-over':s==='under'?'row-under':'row-target');
+        hCell.classList.add(s==='over'?'hours-over':s==='under'?'hours-warn':'hours-ok');
+      }
       calcOT(row);
       autoDetectSchedType(row);  // may update sched type + re-run calcOT internally
       updateDashboard();
@@ -1680,6 +1904,7 @@
       if (has12 && hasUnder12) return;   // mixed — don't touch
       const sel = row.querySelector('.sched-cell select');
       if (!sel) return;
+      if (sel.value === 'BC') return;    // never auto-override BC schedule type
       const newType = has12 ? '12 Hours' : 'Regular';
       if (sel.value === newType) return; // already correct — no-op
       sel.value = newType;
@@ -1946,12 +2171,14 @@
         const schedType=row.querySelector('.sched-cell select')?.value||'';
         const otCell=row.querySelector('.ot-cell');
         const otOverride=otCell?.dataset?.override==='true' ? (otCell.querySelector('.ot-val')?.textContent||null) : null;
-        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride});
+        const extension=Number(row.querySelector('.ext-cell input')?.value)||0;
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, extension});
       }
       return payload;
     }
 
-    function applyPayloadToTable(payload) {
+    function applyPayloadToTable(payload, fromDraft=false) {
+      if (!fromDraft) clearDraft();  // loading from cloud/file clears the draft
       const records=Array.isArray(payload?.records)?payload.records:[];
       if (payload?.month) document.getElementById('monthSelect').value=String(payload.month);
       document.getElementById('rotaTitleInput').value=(payload?.rotaTitle||'').trim();
@@ -1971,6 +2198,7 @@
         const hIdx=Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
         for (let i=1;i<hIdx;i++) { const v=(days[`day${i}`]||'').toUpperCase(); const bv=v.endsWith('_O')?v.slice(0,-2):v; if(DUTIES[bv]) applyDutyToCell(row.cells[i],v); }
         const sel=row.querySelector('.sched-cell select'); if(sel&&rec.schedType) sel.value=rec.schedType;
+        if (rec.extension!=null) { const ei=row.querySelector('.ext-cell input'); if(ei) ei.value=String(Number(rec.extension)||0); }
         updateHours(row);
         if (rec.otOverride!=null) {
           const otCell=row.querySelector('.ot-cell');
@@ -2331,9 +2559,13 @@
       rows.forEach(row=>{
         const name=row.cells[0]?.querySelector('input')?.value?.trim(); if(!name) return;
         count++;
-        const h=Number(row.lastElementChild?.textContent||0); assigned+=h;
-        const s=getRowHoursStatus(h);
-        if(s==='over')over++; else if(s==='under')under++; else balanced++;
+        const h=Number(row.querySelector('.hours-cell')?.textContent||0); assigned+=h;
+        const isBc=row.querySelector('.sched-cell select')?.value==='BC';
+        if(!isBc){
+          // BC rows have no monthly target — exclude from over/under/balanced counts
+          const s=getRowHoursStatus(h);
+          if(s==='over')over++; else if(s==='under')under++; else balanced++;
+        }
         for(let i=1;i<row.cells.length-1;i++){ let v=row.cells[i].textContent.trim().toUpperCase(); if(v.endsWith('_O'))v=v.slice(0,-2); if(DUTIES[v]) filled++; }
       });
       const total=count*days;
@@ -2348,12 +2580,47 @@
       document.getElementById('pageMainTitle').textContent=document.getElementById('rotaTitleInput').value.trim()||'Business Center Rota';
       _scheduleCoverage();  // rebuild coverage panel
       updateBannerBudget();
+      scheduleDraftSave();
+    }
+
+    // ── Draft auto-save (localStorage) ───────────────────────────────────────
+    // Preserves rota work across page navigations (e.g. going to Duties.html and back)
+    const DRAFT_KEY = 'BCOT_ROTA_DRAFT_V1';
+    let _draftTimer = null;
+    function scheduleDraftSave() {
+      clearTimeout(_draftTimer);
+      _draftTimer = setTimeout(() => {
+        try {
+          const payload = tableToPayload();
+          if (payload.records.length) localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+        } catch(e) { console.warn('Draft save failed:', e); }
+      }, 800);
+    }
+    function restoreDraft() {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return false;
+        const payload = JSON.parse(raw);
+        if (!Array.isArray(payload?.records) || !payload.records.length) return false;
+        applyPayloadToTable(payload, true);
+        return true;
+      } catch(e) { return false; }
+    }
+    function clearDraft() {
+      localStorage.removeItem(DRAFT_KEY);
     }
 
     // ── Clear All ─────────────────────────────────────────────────────────────
-    function clearAllTable() {
-      if (!confirm('Clear everything? This will remove all rows, names and assignments.')) return;
+    async function clearAllTable() {
+      const ok = await showConfirmModal({
+        title: 'Clear all rota data?',
+        message: 'All rows, staff names and duty assignments will be removed. This cannot be undone.',
+        confirmLabel: 'Clear All',
+        danger: true
+      });
+      if (!ok) return;
       document.querySelector('#rotaTable tbody').innerHTML = '';
+      clearDraft();
       updateDashboard();
       showStatusMessage('Table cleared.', 'info');
     }
@@ -2747,17 +3014,520 @@
       }, true);
     })();
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // DUTIES MODAL  (DM namespace)
+    // ══════════════════════════════════════════════════════════════════════════
+    const DM = (() => {
+      const CLOUD_DOC = "DUTIES_POOL";
+      const DAYS = ["Any","Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      const PALETTE = ["#1a4f8b","#2e8b57","#dc3545","#d97706","#6f42c1","#0f766e","#7c2d12","#c93c5d","#2563eb","#b8860b","#0284c7","#16a34a","#9333ea","#ea580c","#0891b2","#be185d","#4f46e5","#65a30d","#6b7280","#374151"];
+
+      function getFilter() { return (document.getElementById("dm-areaFilter")?.value||"ALL").toUpperCase(); }
+
+      function rebuildUI() {
+        const list = getAreasList();
+        const sel = document.getElementById("dm-areaFilter"), prev = sel?.value||"ALL";
+        if (sel) { sel.innerHTML='<option value="ALL">All Areas</option>'; list.forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;sel.appendChild(o);}); if(prev&&(prev==="ALL"||list.includes(prev)))sel.value=prev; }
+        const dl = document.getElementById("dm-areasDatalist");
+        if (dl) { dl.innerHTML=""; list.forEach(a=>{const o=document.createElement("option");o.value=a;dl.appendChild(o);}); }
+        const imp = document.getElementById("dm-importSourceArea");
+        if (imp) { const cur=getFilter(); imp.innerHTML='<option value="">-- Source area --</option>'; list.filter(a=>a!==cur).forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;imp.appendChild(o);}); }
+        const ct = document.getElementById("sm-copyTarget");
+        if (ct) { const pv=ct.value; ct.innerHTML='<option value="">— Target Area —</option>'; list.forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;ct.appendChild(o);}); if(pv&&list.includes(pv))ct.value=pv; }
+      }
+
+      function applyAreaFilter() {
+        const f = getFilter();
+        Array.from(document.querySelectorAll("#dm-dutiesBody tr")).forEach(tr => {
+          if (f==="ALL"){tr.classList.remove("hidden-row");return;}
+          const ra=(tr.querySelector(".dm-area-cell")?.value||"").trim().toUpperCase();
+          const ar=ra.split(",").map(x=>x.trim()).filter(Boolean);
+          tr.classList.toggle("hidden-row", !(!ra||ar.includes(f)));
+        });
+      }
+
+      function addNewArea() {
+        const raw=(document.getElementById("dm-newAreaInput").value||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
+        if(!raw){showStatusMessage("Enter a valid area name.","error");return;}
+        saveAreaToList(raw); rebuildUI();
+        document.getElementById("dm-areaFilter").value=raw;
+        document.getElementById("dm-newAreaInput").value="";
+        applyAreaFilter();
+      }
+
+      function ptm(t){const m=/^(\d{2}):(\d{2})$/.exec((t||"").trim());if(!m)return null;const hh=Number(m[1]),mm=Number(m[2]);if(hh<0||hh>23||mm<0||mm>59)return null;return hh*60+mm;}
+      function mtt(min){min=((min%1440)+1440)%1440;return String(Math.floor(min/60)).padStart(2,"0")+":"+String(min%60).padStart(2,"0");}
+      function calcEnd(st,h){const s=(st||"Any").toString().trim();if(s.toUpperCase()==="ANY")return"Any";const sm=ptm(s);if(sm===null)return"Any";return mtt(sm+Math.round((Number(h)||0)*60));}
+      function buildTOpts(){const o=[];for(let h=0;h<24;h++)for(let m=0;m<60;m+=30){const t=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");o.push(`<option value="${t}">${t}</option>`);}return o.join("");}
+      function buildDOpts(){return Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join("");}
+      function nextColor(){const used=new Set(Array.from(document.querySelectorAll('#dm-dutiesBody input[type="color"]')).map(e=>e.value.toLowerCase()));return PALETTE.find(c=>!used.has(c.toLowerCase()))||PALETTE[used.size%PALETTE.length];}
+
+      function addDutyRow(data) {
+        const tbody=document.getElementById("dm-dutiesBody");
+        const tr=document.createElement("tr");
+        const code=(data?.code||data?.dutyCode||"").toString().trim().toUpperCase();
+        const color=data?.color?data.color.toString():nextColor();
+        const f=getFilter(), defArea=f==="ALL"?"":f;
+        const area=(data?.area||defArea||"").toString().toUpperCase();
+        tr.innerHTML=`
+          <td style="padding:3px;"><input placeholder="CODE" value="${code}" style="width:64px;text-transform:uppercase;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
+          <td style="padding:3px;"><input placeholder="Label" value="${(data?.label||"").toString()}" style="width:130px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
+          <td style="padding:3px;"><input type="number" min="0" step="0.25" value="${Number(data?.hours??0)}" style="width:54px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
+          <td style="padding:3px;text-align:center;">
+            <input type="color" value="${color}" style="width:36px;height:24px;padding:0;border:none;background:transparent;cursor:pointer;"/>
+            <div class="dm-sw" style="background:${color};width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15);vertical-align:middle;"></div>
+          </td>
+          <td style="padding:3px;"><input class="dm-area-cell" type="text" list="dm-areasDatalist" value="${area}" style="width:66px;text-transform:uppercase;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;" placeholder="Area"/></td>
+          <td style="padding:3px;"><input type="number" min="0" step="1" value="${Number(data?.assignedSt??0)}" style="width:52px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
+          <td style="padding:3px;"><select style="width:76px;font-size:11px;">${DAYS.map(d=>`<option value="${d}">${d}</option>`).join("")}</select></td>
+          <td style="padding:3px;"><select style="width:76px;font-size:11px;"><option value="Any">Any</option>${buildTOpts()}</select></td>
+          <td class="dm-et" style="padding:3px;font-size:11px;text-align:center;">Any</td>
+          <td style="padding:3px;"><select style="width:76px;font-size:11px;"><option value="Any">Any</option>${buildDOpts()}</select></td>
+          <td style="padding:3px;text-align:center;"><button style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;">✕</button></td>`;
+        tr.cells[6].querySelector("select").value=(data?.startDay||"Any").toString();
+        tr.cells[7].querySelector("select").value=(data?.startTime||"Any").toString();
+        tr.cells[9].querySelector("select").value=(data?.defaultDays??"Any").toString();
+        const ci=tr.cells[3].querySelector('input[type="color"]'), sw=tr.cells[3].querySelector(".dm-sw");
+        ci.addEventListener("input",()=>sw.style.background=ci.value);
+        tr.cells[4].querySelector(".dm-area-cell").addEventListener("change",function(){
+          const v=this.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
+          this.value=v; if(v){saveAreaToList(v);rebuildUI();} applyAreaFilter();
+        });
+        function re(){const h=Number(tr.cells[2].querySelector("input").value||0)||0;const s=tr.cells[7].querySelector("select").value;tr.querySelector(".dm-et").textContent=calcEnd(s,h);}
+        tr.cells[2].querySelector("input").addEventListener("input",re);
+        tr.cells[7].querySelector("select").addEventListener("change",re); re();
+        tr.querySelector("button").addEventListener("click",async()=>{
+          const ok=await showConfirmModal({title:"Delete this duty?",message:"This duty will be removed from the list.",confirmLabel:"Delete",danger:true});
+          if(ok)tr.remove();
+        });
+        tbody.appendChild(tr);
+        if(f!=="ALL"&&area&&area!==f)tr.classList.add("hidden-row");
+      }
+
+      function readTable() {
+        const out={};
+        for(const tr of Array.from(document.querySelectorAll("#dm-dutiesBody tr"))){
+          const code=(tr.cells[0].querySelector("input").value||"").toString().trim().toUpperCase();
+          if(!code)continue;
+          if(!/^[A-Z0-9_]{1,6}$/.test(code))throw new Error(`Invalid code: "${code}"`);
+          out[code]={label:(tr.cells[1].querySelector("input").value||code).toString().trim(),hours:Number(tr.cells[2].querySelector("input").value||0)||0,color:(tr.cells[3].querySelector('input[type="color"]').value||"#111827").toString(),area:(tr.cells[4].querySelector(".dm-area-cell").value||"").toString().toUpperCase(),assignedSt:Number(tr.cells[5].querySelector("input").value||0)||0,startDay:(tr.cells[6].querySelector("select").value||"Any").toString(),startTime:(tr.cells[7].querySelector("select").value||"Any").toString(),defaultDays:(tr.cells[9].querySelector("select").value||"Any").toString()};
+        }
+        return out;
+      }
+
+      function loadLocal() {
+        const raw=localStorage.getItem(DUTIES_ALL_KEY);
+        document.getElementById("dm-dutiesBody").innerHTML="";
+        if(!raw)return;
+        let data=null; try{data=JSON.parse(raw);}catch{data=null;}
+        if(!data||!Object.keys(data).length)return;
+        for(const[code,meta]of Object.entries(data))addDutyRow({code,...meta});
+        applyAreaFilter();
+      }
+
+      async function saveToCloud() {
+        try {
+          const key=(window.BCOT_APP_KEY||"").trim(); if(!key){showStatusMessage("config.js not found.","error");return;}
+          const obj=readTable(); if(!Object.keys(obj).length){showStatusMessage("No duties to save.","error");return;}
+          localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(obj));
+          await window.FB.setDoc(window.FB.doc(window.FB.db,"bcot_overtime_secure",key,"duties_named",CLOUD_DOC),{savedAt:new Date().toISOString(),duties:obj},{merge:true});
+          showStatusMessage(`${Object.keys(obj).length} duties saved to cloud ✅`);
+        }catch(e){console.error(e);showStatusMessage("Save duties failed: "+(e?.message||e),"error");}
+      }
+
+      async function loadFromCloud() {
+        try {
+          const key=(window.BCOT_APP_KEY||"").trim(); if(!key){showStatusMessage("config.js not found.","error");return;}
+          showStatusMessage("Loading duties from cloud…","info");
+          const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,"bcot_overtime_secure",key,"duties_named",CLOUD_DOC));
+          if(!snap.exists()||!Object.keys(snap.data()?.duties||{}).length){showStatusMessage("No duties in cloud yet.","info");return;}
+          const duties=snap.data().duties;
+          document.getElementById("dm-dutiesBody").innerHTML="";
+          for(const[code,meta]of Object.entries(duties))addDutyRow({code,...meta});
+          localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(duties));
+          rebuildUI(); applyAreaFilter();
+          showStatusMessage(`Loaded ${Object.keys(duties).length} duties from cloud ✅`);
+        }catch(e){console.error(e);showStatusMessage("Load duties failed: "+(e?.message||e),"error");}
+      }
+
+      async function clearFiltered() {
+        const f=getFilter();
+        const ok=await showConfirmModal({title:"Clear duties?",message:f==="ALL"?"Clear ALL duties for all areas?": `Clear all duties tagged with area "${f}"?`,confirmLabel:"Clear",danger:true});
+        if(!ok)return;
+        if(f==="ALL"){localStorage.removeItem(DUTIES_ALL_KEY);document.getElementById("dm-dutiesBody").innerHTML="";}
+        else{Array.from(document.querySelectorAll("#dm-dutiesBody tr")).forEach(tr=>{const ra=(tr.querySelector(".dm-area-cell")?.value||"").trim().toUpperCase();if(ra===f)tr.remove();});
+          try{localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(readTable()));}catch{localStorage.removeItem(DUTIES_ALL_KEY);}}
+        showStatusMessage("Duties cleared ✅");
+      }
+
+      function previewImport() {
+        const src=document.getElementById("dm-importSourceArea").value, cur=getFilter();
+        if(!src){showStatusMessage("Select a source area first.","error");return;}
+        if(cur==="ALL"){showStatusMessage("Set a specific area filter first.","error");return;}
+        let all={}; try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||"{}")||{};}catch{}
+        const srcD=Object.entries(all).filter(([,m])=>{const ar=(m.area||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean);return ar.includes(src.toUpperCase())||(!ar.length&&src==="ALL");});
+        const curC=new Set(Object.entries(all).filter(([,m])=>{const ar=(m.area||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean);return ar.includes(cur)||!ar.length;}).map(([c])=>c));
+        const avail=srcD.filter(([c])=>!curC.has(c));
+        const hint=document.getElementById("dm-importHint");
+        if(!avail.length){document.getElementById("dm-importPreview").style.display="none";if(hint)hint.textContent="No new duties found in that area.";return;}
+        if(hint)hint.textContent=`${avail.length} duties available from ${src}.`;
+        const list=document.getElementById("dm-importList"); list.innerHTML="";
+        avail.forEach(([code,meta])=>{const bg=meta.color||"#1a4f8b";const item=document.createElement("label");item.style.cssText=`display:inline-flex;align-items:center;gap:5px;background:${bg};color:#fff;font-weight:700;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;`;item.innerHTML=`<input type="checkbox" data-code="${code}" style="accent-color:#fff;width:13px;height:13px;" checked>${code}${meta.label?` — ${meta.label}`:''}`;list.appendChild(item);});
+        document.getElementById("dm-importPreview").style.display="block";
+      }
+      function selectAllImport(){document.querySelectorAll("#dm-importList input[type=checkbox]").forEach(cb=>cb.checked=true);}
+      function cancelImport(){document.getElementById("dm-importPreview").style.display="none";const h=document.getElementById("dm-importHint");if(h)h.textContent="Select a source area and click Preview.";}
+      function doImportDuties() {
+        const cur=getFilter(); if(cur==="ALL"){showStatusMessage("Set a specific area filter first.","error");return;}
+        const sel=[...document.querySelectorAll("#dm-importList input[type=checkbox]:checked")].map(cb=>cb.dataset.code);
+        if(!sel.length){showStatusMessage("No duties selected.","error");return;}
+        let all={}; try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||"{}")||{};}catch{}
+        let imp=0;
+        sel.forEach(code=>{if(!all[code])return;const ex=(all[code].area||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean);if(!ex.includes(cur.toUpperCase())){ex.push(cur.toUpperCase());all[code].area=ex.join(",");imp++;}});
+        if(!imp){showStatusMessage("All selected duties already in this area.","info");return;}
+        localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));
+        document.getElementById("dm-dutiesBody").innerHTML="";
+        for(const[code,meta]of Object.entries(all))addDutyRow({code,...meta});
+        applyAreaFilter(); cancelImport();
+        showStatusMessage(`Imported ${imp} duties into ${cur} ✅`);
+      }
+
+      async function saveAndClose() { await saveToCloud(); await reloadDutiesFromStorage(); close(); }
+
+      function open() {
+        document.getElementById("dutiesModal").style.display="block";
+        loadLocal(); rebuildUI();
+        const area=getCurrentArea(), sel=document.getElementById("dm-areaFilter");
+        if(sel&&area&&(area==="ALL"||getAreasList().includes(area)))sel.value=area;
+        applyAreaFilter();
+      }
+      function close() { document.getElementById("dutiesModal").style.display="none"; }
+
+      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose};
+    })();
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // STAFF MODAL  (SM namespace)
+    // ══════════════════════════════════════════════════════════════════════════
+    const SM = (() => {
+      const CLOUD_DOC = "STAFF_POOL";
+      let records = [];
+      let _saveTimer = null;
+
+      function getDocRef(key) { return window.FB.doc(window.FB.db,"bcot_overtime_secure",key,"staff_named",CLOUD_DOC); }
+
+      function setStatus(status) {
+        const el=document.getElementById("sm-cloudStatus"); if(!el)return;
+        const s={pending:{text:"⏳ Pending…",color:"#d97706",bg:"#fefce8"},saving:{text:"☁ Saving…",color:"#2563eb",bg:"#eff6ff"},saved:{text:"✅ Saved",color:"#16a34a",bg:"#f0fdf4"},error:{text:"❌ Failed",color:"#dc2626",bg:"#fef2f2"}}[status];
+        if(!s)return; el.textContent=s.text;el.style.color=s.color;el.style.background=s.bg;
+        if(status==="saved")setTimeout(()=>{el.textContent="";el.style.background="transparent";},3000);
+      }
+      function schedSave() {
+        clearTimeout(_saveTimer); setStatus("pending");
+        _saveTimer=setTimeout(async()=>{
+          setStatus("saving");
+          try{const key=(window.BCOT_APP_KEY||"").trim();if(!key){setStatus("error");return;}
+          await window.FB.setDoc(getDocRef(key),{savedAt:new Date().toISOString(),records},{merge:true});
+          setStatus("saved");}
+          catch(e){console.error(e);setStatus("error");}
+        },1500);
+      }
+
+      function normalize(r) { return {name:String(r?.name||"").trim(),badge:String(r?.badge||"").trim(),role:String(r?.role||"Pharmacist").trim()||"Pharmacist",hrr:Number(r?.hrr??0)||0,area:String(r?.area||"").trim().toUpperCase()}; }
+
+      function rebuildUI() {
+        const list=getAreasList();
+        const af=document.getElementById("sm-areaFilter"),pv=af?.value||"ALL";
+        if(af){af.innerHTML='<option value="ALL">All Areas</option>';list.forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;af.appendChild(o);});if(pv&&(pv==="ALL"||list.includes(pv)))af.value=pv;}
+        const dl=document.getElementById("sm-areasDatalist");
+        if(dl){dl.innerHTML="";list.forEach(a=>{const o=document.createElement("option");o.value=a;dl.appendChild(o);});}
+        const ct=document.getElementById("sm-copyTarget");
+        if(ct){const p=ct.value;ct.innerHTML='<option value="">— Target Area —</option>';list.forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;ct.appendChild(o);});if(p&&list.includes(p))ct.value=p;}
+        // also update DM import source
+        const di=document.getElementById("dm-importSourceArea");
+        if(di){const cur=(document.getElementById("dm-areaFilter")?.value||"ALL").toUpperCase();di.innerHTML='<option value="">-- Source area --</option>';list.filter(a=>a!==cur).forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;di.appendChild(o);});}
+      }
+
+      function applyFilter() {
+        const filter=(document.getElementById("sm-areaFilter")?.value||"ALL").toUpperCase();
+        const query=(document.getElementById("sm-search")?.value||"").trim().toLowerCase();
+        let vis=0;
+        Array.from(document.querySelectorAll("#sm-tbody tr")).forEach(tr=>{
+          const ra=(tr.querySelector(".sm-area-btn")?.dataset?.areas||"").trim().toUpperCase();
+          const ars=ra.split(",").map(x=>x.trim()).filter(Boolean);
+          const aok=filter==="ALL"||ars.includes(filter);
+          let sok=true; if(query){const n=(tr.cells[1]?.textContent||"").toLowerCase(),b=(tr.cells[2]?.textContent||"").toLowerCase();sok=n.includes(query)||b.includes(query);}
+          const hide=!(aok&&sok); tr.classList.toggle("hidden-row",hide); if(!hide)vis++;
+        });
+        const total=document.querySelectorAll("#sm-tbody tr").length;
+        const ce=document.getElementById("sm-searchCount");
+        if(ce)ce.textContent=(query||filter!=="ALL")?`${vis} of ${total} shown`:`${total} staff total`;
+      }
+      function clearSearch(){document.getElementById("sm-search").value="";applyFilter();}
+
+      function writeLocal() {
+        localStorage.setItem(STAFF_RECORDS_KEY,JSON.stringify(records));
+        schedSave();
+      }
+
+      function renderTable() {
+        const tbody=document.getElementById("sm-tbody"); tbody.innerHTML="";
+        records.forEach((s,idx)=>{
+          const tr=document.createElement("tr");
+          tr.innerHTML=`
+            <td style="padding:4px;text-align:center;">${idx+1}</td>
+            <td style="padding:4px;">${s.name.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</td>
+            <td style="padding:4px;text-align:center;">${s.badge}</td>
+            <td style="padding:4px;">${s.role}</td>
+            <td style="padding:4px;text-align:center;">${Number(s.hrr||0).toFixed(2)}</td>
+            <td style="padding:4px;">
+              <button type="button" class="sm-area-btn" data-i="${idx}" data-areas="${s.area}"
+                style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:#0369a1;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">
+                ${s.area||"— Select —"}
+              </button>
+            </td>
+            <td style="padding:4px;white-space:nowrap;">
+              <button type="button" data-edit="${idx}" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;">Edit</button>
+              <button type="button" data-del="${idx}"  style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;margin-left:3px;">Del</button>
+              <button type="button" data-copy="${idx}" style="background:#0284c7;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;margin-left:3px;">Copy→</button>
+            </td>`;
+          tr.querySelector(".sm-area-btn").addEventListener("click",function(){
+            const i=Number(this.dataset.i), btn=this;
+            openAreaPicker("sm-area-inline-"+i, null, "Assign Areas — "+records[i].name, records[i].area||"", newAreas=>{
+              records[i].area=newAreas; btn.textContent=newAreas||"— Select —"; btn.dataset.areas=newAreas;
+              if(newAreas)newAreas.split(",").forEach(a=>{if(a.trim())saveAreaToList(a.trim());}); rebuildUI(); writeLocal(); applyFilter();
+            });
+          });
+          tr.querySelector("[data-edit]").addEventListener("click",()=>openEditModal(idx));
+          tr.querySelector("[data-del]").addEventListener("click",async()=>{
+            const ok=await showConfirmModal({title:"Delete staff member?",message:`Remove "${s.name}" from the staff pool?`,confirmLabel:"Delete",danger:true});
+            if(ok){records.splice(idx,1);renderTable();writeLocal();applyFilter();}
+          });
+          tr.querySelector("[data-copy]").addEventListener("click",()=>{
+            const areas=getAreasList().filter(a=>!s.area.split(",").includes(a));
+            if(!areas.length){showStatusMessage("No other areas available.","error");return;}
+            openAreaPicker("sm-copy-"+idx,null,"Copy "+s.name+" to area","",(newAreas)=>{
+              if(!newAreas)return;
+              newAreas.split(",").forEach(ta=>{ta=ta.trim();if(!ta)return;
+                const dup=s.badge?records.some(x=>x.badge&&x.badge===s.badge&&x.area===ta):records.some(x=>x.name.toLowerCase()===s.name.toLowerCase()&&x.area===ta);
+                if(dup){showStatusMessage(`"${s.name}" already in ${ta}.`,"error");return;}
+                records.push({name:s.name,badge:s.badge,role:s.role,hrr:s.hrr,area:ta});
+              });
+              renderTable(); writeLocal(); showStatusMessage("Copied ✅");
+            });
+          });
+          tbody.appendChild(tr);
+        });
+        applyFilter();
+      }
+
+      function openAreaPicker(id, hiddenInputId, title, currentAreas, callback) {
+        const modal=document.getElementById("areaPickerModal2");
+        const titleEl=document.getElementById("apm2-title");
+        const listEl=document.getElementById("apm2-list");
+        if(!modal)return;
+        titleEl.textContent=title;
+        const areas=getAreasList();
+        const sel=new Set((currentAreas||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean));
+        listEl.innerHTML=areas.map(a=>`
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:7px 10px;border-radius:6px;border:1.5px solid ${sel.has(a)?"#bfdbfe":"#e5e7eb"};background:${sel.has(a)?"#eff6ff":"#fff"};">
+            <input type="checkbox" value="${a}" ${sel.has(a)?"checked":""} style="width:14px;height:14px;cursor:pointer;accent-color:#1a4f8b;"/>
+            <span style="font-weight:${sel.has(a)?"700":"400"};color:#1f2937;">${a}</span>
+          </label>`).join("");
+        modal.style.display="flex";
+        const cleanup=(ok)=>{
+          modal.style.display="none";
+          document.getElementById("apm2-apply").onclick=null;
+          document.getElementById("apm2-cancel").onclick=null;
+          if(ok){
+            const checked=Array.from(modal.querySelectorAll("#apm2-list input:checked")).map(cb=>cb.value.trim().toUpperCase()).filter(Boolean);
+            const val=checked.join(",");
+            if(hiddenInputId){const h=document.getElementById(hiddenInputId);if(h)h.value=val;}
+            callback(val);
+          }
+        };
+        document.getElementById("apm2-apply").onclick=()=>cleanup(true);
+        document.getElementById("apm2-cancel").onclick=()=>cleanup(false);
+        modal.addEventListener("click",function handler(e){if(e.target===modal){modal.style.display="none";modal.removeEventListener("click",handler);}});
+      }
+
+      function openEditModal(idx) {
+        const rec=records[idx]; if(!rec)return;
+        const ex=document.getElementById("sm-editModal"); if(ex)ex.remove();
+        let _editAreas=rec.area||"";
+        const modal=document.createElement("div");
+        modal.id="sm-editModal";
+        modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9600;";
+        modal.innerHTML=`<div style="background:#fff;border-radius:12px;padding:22px 24px;min-width:360px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+          <h3 style="margin:0 0 16px;font-size:13px;color:#1a4f8b;">Edit Staff Record</h3>
+          <div style="display:grid;gap:10px;">
+            <label style="font-size:11px;font-weight:700;color:#374151;">Name<input id="sm-eName" type="text" value="${rec.name.replace(/"/g,"&quot;")}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Badge<input id="sm-eBadge" type="text" value="${rec.badge}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Role<select id="sm-eRole" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"><option${rec.role==="Pharmacist"?" selected":""}>Pharmacist</option><option${rec.role==="Technician"?" selected":""}>Technician</option><option${rec.role==="Pharmacy Aide"?" selected":""}>Pharmacy Aide</option></select></label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">HRR<input id="sm-eHRR" type="number" step="0.01" value="${rec.hrr||0}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Areas
+              <div style="display:flex;gap:6px;align-items:center;margin-top:3px;">
+                <div id="sm-eAreaDisplay" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#f9fafb;min-height:32px;color:#374151;">${rec.area||"—"}</div>
+                <button type="button" id="sm-eAreaBtn" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;flex-shrink:0;">Edit Areas</button>
+              </div>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+            <button id="sm-eSave" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:12px;cursor:pointer;font-weight:700;">Save</button>
+            <button id="sm-eCancel" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;">Cancel</button>
+          </div>
+        </div>`;
+        document.body.appendChild(modal);
+        document.getElementById("sm-eCancel").onclick=()=>modal.remove();
+        modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+        document.getElementById("sm-eAreaBtn").onclick=()=>{
+          openAreaPicker("sm-edit-area",null,"Edit Areas — "+rec.name,_editAreas,(v)=>{_editAreas=v;document.getElementById("sm-eAreaDisplay").textContent=v||"—";});
+        };
+        document.getElementById("sm-eSave").onclick=()=>{
+          const newName=document.getElementById("sm-eName").value.trim();
+          const newBadge=document.getElementById("sm-eBadge").value.trim();
+          const newRole=document.getElementById("sm-eRole").value;
+          const newHRR=parseFloat(document.getElementById("sm-eHRR").value)||0;
+          const newArea=_editAreas.toUpperCase();
+          if(!newName){alert("Name is required.");return;}
+          const oldBadge=rec.badge;
+          records.forEach(r=>{if(oldBadge&&r.badge===oldBadge){r.name=newName;r.badge=newBadge;r.role=newRole;r.hrr=newHRR;}});
+          records[idx].area=newArea;
+          if(newArea)newArea.split(",").forEach(a=>{if(a.trim())saveAreaToList(a.trim());});
+          renderTable(); writeLocal(); rebuildUI(); applyFilter(); modal.remove();
+          showStatusMessage("Staff updated ✅");
+        };
+      }
+
+      function addNewArea() {
+        const raw=(document.getElementById("sm-newAreaInput").value||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
+        if(!raw){showStatusMessage("Enter a valid area name.","error");return;}
+        saveAreaToList(raw); rebuildUI();
+        document.getElementById("sm-areaFilter").value=raw;
+        document.getElementById("sm-newAreaInput").value="";
+        applyFilter();
+      }
+
+      function addStaff() {
+        const name=(document.getElementById("sm-stName").value||"").trim();
+        const badge=(document.getElementById("sm-stBadge").value||"").trim();
+        const role=document.getElementById("sm-stRole").value||"Pharmacist";
+        const hrr=Number(document.getElementById("sm-stHRR").value||0)||0;
+        const area=(document.getElementById("sm-stAreaValue").value||"").trim().toUpperCase();
+        if(!name){showStatusMessage("Name is required.","error");return;}
+        if(badge&&records.some(x=>x.badge&&x.badge===badge&&x.area===area)){showStatusMessage(`Badge "${badge}" already exists in that area.`,"error");return;}
+        if(!badge&&records.some(x=>x.name.toLowerCase()===name.toLowerCase()&&x.area===area)){showStatusMessage("Name already exists in this area.","error");return;}
+        if(area)saveAreaToList(area);
+        records.push({name,badge,role,hrr,area});
+        renderTable(); writeLocal(); rebuildUI();
+        document.getElementById("sm-stName").value="";
+        document.getElementById("sm-stBadge").value="";
+        document.getElementById("sm-stHRR").value="";
+        document.getElementById("sm-stAreaValue").value="";
+        const btn=document.getElementById("sm-stAreaBtn");
+        if(btn){btn.textContent="— Area —";}
+        showStatusMessage("Staff added ✅");
+      }
+
+      async function saveNow() {
+        clearTimeout(_saveTimer); setStatus("saving");
+        try{const key=(window.BCOT_APP_KEY||"").trim();if(!key){setStatus("error");return;}
+          if(!records.length){showStatusMessage("No staff to save.","error");setStatus("error");return;}
+          await window.FB.setDoc(getDocRef(key),{savedAt:new Date().toISOString(),records},{merge:true});
+          setStatus("saved"); showStatusMessage(`${records.length} staff saved to cloud ✅`);}
+        catch(e){console.error(e);setStatus("error");showStatusMessage("Save failed: "+(e?.message||e),"error");}
+      }
+
+      async function loadFromCloud() {
+        try{const key=(window.BCOT_APP_KEY||"").trim();if(!key){showStatusMessage("config.js not found.","error");return;}
+          showStatusMessage("Loading staff from cloud…","info");
+          const snap=await window.FB.getDoc(getDocRef(key));
+          if(!snap.exists()){showStatusMessage("No staff in cloud yet.","info");return;}
+          records=(Array.isArray(snap.data()?.records)?snap.data().records:[]).map(normalize).filter(s=>s.name);
+          localStorage.setItem(STAFF_RECORDS_KEY,JSON.stringify(records));
+          records.forEach(s=>{if(s.area)s.area.split(",").forEach(a=>{if(a.trim())saveAreaToList(a.trim());});});
+          rebuildUI(); renderTable();
+          showStatusMessage(`Loaded ${records.length} staff from cloud ✅`);}
+        catch(e){console.error(e);showStatusMessage("Load failed: "+(e?.message||e),"error");}
+      }
+
+      function importFromExcel(input) {
+        const file=input.files[0]; if(!file)return; input.value="";
+        const role=document.getElementById("sm-importRole").value||"Pharmacist";
+        const area=(document.getElementById("sm-importAreaValue").value||"").trim();
+        const hrr=parseFloat(document.getElementById("sm-importHRR").value)||0;
+        const reader=new FileReader();
+        reader.onload=function(e){
+          try{const wb=XLSX.read(e.target.result,{type:"array"}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+            const exBadges=new Set(records.map(s=>(s.badge||"").toString().trim()));
+            let added=0,skipped=0,invalid=0; const toAdd=[];
+            rows.forEach(row=>{const raw=String(row[0]||"").replace(/ /g," ").trim();if(!raw)return;const m=raw.match(/^(.+?)\s*\((\d+)\)\s*$/);if(!m){invalid++;return;}const name=m[1].trim(),badge=m[2].trim();if(!name||!badge){invalid++;return;}if(exBadges.has(badge)){skipped++;return;}exBadges.add(badge);toAdd.push({name:raw,badge,role,hrr,area:area||""});added++;});
+            toAdd.forEach(r=>{records.push(normalize(r));if(r.area)saveAreaToList(r.area);});
+            if(added){writeLocal();renderTable();rebuildUI();}
+            showStatusMessage(`Import: ${added} added, ${skipped} dup(s) skipped${invalid?", "+invalid+" invalid":""}`);}
+          catch(err){console.error(err);showStatusMessage("Import failed: "+(err?.message||err),"error");}
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function importHRR(input) {
+        const file=input.files[0]; if(!file)return; input.value="";
+        const reader=new FileReader();
+        reader.onload=function(e){
+          try{const wb=XLSX.read(e.target.result,{type:"array"}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+            if(rows.length<2){showStatusMessage("File empty.","error");return;}
+            const header=rows[0].map(h=>String(h||"").trim().toLowerCase());
+            let bC=-1,nC=-1,hC=-1;
+            header.forEach((h,i)=>{if(/badge/i.test(h))bC=i;else if(/name/i.test(h))nC=i;else if(/hrr|rate|hourly/i.test(h))hC=i;});
+            if(bC<0&&hC<0){bC=0;nC=1;hC=2;}
+            if(hC<0){showStatusMessage("Could not find HRR column.","error");return;}
+            let upd=0,notF=[];
+            rows.slice(1).forEach(row=>{const rb=String(row[bC]??"").trim(),rn=String(row[nC]??"").trim().toUpperCase(),rh=parseFloat(row[hC]);if(!Number.isFinite(rh)||rh<=0)return;let idx=rb?records.findIndex(s=>String(s.badge).trim()===rb):-1;if(idx<0&&rn)idx=records.findIndex(s=>s.name.replace(/\s*\(\d+\)\s*$/,"").trim().toUpperCase()===rn);if(idx<0){notF.push(rn||rb);return;}records[idx].hrr=rh;upd++;});
+            if(upd){writeLocal();renderTable();}
+            let msg=`HRR updated: ${upd} staff`;if(notF.length)msg+=` · ${notF.length} not found`;showStatusMessage(msg+(upd?"":" — nothing updated"),"error");}
+          catch(err){console.error(err);showStatusMessage("HRR import failed: "+(err?.message||err),"error");}
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function doCopyToArea(sourceRecs, targetArea) {
+        if(!targetArea){showStatusMessage("Select a target area.","error");return;}
+        let copied=0,skipped=0;
+        sourceRecs.forEach(src=>{const dup=src.badge?records.some(x=>x.badge&&x.badge===src.badge&&x.area===targetArea):records.some(x=>x.name.toLowerCase()===src.name.toLowerCase()&&x.area===targetArea);if(dup){skipped++;return;}records.push({name:src.name,badge:src.badge,role:src.role,hrr:src.hrr,area:targetArea});copied++;});
+        if(copied){renderTable();writeLocal();applyFilter();}
+        showStatusMessage(`Copied ${copied} to ${targetArea}${skipped?`, ${skipped} skipped`:""}`,copied===0);
+      }
+      function copyVisible(){const ta=(document.getElementById("sm-copyTarget").value||"").trim();const f=(document.getElementById("sm-areaFilter")?.value||"ALL").toUpperCase();const src=f==="ALL"?[...records]:records.filter(s=>(s.area||"").toUpperCase().split(",").map(x=>x.trim()).includes(f));doCopyToArea(src,ta);}
+      function copyAll(){const ta=(document.getElementById("sm-copyTarget").value||"").trim();doCopyToArea([...records],ta);}
+
+      function open() {
+        document.getElementById("staffModal").style.display="block";
+        records=(()=>{try{const r=JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY)||"[]");return Array.isArray(r)?r.map(normalize).filter(s=>s.name):[];}catch{return [];}})();
+        rebuildUI(); renderTable();
+        // Set area filter to match rota
+        const area=getCurrentArea(), sel=document.getElementById("sm-areaFilter");
+        if(sel&&area&&(area==="ALL"||getAreasList().includes(area)))sel.value=area;
+        applyFilter();
+      }
+      function close() { document.getElementById("staffModal").style.display="none"; }
+
+      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal};
+    })();
+
     // ── Init ──────────────────────────────────────────────────────────────────
     (function init() {
       setKeyFieldFromStorage();
 
-      // Build area select and restore last filter
-      rebuildAreaSelect();
+      // Build area picker and restore last filter
       const lastArea=(localStorage.getItem(AREA_KEY)||"ALL").trim().toUpperCase();
-      const sel=document.getElementById("areaFilter");
-      if (lastArea==="ALL"||getAreasList().includes(lastArea)) sel.value=lastArea;
+      const inp=document.getElementById("areaFilter");
+      const validLast = (lastArea==="ALL"||getAreasList().includes(lastArea)) ? lastArea : "ALL";
+      if (inp) inp.value = validLast;
+      const areaLabel = validLast==="ALL" ? "All Areas" : validLast;
+      const lbl = document.getElementById("areaPickerLabel");
+      if (lbl) lbl.textContent = areaLabel;
+      rebuildAreaSelect();
       const hdr=document.getElementById("headerAreaLabel");
-      const areaLabel=sel.value==="ALL"?"All Areas":sel.value;
       if (hdr) hdr.textContent=areaLabel;
       const pal=document.getElementById("printAreaLabel");
       if (pal) pal.textContent=areaLabel;
@@ -2771,11 +3541,15 @@
       injectDutyStyles();
       buildLegend();
       updateTable();
-      addNewRow();
+
+      // Restore any unsaved rota work from the draft (e.g. after navigating to Duties.html and back)
+      const restored = restoreDraft();
+      if (!restored) addNewRow();
       applyColumnWidths();
       setPatternIndicator(false);
 
       if (!Object.keys(DUTIES).length) showStatusMessage('No duties found. Open Duties.html to add duties.','error');
+      else if (restored)               showStatusMessage('Your previous rota work has been restored ✅');
       else if (!staffList.length)      showStatusMessage('No staff for this filter. Open Staff.html to add staff.','error');
 
       // Load release number for current area and show rota label
@@ -2785,5 +3559,158 @@
       updateDashboard();
     })();
   </script>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       DUTIES MODAL
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div id="dutiesModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:8000;overflow-y:auto;padding:16px;">
+    <div style="background:#fff;border-radius:16px;max-width:1300px;margin:0 auto;padding:24px;position:relative;min-height:400px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+        <h2 style="margin:0;font-size:16px;color:#1a4f8b;">📋 Duties Management</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button onclick="DM.loadFromCloud()" style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">☁ Load from Cloud</button>
+          <button onclick="DM.saveAndClose()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">💾 Save &amp; Close</button>
+          <button onclick="DM.close()" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;">✕ Close</button>
+        </div>
+      </div>
+      <!-- Area bar -->
+      <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="font-weight:700;color:#3730a3;white-space:nowrap;">Area filter:</label>
+        <select id="dm-areaFilter" onchange="DM.applyAreaFilter()" style="min-width:120px;"></select>
+        <input id="dm-newAreaInput" type="text" placeholder="New area…" style="width:110px;text-transform:uppercase"/>
+        <button type="button" onclick="DM.addNewArea()" style="background:#3730a3;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">+ Add</button>
+        <button type="button" onclick="DM.addDutyRow()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;margin-left:auto;">+ Add Duty</button>
+        <button type="button" onclick="DM.clearFiltered()" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">🗑 Clear Filtered</button>
+      </div>
+      <!-- Import from another area -->
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
+        <b style="color:#92400e;font-size:12px;">⬇ Import Duties from Another Area</b>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">Source:</label>
+          <select id="dm-importSourceArea" style="min-width:110px;font-size:12px;"></select>
+          <button type="button" onclick="DM.previewImport()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Preview</button>
+          <span id="dm-importHint" style="font-size:11px;color:#555;">Select a source area and click Preview.</span>
+        </div>
+        <div id="dm-importPreview" style="display:none;margin-top:8px;">
+          <div id="dm-importList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" onclick="DM.selectAllImport()" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Select All</button>
+            <button type="button" onclick="DM.doImportDuties()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Import Selected ✅</button>
+            <button type="button" onclick="DM.cancelImport()" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <!-- Duties table -->
+      <div style="overflow:auto;max-height:55vh;border-radius:8px;border:1px solid #e5e7eb;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead>
+            <tr style="background:#1a4f8b;color:#fff;position:sticky;top:0;">
+              <th style="padding:6px;">Code</th><th>Label</th><th>Hours</th><th>Color</th>
+              <th>Area</th><th>Assigned St</th><th>Start Day</th><th>Start Time</th>
+              <th>End Time</th><th>Default Days</th><th>Del</th>
+            </tr>
+          </thead>
+          <tbody id="dm-dutiesBody"></tbody>
+        </table>
+      </div>
+      <datalist id="dm-areasDatalist"></datalist>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       STAFF MODAL
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div id="staffModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:8000;overflow-y:auto;padding:16px;">
+    <div style="background:#fff;border-radius:16px;max-width:1300px;margin:0 auto;padding:24px;position:relative;min-height:400px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+        <h2 style="margin:0;font-size:16px;color:#1a4f8b;">👥 Staff Management</h2>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span id="sm-cloudStatus" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;transition:all .3s;"></span>
+          <button onclick="SM.loadFromCloud()" style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">☁ Load from Cloud</button>
+          <button onclick="SM.saveNow()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">☁ Save Now</button>
+          <button onclick="SM.close()" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;">✕ Close</button>
+        </div>
+      </div>
+      <!-- Area filter -->
+      <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="font-weight:700;color:#3730a3;white-space:nowrap;">Area filter:</label>
+        <select id="sm-areaFilter" onchange="SM.applyFilter()" style="min-width:120px;"></select>
+        <input id="sm-newAreaInput" type="text" placeholder="New area…" style="width:110px;text-transform:uppercase"/>
+        <button type="button" onclick="SM.addNewArea()" style="background:#3730a3;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">+ Add Area</button>
+        <input id="sm-search" type="text" placeholder="🔍 Search name or badge…" style="min-width:220px;font-size:12px;"
+          oninput="SM.applyFilter()"/>
+        <button type="button" onclick="SM.clearSearch()" style="background:#d97706;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">✕</button>
+        <span id="sm-searchCount" style="font-size:11px;color:#555;font-weight:700;"></span>
+      </div>
+      <!-- Add staff form -->
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <b style="font-size:12px;color:#374151;white-space:nowrap;">Add Staff:</b>
+        <input id="sm-stName"  type="text" placeholder="Name (required)" style="min-width:180px;font-size:12px;"/>
+        <input id="sm-stBadge" type="text" placeholder="Badge" style="min-width:100px;font-size:12px;"/>
+        <select id="sm-stRole" style="min-width:120px;font-size:12px;">
+          <option>Pharmacist</option><option>Technician</option><option>Pharmacy Aide</option>
+        </select>
+        <input id="sm-stHRR" type="number" step="0.01" placeholder="HRR" style="min-width:80px;font-size:12px;"/>
+        <input type="hidden" id="sm-stAreaValue" value=""/>
+        <button type="button" id="sm-stAreaBtn" onclick="SM.openAreaPicker('sm-stAreaValue','sm-stAreaBtn','Select Areas')"
+          style="min-width:90px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;color:#0369a1;">— Area —</button>
+        <button type="button" onclick="SM.addStaff()" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">Add</button>
+      </div>
+      <!-- Import / Copy controls -->
+      <details style="margin-bottom:10px;">
+        <summary style="cursor:pointer;font-size:11px;color:#6b7280;font-weight:700;padding:4px 0;user-select:none;">⚙ Import &amp; Bulk Operations</summary>
+        <div style="padding:10px;background:#f9fbfd;border-radius:8px;border:1px solid #e2e8f0;margin-top:4px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:12px;">Import from Excel:</b>
+            <button type="button" onclick="document.getElementById('sm-xlsxInput').click()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">📂 Choose File</button>
+            <input type="file" id="sm-xlsxInput" accept=".xlsx,.xls" style="display:none;" onchange="SM.importFromExcel(this)"/>
+            <select id="sm-importRole" style="font-size:12px;">
+              <option>Pharmacist</option><option>Technician</option><option>Pharmacy Aide</option>
+            </select>
+            <input type="hidden" id="sm-importAreaValue" value=""/>
+            <button type="button" id="sm-importAreaBtn" onclick="SM.openAreaPicker('sm-importAreaValue','sm-importAreaBtn','Import Area')"
+              style="min-width:90px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;color:#0369a1;">— Area —</button>
+            <input type="number" id="sm-importHRR" step="0.01" placeholder="HRR (opt.)" style="min-width:90px;font-size:12px;"/>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:12px;">Update HRR:</b>
+            <button type="button" onclick="document.getElementById('sm-hrrInput').click()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">💰 Import HRR</button>
+            <input type="file" id="sm-hrrInput" accept=".xlsx,.xls" style="display:none;" onchange="SM.importHRR(this)"/>
+            <span style="font-size:11px;color:#555;">Columns: Badge No. · Name · HRR</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:12px;">Copy to Area:</b>
+            <select id="sm-copyTarget" style="min-width:120px;font-size:12px;"><option value="">— Target Area —</option></select>
+            <button type="button" onclick="SM.copyVisible()" style="background:#0284c7;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Copy Visible</button>
+            <button type="button" onclick="SM.copyAll()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Copy All</button>
+          </div>
+        </div>
+      </details>
+      <!-- Staff table -->
+      <div style="overflow:auto;max-height:48vh;border-radius:8px;border:1px solid #e5e7eb;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#1a4f8b;color:#fff;position:sticky;top:0;">
+              <th style="padding:6px;">#</th><th>Name</th><th>Badge</th><th>Role</th><th>HRR</th><th>Area</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sm-tbody"></tbody>
+        </table>
+      </div>
+      <datalist id="sm-areasDatalist"></datalist>
+    </div>
+  </div>
+
+  <!-- Area picker modal (shared by DM and SM) -->
+  <div id="areaPickerModal2" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9500;">
+    <div style="background:#fff;border-radius:12px;padding:20px 24px;min-width:260px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+      <h3 id="apm2-title" style="margin:0 0 14px;font-size:13px;color:#1a4f8b;font-weight:800;"></h3>
+      <div id="apm2-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="apm2-apply" style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer;">Apply</button>
+        <button id="apm2-cancel" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
