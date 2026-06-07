@@ -1479,6 +1479,14 @@
     let DUTIES = loadDuties() || {};
 
     // ── Duty styles & legend ──────────────────────────────────────────────────
+    // Produce a CSS-safe class token for any duty code.
+    // Replaces every character that is not alphanumeric, hyphen, or underscore
+    // with an underscore, preventing invalid CSS selectors and DOMException
+    // from classList when codes contain spaces, dots, slashes, etc.
+    function dutyCls(code) {
+      return 'D_' + String(code).replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
     function injectDutyStyles() {
       const old = document.getElementById("dutiesStyleTag");
       if (old) old.remove();
@@ -1486,9 +1494,10 @@
       style.id = "dutiesStyleTag";
       let css = "";
       Object.entries(DUTIES).forEach(([code, meta]) => {
-        const color = (meta?.color || "#111827").toString();
-        css += `.D_${code}{background:${color}!important;color:#fff!important;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact;}` +
-               `.weekend.D_${code}{filter:brightness(0.95);}`;
+        const color = (meta?.color && meta.color !== 'undefined') ? meta.color : "#1a4f8b";
+        const cls   = dutyCls(code);
+        css += `.${cls}{background:${color}!important;color:#fff!important;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact;}` +
+               `.weekend.${cls}{filter:brightness(0.92);}`;
       });
       style.textContent = css;
       document.head.appendChild(style);
@@ -1764,8 +1773,8 @@
       if (!DUTIES[baseCode]) return;
       const wknd = cell.classList.contains('weekend');
       cell.textContent = code;
-      Object.keys(DUTIES).forEach(c => cell.classList.remove('D_'+c));
-      cell.classList.add('D_'+baseCode);
+      Object.keys(DUTIES).forEach(c => cell.classList.remove(dutyCls(c)));
+      cell.classList.add(dutyCls(baseCode));
       if (wknd) cell.classList.add('weekend');
       // Font scaling for long codes
       const len = code.length;
@@ -1913,7 +1922,7 @@
 
     function clearSingleCell(cell) {
       const wknd=cell.classList.contains('weekend'); cell.textContent='';
-      Object.keys(DUTIES).forEach(c=>cell.classList.remove('D_'+c));
+      Object.keys(DUTIES).forEach(c=>cell.classList.remove(dutyCls(c)));
       if (wknd) cell.classList.add('weekend');
       cell.removeAttribute('data-dlen');
     }
