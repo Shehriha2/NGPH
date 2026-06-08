@@ -258,6 +258,119 @@
     .cov-critical { background:#dc2626; color:#fff; }
     .cov-none     { background:#f1f5f9; color:#94a3b8; font-weight:400; }
 
+    /* ══════════════════════════════════════════════════════════════════
+       MOBILE — all rules scoped to max-width:768px. Desktop untouched.
+    ══════════════════════════════════════════════════════════════════ */
+    @media (max-width:768px){
+
+      body{ padding:6px; }
+
+      /* ── Header ── */
+      .header-banner{
+        grid-template-columns:52px 1fr;
+        padding:8px 10px; gap:8px;
+      }
+      .logo{ width:52px; height:52px; }
+      .header-text h1{ font-size:10px; }
+      .header-text h2{ font-size:10px; }
+      .area-badge{ font-size:11px; padding:3px 8px; }
+      .header-right{ grid-column:1/-1; }
+
+      /* Horizontally scrollable button strip */
+      .header-right > div.no-print{
+        display:flex; flex-wrap:nowrap; overflow-x:auto;
+        gap:6px; padding-bottom:4px;
+        -webkit-overflow-scrolling:touch; scrollbar-width:none;
+      }
+      .header-right > div.no-print::-webkit-scrollbar{ display:none; }
+      .header-right button{
+        font-size:11px; padding:8px 10px; border-radius:8px;
+        white-space:nowrap; flex-shrink:0; min-height:40px;
+      }
+
+      /* ── Toolbar / modals cards ── */
+      .top-toolbar{ padding:8px; }
+      .toolbar-grid,.button-groups,.dashboard-grid{ grid-template-columns:1fr; }
+      .field-row{ flex-wrap:wrap; gap:6px; }
+      .field-row label{ min-width:70px; font-size:11px; }
+
+      /* Minimum 44 px tap targets everywhere */
+      input,select,button{ min-height:40px; }
+
+      /* ── Rota table: sticky name column ── */
+      .table-container{ border-radius:8px; }
+
+      #rotaTable th:first-child,
+      #rotaTable td:first-child{
+        position:sticky; left:0; z-index:3;
+        background:#fff; border-right:2px solid #c7d2fe;
+        min-width:100px !important; max-width:120px !important; width:100px !important;
+      }
+      #rotaTable th:first-child{
+        background:var(--primary-color); z-index:4;
+      }
+      #rotaTable td:first-child .staff-input{
+        width:100% !important; min-width:0 !important; font-size:11px;
+      }
+      /* Preserve amber highlight on sticky cell */
+      #rotaTable tbody tr.active-editing-row > td:first-child{
+        background:#fef3c7 !important;
+      }
+
+      /* Comfortable cell height for finger tapping */
+      #rotaTable td{ min-height:36px; padding:5px 2px; }
+      th,td{ min-width:30px; }
+
+      /* Duty dropdown — bigger touch area */
+      .sched-cell select{ font-size:11px; min-width:56px; height:32px; }
+
+      /* OT lock button */
+      .ot-lock-btn{ min-height:28px; padding:3px 8px; font-size:11px; }
+
+      /* ── Modals — full screen on mobile ── */
+      .modal{ padding:0 !important; align-items:flex-start !important; }
+      .modal-card{
+        width:100% !important; border-radius:0 !important;
+        max-height:100dvh !important; height:100dvh; overflow-y:auto;
+      }
+      .modal-header{ border-radius:0; padding:12px 14px; }
+      .modal-header h2{ font-size:14px; }
+      .modal-body{ padding:10px; }
+
+      /* Release picker modal — full screen too */
+      .rel-modal-backdrop{ align-items:flex-start !important; }
+      .rel-modal{
+        width:100% !important; border-radius:0 !important;
+        max-height:100dvh !important; height:100dvh;
+      }
+
+      /* ── Status message — full width ── */
+      .status-message{
+        top:8px; left:8px; right:8px; max-width:none;
+        white-space:normal; text-align:center; font-size:11px;
+      }
+
+      /* ── Active staff banner ── */
+      #activeStaffBanner{
+        left:8px; right:8px; transform:none;
+        padding:5px 14px; border-radius:0 0 12px 12px;
+      }
+      #activeStaffBanner .asb-name{ font-size:13px; }
+
+      /* ── Duties help popup ── */
+      #dutiesHelpPopup{
+        left:8px !important; right:8px !important;
+        transform:none !important; min-width:unset;
+      }
+
+      /* ── Coverage panel ── */
+      .coverage-wrap{ padding:6px 8px; }
+
+      /* ── Legend ── */
+      .legend{ gap:8px; padding:8px; font-size:10px; }
+      .legend-color{ width:10px; height:10px; }
+    }
+
     @media print{
       @page{ size:landscape; margin:10mm; }
       body{ padding:0; background:#fff; font-size:8pt; }
@@ -299,8 +412,7 @@
         <h2>KAMC-WR — Pharmaceutical Care Department</h2>
         <h2 id="pageMainTitle">Pharmaceutical Care — Staff Rota</h2>
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:5px;">
-          <div class="area-badge">Filter: <span id="headerAreaLabel">All Areas</span></div>
-          <div class="area-badge no-print" id="rotaNameLabel" style="background:rgba(255,255,255,.25);font-size:11px;font-weight:700;letter-spacing:.3px;">—</div>
+<div class="area-badge no-print" id="rotaNameLabel" style="background:rgba(255,255,255,.25);font-size:11px;font-weight:700;letter-spacing:.3px;">—</div>
           <button type="button" class="no-print" onclick="newRelease()"
             style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:10px;padding:4px 10px;border-radius:999px;cursor:pointer;font-weight:700;">
             🔄 New Release
@@ -790,21 +902,20 @@
       const current = getRotaDisplayName();
       const next    = `${area}-${MONTH_NAMES_SHORT[parseInt(document.getElementById("monthSelect")?.value||"1",10)]}-R${loadReleaseNum(area)+1}`;
 
-      const ok = await showConfirmModal({
-        title: 'Create New Release?',
-        message: `Current release <b>${current}</b> stays safely in the cloud.<br>
-          All manual OT overrides will be reset to auto-calculated.<br>
-          New release will be: <b>${next}</b><br>
-          Press 💾 Save after this to store it in the cloud.`,
-        confirmLabel: 'Create Release'
-      });
-      if (!ok) return;
+      const choice = await showNewReleaseModal({ current, next });
+      if (!choice) return;
 
       releaseNum = loadReleaseNum(area) + 1;
       saveReleaseNum(area, releaseNum);
       updateRotaLabel();
 
-      // Reset every manual OT override back to auto-calculated
+      if (choice === 'fresh') {
+        await onAreaChanged(area);
+        showStatusMessage(`New release: ${getRotaDisplayName()} — grid cleared, staff loaded from cloud ✅`);
+        return;
+      }
+
+      // Continue: reset OT overrides back to auto-calculated
       let resetCount = 0;
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const otCell = row.querySelector('.ot-cell');
@@ -1250,6 +1361,55 @@
         document.getElementById('confirmModalOk').onclick     = () => cleanup(true);
         document.getElementById('confirmModalCancel').onclick = () => cleanup(false);
         modal.addEventListener('click', e => { if (e.target === modal) cleanup(false); });
+      });
+    }
+
+    function showNewReleaseModal({ current, next }) {
+      return new Promise(resolve => {
+        document.getElementById('newReleaseModal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'newReleaseModal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(2,8,23,.82);display:flex;align-items:center;justify-content:center;z-index:9000;backdrop-filter:blur(8px);';
+        modal.innerHTML = `
+          <div style="background:linear-gradient(145deg,#0f172a 0%,#1e293b 60%,#0f172a 100%);
+            border:1px solid rgba(148,163,184,.18);border-radius:22px;padding:34px 36px;
+            min-width:360px;max-width:500px;width:92%;
+            box-shadow:0 40px 100px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);">
+            <div style="height:3px;border-radius:99px;background:linear-gradient(90deg,#1d4ed8,#06b6d4);margin-bottom:26px;"></div>
+            <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;">
+              <div style="flex-shrink:0;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;
+                justify-content:center;font-size:22px;background:rgba(29,78,216,.15);border:1px solid rgba(96,165,250,.3);">🔄</div>
+              <div style="flex:1;">
+                <div style="font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:9px;letter-spacing:.1px;">Create New Release?</div>
+                <div style="font-size:13px;color:#cbd5e1;line-height:1.75;">
+                  Current: <b style="color:#93c5fd;">${current}</b><br>
+                  New: <b style="color:#86efac;">${next}</b><br>
+                  <span style="color:#94a3b8;font-size:12px;">Current release stays safely in the cloud.</span>
+                </div>
+              </div>
+            </div>
+            <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.2),transparent);margin-bottom:20px;"></div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <button id="nrm-continue" style="background:linear-gradient(135deg,#1d4ed8,#1e40af);color:#fff;border:none;
+                border-radius:11px;padding:12px 20px;font-size:13px;font-weight:800;cursor:pointer;text-align:left;">
+                ▶ Continue current work
+                <div style="font-size:11px;font-weight:400;color:#bfdbfe;margin-top:2px;">Keep all duties &amp; OT — save as new release when ready</div>
+              </button>
+              <button id="nrm-fresh" style="background:linear-gradient(135deg,#0f766e,#065f46);color:#fff;border:none;
+                border-radius:11px;padding:12px 20px;font-size:13px;font-weight:800;cursor:pointer;text-align:left;">
+                🗑 Start fresh
+                <div style="font-size:11px;font-weight:400;color:#a7f3d0;margin-top:2px;">Clear grid, load staff from cloud — save when ready</div>
+              </button>
+              <button id="nrm-cancel" style="background:transparent;color:#94a3b8;border:1px solid rgba(148,163,184,.25);
+                border-radius:11px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+        const cleanup = val => { modal.remove(); resolve(val); };
+        document.getElementById('nrm-continue').onclick = () => cleanup('continue');
+        document.getElementById('nrm-fresh').onclick    = () => cleanup('fresh');
+        document.getElementById('nrm-cancel').onclick   = () => cleanup(null);
+        modal.addEventListener('click', e => { if (e.target === modal) cleanup(null); });
       });
     }
 

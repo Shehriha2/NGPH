@@ -66,6 +66,32 @@
     .status-error{ background:#dc3545; }
     .status-info{ background:#2563eb; }
 
+    /* ── Release picker modal ── */
+    .rel-modal-backdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1100; display:flex; align-items:center; justify-content:center;
+    }
+    .rel-modal{
+      background:#fff; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,.22);
+      width:min(500px,95vw); max-height:80vh; display:flex; flex-direction:column; overflow:hidden;
+    }
+    .rel-modal-head{
+      background:linear-gradient(135deg,#1a4f8b,#2e8b57); color:#fff; padding:12px 16px;
+      font-weight:700; font-size:13px; display:flex; justify-content:space-between; align-items:center;
+    }
+    .rel-modal-close{ cursor:pointer; font-size:18px; line-height:1; background:none; border:none; color:#fff; padding:0 4px; }
+    .rel-modal-body{ overflow-y:auto; padding:10px 12px; flex:1; }
+    .rel-item{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:9px 12px; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:7px; cursor:pointer;
+      transition:background .15s;
+    }
+    .rel-item:hover{ background:#eff6ff; border-color:#bfdbfe; }
+    .rel-item-name{ font-weight:700; font-size:12px; color:#1a4f8b; }
+    .rel-item-meta{ font-size:11px; color:#666; margin-top:2px; }
+    .rel-item-btn{ background:#1a4f8b; color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:11px; cursor:pointer; white-space:nowrap; }
+    .rel-item-btn:hover{ background:#2e8b57; }
+    .rel-empty{ padding:20px; text-align:center; color:#888; font-size:12px; }
+
     @media print{
       @page{ size:landscape; margin:10mm; }
       .no-print{ display:none !important; }
@@ -109,13 +135,9 @@
       <option value="ALL">All Areas</option>
     </select>
   </div>
-  <div class="field-row">
-    <label>Named Rota</label>
-    <input id="namedRota" type="text" placeholder="Leave blank to load monthly save" style="min-width:220px"/>
-    <span class="hint">If blank, loads the monthly "Save Month" rota for the selected area.</span>
-  </div>
   <div class="btn-row" style="margin-top:6px;">
     <button class="btn-green" onclick="generateReport()">Load &amp; Generate Report</button>
+    <button style="background:#6f42c1;" onmouseover="this.style.background='#5a35a1'" onmouseout="this.style.background='#6f42c1'" onclick="pickRelease()">Pick Release</button>
     <button class="btn-orange" onclick="window.print()">Print Report</button>
     <a href="index.html" style="text-decoration:none;margin-left:auto">
       <button type="button">Back to Rota</button>
@@ -299,8 +321,74 @@
   function getMonthDocRef(key, area, monthDocId) {
     return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',monthDocId);
   }
-  function getNamedDocRef(key, area, safeName) {
-    return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'named',safeName);
+  function getReleaseIndexRef(key, area, docId) {
+    return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'release_index',docId);
+  }
+  function getReleaseDocRef(key, area, releaseId) {
+    return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'releases',releaseId);
+  }
+
+  // ── Release picker ────────────────────────────────────────────────────────
+  let _selectedReleaseId   = null;
+  let _selectedReleaseArea = null;
+
+  async function pickRelease() {
+    const key   = getKeyOrWarn(); if (!key) return;
+    const month = Number(document.getElementById("monthSelect").value);
+    const year  = Number(document.getElementById("yearInput").value) || new Date().getFullYear();
+    const area  = (document.getElementById("areaSelect").value || "ALL").trim().toUpperCase();
+    const docId = `${year}-${String(month).padStart(2,'0')}`;
+
+    showStatus("Fetching releases…", "info");
+    let releases = [];
+    try {
+      const snap = await window.FB.getDoc(getReleaseIndexRef(key, area, docId));
+      releases = snap.exists() ? (snap.data().releases || []) : [];
+    } catch(e) { showStatus("Failed to load releases: "+(e?.message||e), 'error'); return; }
+
+    document.getElementById('relPickerBackdrop')?.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'relPickerBackdrop';
+    backdrop.className = 'rel-modal-backdrop';
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) backdrop.remove(); });
+
+    const monthName = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
+    let bodyHtml = '';
+    if (!releases.length) {
+      bodyHtml = `<div class="rel-empty">No releases saved for ${area} — ${monthName} ${year}.<br>Save a release from the Rota page first.</div>`;
+    } else {
+      [...releases].reverse().forEach(r => {
+        const date = r.savedAt ? new Date(r.savedAt).toLocaleString() : '—';
+        const note = r.note ? `<span style="color:#374151;"> — ${r.note}</span>` : '';
+        bodyHtml += `<div class="rel-item" onclick="applyRelease('${r.id}','${area}')">
+          <div>
+            <div class="rel-item-name">Release #${r.releaseNum} — ${area}-${monthName.slice(0,3)}</div>
+            <div class="rel-item-meta">${date}${note} &nbsp;·&nbsp; ${r.staffCount||'?'} staff</div>
+          </div>
+          <button class="rel-item-btn">Load</button>
+        </div>`;
+      });
+    }
+
+    backdrop.innerHTML = `<div class="rel-modal">
+      <div class="rel-modal-head">
+        <span>Pick Release — ${area} / ${monthName} ${year}</span>
+        <button class="rel-modal-close" onclick="document.getElementById('relPickerBackdrop').remove()">✕</button>
+      </div>
+      <div class="rel-modal-body">${bodyHtml}</div>
+    </div>`;
+    document.body.appendChild(backdrop);
+
+    if (releases.length) showStatus('', 'success');
+    else showStatus(`No releases found for ${area} ${monthName} ${year}.`, 'error');
+  }
+
+  async function applyRelease(releaseId, area) {
+    document.getElementById('relPickerBackdrop')?.remove();
+    _selectedReleaseId   = releaseId;
+    _selectedReleaseArea = area;
+    await generateReport();
   }
 
   // ── Generate report ─────────────────────────────────────────────────────────
@@ -309,17 +397,17 @@
     const month=Number(document.getElementById("monthSelect").value);
     const year =Number(document.getElementById("yearInput").value)||new Date().getFullYear();
     const area =(document.getElementById("areaSelect").value||"ALL").trim().toUpperCase();
-    const named=(document.getElementById("namedRota").value||"").trim();
 
     showStatus("Loading rota from cloud…","info");
 
     let payload;
     try {
-      if (named) {
-        const safe=named.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_');
-        const snap=await window.FB.getDoc(getNamedDocRef(key, area, safe));
-        if (!snap.exists()) { showStatus(`Named rota "${safe}" not found for area ${area}.`,'error'); return; }
-        payload=snap.data();
+      if (_selectedReleaseId) {
+        const rArea = _selectedReleaseArea || area;
+        const snap  = await window.FB.getDoc(getReleaseDocRef(key, rArea, _selectedReleaseId));
+        if (!snap.exists()) { showStatus('Release not found in cloud.','error'); _selectedReleaseId=null; return; }
+        payload = snap.data();
+        _selectedReleaseId = null; _selectedReleaseArea = null;
       } else {
         const docId=`${year}-${String(month).padStart(2,'0')}`;
         const snap=await window.FB.getDoc(getMonthDocRef(key, area, docId));

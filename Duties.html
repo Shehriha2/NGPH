@@ -82,9 +82,10 @@
       <button class="btn-purple" type="button" onclick="saveDutiesToCloud()">☁ Save Duties to Cloud</button>
       <button class="btn-purple" type="button" onclick="loadDutiesFromCloud()">☁ Load Duties from Cloud</button>
       <button class="btn-danger" type="button" onclick="clearAreaDuties()">Clear Filtered</button>
-      <a href="index.html" style="margin-left:auto;text-decoration:none">
-        <button type="button">Open Rota</button>
-      </a>
+      <button type="button" style="margin-left:auto;background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;"
+        onclick="saveDutiesToCloud().then(()=>{ window.location.href='index.html'; })">
+        💾 Save &amp; Back to Rota
+      </button>
     </div>
     <details style="margin-top:8px;">
       <summary style="cursor:pointer;font-size:11px;color:#6b7280;font-weight:700;user-select:none;">⚙ Local / Legacy Storage</summary>

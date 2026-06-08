@@ -50,6 +50,16 @@
     .delete-btn{ background:#ff4444; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer; }
     .delete-btn:hover{ background:#cc0000; }
 
+    /* ── Area picker button ───────────────────────────────────────────────────── */
+    .area-pick-btn{
+      background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px;
+      padding:3px 8px; font-size:11px; cursor:pointer; color:#0369a1;
+      min-width:70px; text-align:left; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; max-width:140px; display:block;
+    }
+    .area-pick-btn:hover{ background:#e0f2fe; border-color:#7dd3fc; }
+    .area-pick-btn.empty{ color:#9ca3af; border-color:#e5e7eb; background:#f9fafb; }
+
     .status-message{
       position:fixed; top:20px; right:20px; padding:10px 16px; border-radius:6px;
       color:#fff; display:none; z-index:1000; max-width:520px;
@@ -111,10 +121,11 @@
 
   <div class="controls-container">
 
-    <div class="control-group">
-      <button type="button" class="saveas-btn" onclick="saveStaffToCloud()">☁ Save Staff to Cloud</button>
-      <button type="button" onclick="loadStaffFromCloud()">☁ Load Staff from Cloud</button>
-      <span class="hint">Staff pool saved &amp; loaded automatically — no name required.</span>
+    <div class="control-group" style="align-items:center;">
+      <button type="button" onclick="loadStaffFromCloud()" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">☁ Load from Cloud</button>
+      <button type="button" onclick="saveStaffToCloud()" style="background:#2e8b57;color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">☁ Save Now</button>
+      <span id="cloudSaveStatus" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;transition:all .3s;"></span>
+      <span class="hint" style="margin-left:auto;">Changes are saved to cloud automatically.</span>
     </div>
 
     <details style="margin-bottom:8px;">
@@ -141,13 +152,9 @@
         <option value="Pharmacy Aide">Pharmacy Aide</option>
       </select>
       <input id="stHRR"  type="number" step="0.01" placeholder="HRR"   style="min-width:100px"/>
-      <select id="stArea" style="min-width:100px">
-        <option value="">— Area —</option>
-      </select>
+      <input type="hidden" id="stAreaValue" value=""/>
+      <button type="button" id="stAreaBtn" class="area-pick-btn empty" style="min-width:100px;">— Area —</button>
       <button type="button" onclick="addStaff()">Add</button>
-      <button type="button" class="save-btn"   onclick="saveStaffLocal()">Save Local</button>
-      <button type="button"                    onclick="loadStaffLocal()">Load Local</button>
-      <button type="button" class="danger-btn" onclick="clearStaffLocal()">Clear All</button>
       <button type="button" onclick="window.print()">Print</button>
       <a href="index.html" style="margin-left:auto;text-decoration:none">
         <button type="button">Back to Rota</button>
@@ -288,14 +295,13 @@
       list.forEach(a => { const o = document.createElement("option"); o.value = a; o.textContent = a; sel.appendChild(o); });
       if (prev && (prev === "ALL" || list.includes(prev))) sel.value = prev;
 
-      // add-form area select
-      const stArea = document.getElementById("stArea");
-      const prevSt = stArea.value;
-      stArea.innerHTML = '<option value="">— Area —</option>';
-      list.forEach(a => { const o = document.createElement("option"); o.value = a; o.textContent = a; stArea.appendChild(o); });
-      if (prevSt && list.includes(prevSt)) stArea.value = prevSt;
-      // default add-form to current filter if not ALL
-      if (!stArea.value && prev !== "ALL" && list.includes(prev)) stArea.value = prev;
+      // add-form area button — pre-fill with current filter if specific area
+      const stAreaBtn = document.getElementById("stAreaBtn");
+      if (stAreaBtn && prev !== "ALL" && list.includes(prev) && !document.getElementById("stAreaValue")?.value) {
+        document.getElementById("stAreaValue").value = prev;
+        stAreaBtn.textContent = prev;
+        stAreaBtn.classList.remove("empty");
+      }
 
       // shared datalist for row area inputs
       const dl = document.getElementById("areasDatalist");
@@ -348,8 +354,9 @@
       let visible = 0;
 
       Array.from(document.querySelectorAll("#tbody tr")).forEach(tr => {
-        const rowArea = (tr.querySelector(".area-cell")?.value || "").trim().toUpperCase();
-        const areaOk  = filter === "ALL" || rowArea === filter;
+        const rowArea   = (tr.querySelector(".area-pick-btn")?.dataset?.areas || "").trim().toUpperCase();
+        const staffAreas = rowArea.split(",").map(x => x.trim()).filter(Boolean);
+        const areaOk    = filter === "ALL" || staffAreas.includes(filter);
 
         let searchOk = true;
         if (query) {
@@ -384,17 +391,49 @@
       };
     }
 
+    // ── Auto-save to cloud ────────────────────────────────────────────────────
+    let _cloudSaveTimer = null;
+    function setCloudSaveStatus(status) {
+      const el = document.getElementById('cloudSaveStatus');
+      if (!el) return;
+      const s = {
+        pending: { text:'⏳ Pending…',          color:'#d97706', bg:'#fefce8' },
+        saving:  { text:'☁ Saving to cloud…',  color:'#2563eb', bg:'#eff6ff' },
+        saved:   { text:'✅ Saved to cloud',    color:'#16a34a', bg:'#f0fdf4' },
+        error:   { text:'❌ Save failed',        color:'#dc2626', bg:'#fef2f2' },
+      }[status];
+      if (!s) return;
+      el.textContent = s.text; el.style.color = s.color; el.style.background = s.bg;
+      if (status === 'saved') setTimeout(() => { el.textContent=''; el.style.background='transparent'; }, 3000);
+    }
+    function scheduleCloudSave() {
+      clearTimeout(_cloudSaveTimer);
+      setCloudSaveStatus('pending');
+      _cloudSaveTimer = setTimeout(async () => {
+        setCloudSaveStatus('saving');
+        try {
+          const key = getKeyOrWarn(); if (!key) { setCloudSaveStatus('error'); return; }
+          await window.FB.setDoc(getStaffDocRef(key, STAFF_CLOUD_DOC), {
+            savedAt: new Date().toISOString(), records: staffRecords
+          }, { merge: true });
+          setCloudSaveStatus('saved');
+        } catch(e) { console.error(e); setCloudSaveStatus('error'); }
+      }, 1500);
+    }
+
     function writeLocalKeys() {
       localStorage.setItem(STAFF_RECORDS_KEY, JSON.stringify(staffRecords));
 
-      // Also write per-area derived keys so index.html can read them without V2 support
+      // Also write per-area derived keys — split comma-separated areas so each area gets its own key
       const byArea = {};
       staffRecords.forEach(s => {
-        const a = s.area || "ALL";
-        if (!byArea[a]) byArea[a] = [];
-        byArea[a].push(s);
+        const areas = (s.area || "").split(",").map(x => x.trim().toUpperCase()).filter(Boolean);
+        const targets = areas.length ? areas : ["ALL"];
+        targets.forEach(a => {
+          if (!byArea[a]) byArea[a] = [];
+          byArea[a].push(s);
+        });
       });
-      // Write the combined list under "ALL" for convenience
       const allNames = staffRecords.map(s => s.name).filter(Boolean);
       localStorage.setItem("BCOT_STAFF_LIST_ALL", JSON.stringify(allNames));
       Object.entries(byArea).forEach(([area, recs]) => {
@@ -403,6 +442,7 @@
         recs.forEach(s => { if (s.name) hrrMap[s.name] = s.hrr; });
         localStorage.setItem(`BCOT_STAFF_HRR_MAP_${area}`, JSON.stringify(hrrMap));
       });
+      scheduleCloudSave();  // auto-save to cloud after every data change
     }
 
     function readRecordsFromLocal() {
@@ -436,10 +476,9 @@
           <td>${escapeHtml(s.role)}</td>
           <td>${Number(s.hrr || 0).toFixed(2)}</td>
           <td>
-            <input class="area-cell" type="text" list="areasDatalist"
-              value="${escapeHtml(s.area)}"
-              style="width:80px;text-transform:uppercase;border:1px solid #ddd;border-radius:4px;padding:3px 5px;font-size:11px;"
-              placeholder="Area"/>
+            <button type="button" class="area-pick-btn ${s.area ? '' : 'empty'}" data-i="${idx}" data-areas="${escapeHtml(s.area)}">
+              ${escapeHtml(s.area || '— Select —')}
+            </button>
           </td>
           <td style="white-space:nowrap;">
             <button type="button" class="edit-btn" data-i="${idx}" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;">Edit</button>
@@ -448,14 +487,19 @@
           </td>
         `;
 
-        // update area in record when changed
-        tr.querySelector(".area-cell").addEventListener("change", function() {
-          const v = this.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
-          this.value = v;
-          staffRecords[idx].area = v;
-          if (v) { saveAreaToList(v); rebuildAreaUI(); }
-          writeLocalKeys();
-          applyAreaFilter();
+        // open area picker when clicking the area button
+        tr.querySelector(".area-pick-btn").addEventListener("click", function() {
+          const i = Number(this.getAttribute("data-i"));
+          const btn = this;
+          openAreaPickerModal("Assign Areas — " + escapeHtml(staffRecords[i].name), staffRecords[i].area || "", newAreas => {
+            staffRecords[i].area = newAreas;
+            btn.textContent = newAreas || "— Select —";
+            btn.dataset.areas = newAreas;
+            btn.classList.toggle("empty", !newAreas);
+            if (newAreas) { newAreas.split(",").forEach(a => { if (a.trim()) saveAreaToList(a.trim()); }); rebuildAreaUI(); }
+            writeLocalKeys();
+            applyAreaFilter();
+          });
         });
 
         tbody.appendChild(tr);
@@ -537,13 +581,49 @@
       applyAreaFilter();
     }
 
+    // ── Area picker modal ─────────────────────────────────────────────────────
+    function openAreaPickerModal(title, currentAreas, callback) {
+      const existing = document.getElementById("areaPickerModal");
+      if (existing) existing.remove();
+      const areas = getAreasList();
+      if (!areas.length) { showStatusMessage("No areas defined yet. Add an area first.", true); return; }
+      const selected = new Set((currentAreas || "").split(",").map(x => x.trim().toUpperCase()).filter(Boolean));
+      const modal = document.createElement("div");
+      modal.id = "areaPickerModal";
+      modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:4000;";
+      modal.innerHTML = `
+        <div style="background:#fff;border-radius:12px;padding:20px 24px;min-width:260px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+          <h3 style="margin:0 0 14px;font-size:13px;color:#1a4f8b;">${title}</h3>
+          <div id="areaCheckList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:16px;">
+            ${areas.map(a => `
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid ${selected.has(a)?'#bfdbfe':'#e5e7eb'};background:${selected.has(a)?'#eff6ff':'#fff'};">
+                <input type="checkbox" value="${a}" ${selected.has(a)?'checked':''} style="width:14px;height:14px;cursor:pointer;accent-color:#1a4f8b;"/>
+                <span style="font-weight:${selected.has(a)?'700':'400'};color:#1f2937;">${a}</span>
+              </label>`).join("")}
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="areaPickApply" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:12px;cursor:pointer;font-weight:700;">Apply</button>
+            <button id="areaPickCancel" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;">Cancel</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      document.getElementById("areaPickCancel").onclick = () => modal.remove();
+      modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+      document.getElementById("areaPickApply").onclick = () => {
+        const checked = Array.from(modal.querySelectorAll("#areaCheckList input:checked"))
+          .map(cb => cb.value.trim().toUpperCase()).filter(Boolean);
+        callback(checked.join(","));
+        modal.remove();
+      };
+    }
+
     // ── Add staff ──────────────────────────────────────────────────────────────
     function addStaff() {
       const name  = (document.getElementById("stName").value  || "").trim();
       const badge = (document.getElementById("stBadge").value || "").trim();
       const role  = document.getElementById("stRole").value  || "Pharmacist";
       const hrr   = Number(document.getElementById("stHRR").value  || 0) || 0;
-      const area  = (document.getElementById("stArea").value  || "").trim().toUpperCase();
+      const area  = (document.getElementById("stAreaValue").value || "").trim().toUpperCase();
 
       if (!name) { showStatusMessage("Name is required.", true); return; }
       if (badge && staffRecords.some(x => x.badge && x.badge === badge && x.area === area))
@@ -561,6 +641,9 @@
       document.getElementById("stName").value  = "";
       document.getElementById("stBadge").value = "";
       document.getElementById("stHRR").value   = "";
+      document.getElementById("stAreaValue").value = "";
+      const stBtn = document.getElementById("stAreaBtn");
+      if (stBtn) { stBtn.textContent = "— Area —"; stBtn.classList.add("empty"); }
       document.getElementById("stName").focus();
     }
 
@@ -606,7 +689,7 @@
       const targetArea = (document.getElementById("copyTargetAreaBulk").value || "").trim();
       if (!targetArea) { showStatusMessage("Select a target area first.", true); return; }
       const filter = getCurrentFilter();
-      const source = filter === "ALL" ? [...staffRecords] : staffRecords.filter(s => (s.area || "").toUpperCase() === filter);
+      const source = filter === "ALL" ? [...staffRecords] : staffRecords.filter(s => (s.area||"").toUpperCase().split(",").map(x=>x.trim()).includes(filter));
       if (!source.length) { showStatusMessage("No visible staff to copy.", true); return; }
       doCopyToArea(source, targetArea);
     }
@@ -626,10 +709,7 @@
       const existing = document.getElementById("editStaffModal");
       if (existing) existing.remove();
 
-      const areas = getAreasList();
-      const areaOpts = ['<option value="">— Area —</option>',
-        ...areas.map(a => `<option value="${a}"${a===rec.area?' selected':''}>${a}</option>`)
-      ].join("");
+      let _editAreas = rec.area || "";
 
       const modal = document.createElement("div");
       modal.id = "editStaffModal";
@@ -657,10 +737,13 @@
               <input id="editHRR" type="number" step="0.01" value="${rec.hrr||0}"
                 style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/>
             </label>
-            <label style="font-size:11px;font-weight:700;color:#374151;">Area (this record only)
-              <select id="editArea" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;">
-                ${areaOpts}
-              </select>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Areas (this record only)
+              <div style="display:flex;gap:6px;align-items:center;margin-top:3px;">
+                <div id="editAreaDisplay" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#f9fafb;min-height:32px;color:#374151;word-break:break-all;">
+                  ${escapeHtml(rec.area || '—')}
+                </div>
+                <button type="button" id="editAreaBtn" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Edit Areas</button>
+              </div>
             </label>
             <div style="font-size:10px;color:#6b7280;background:#f9fbfd;border-radius:6px;padding:6px 8px;">
               ℹ️ Name, Badge, Role and HRR changes apply to <b>all area copies</b> of this staff member (matched by badge). Area change applies only to this record.
@@ -676,12 +759,19 @@
       document.getElementById("editCancelBtn").onclick = () => modal.remove();
       modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
 
+      document.getElementById("editAreaBtn").onclick = () => {
+        openAreaPickerModal("Edit Areas — " + escapeHtml(rec.name), _editAreas, newAreas => {
+          _editAreas = newAreas;
+          document.getElementById("editAreaDisplay").textContent = newAreas || "—";
+        });
+      };
+
       document.getElementById("editSaveBtn").onclick = () => {
         const newName  = document.getElementById("editName").value.trim();
         const newBadge = document.getElementById("editBadge").value.trim();
         const newRole  = document.getElementById("editRole").value;
         const newHRR   = parseFloat(document.getElementById("editHRR").value) || 0;
-        const newArea  = document.getElementById("editArea").value.trim().toUpperCase();
+        const newArea  = _editAreas.toUpperCase();
 
         if (!newName) { alert("Name is required."); return; }
 
@@ -698,7 +788,7 @@
         });
         // Area change only for this specific record
         staffRecords[idx].area = newArea;
-        if (newArea) saveAreaToList(newArea);
+        if (newArea) newArea.split(",").forEach(a => { if (a.trim()) saveAreaToList(a.trim()); });
 
         renderTable();
         writeLocalKeys();
@@ -789,15 +879,17 @@
     const STAFF_CLOUD_DOC = "STAFF_POOL";   // fixed doc name — no user input needed
 
     async function saveStaffToCloud() {
+      clearTimeout(_cloudSaveTimer);  // cancel any pending auto-save
+      setCloudSaveStatus('saving');
       try {
-        const key = getKeyOrWarn(); if (!key) return;
-        if (!staffRecords.length) { showStatusMessage("No staff to save.", true); return; }
-        showStatusMessage("Saving staff to cloud…");
+        const key = getKeyOrWarn(); if (!key) { setCloudSaveStatus('error'); return; }
+        if (!staffRecords.length) { showStatusMessage("No staff to save.", true); setCloudSaveStatus('error'); return; }
         await window.FB.setDoc(getStaffDocRef(key, STAFF_CLOUD_DOC), {
-          savedAt: new Date().toISOString(), records: staffRecords
+          savedAt: new Date().toISOString(), records: staffRecords, areasList: getAreasList()
         }, { merge: true });
+        setCloudSaveStatus('saved');
         showStatusMessage(`${staffRecords.length} staff saved to cloud ✅`);
-      } catch(e) { console.error(e); showStatusMessage("Save failed: " + (e?.message||e), true); }
+      } catch(e) { console.error(e); setCloudSaveStatus('error'); showStatusMessage("Save failed: " + (e?.message||e), true); }
     }
 
     async function loadStaffFromCloud() {
@@ -810,7 +902,12 @@
         staffRecords = (Array.isArray(data.records) ? data.records : []).map(normalizeRecord).filter(s => s.name);
         renderTable();
         writeLocalKeys();
-        staffRecords.forEach(s => { if (s.area) saveAreaToList(s.area); });
+        const cloudAreas = Array.isArray(data.areasList) ? data.areasList : [];
+        if (cloudAreas.length) {
+          localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(cloudAreas));
+        } else {
+          staffRecords.forEach(s => { if (s.area) s.area.split(",").forEach(a => { if (a.trim()) saveAreaToList(a.trim()); }); });
+        }
         rebuildAreaUI();
         showStatusMessage(`Loaded ${staffRecords.length} staff from cloud ✅`);
       } catch(e) { console.error(e); showStatusMessage("Load failed: " + (e?.message||e), true); }
@@ -912,13 +1009,28 @@
       const lastArea = (localStorage.getItem("BCOT_CURRENT_AREA_V1") || "ALL").trim().toUpperCase();
       const sel = document.getElementById("areaFilter");
       if (lastArea === "ALL" || getAreasList().includes(lastArea)) sel.value = lastArea;
-      if (lastArea !== "ALL") document.getElementById("stArea").value = lastArea;
+      if (lastArea !== "ALL" && getAreasList().includes(lastArea)) {
+        document.getElementById("stAreaValue").value = lastArea;
+        const btn = document.getElementById("stAreaBtn");
+        if (btn) { btn.textContent = lastArea; btn.classList.remove("empty"); }
+      }
 
       staffRecords = readRecordsFromLocal();
       renderTable();
       writeLocalKeys();
 
       if (!staffRecords.length) showStatusMessage("No staff yet. Add staff using the form above.", true);
+
+      // Wire up area picker button for new-staff form
+      document.getElementById("stAreaBtn").addEventListener("click", () => {
+        const cur = document.getElementById("stAreaValue").value || "";
+        openAreaPickerModal("Select Areas for New Staff", cur, newAreas => {
+          document.getElementById("stAreaValue").value = newAreas;
+          const btn = document.getElementById("stAreaBtn");
+          btn.textContent = newAreas || "— Area —";
+          btn.classList.toggle("empty", !newAreas);
+        });
+      });
 
       document.getElementById("stName").addEventListener("keydown", e => { if (e.key === "Enter") addStaff(); });
       document.getElementById("newAreaInput").addEventListener("keydown", e => { if (e.key === "Enter") addNewArea(); });
