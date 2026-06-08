@@ -1,0 +1,32 @@
+Great. So here's the full agreed spec — confirm and then I'll start coding:
+
+---
+
+**Staff.html changes:**
+1. Copy single staff to another area — badge as unique ID (fix existing)
+2. "Copy to Area" section in top controls with target area dropdown + two buttons: **Copy Visible** and **Copy All**
+3. Duplicate check by badge number, not name
+
+---
+
+**New page: `Areas.html`**
+- List all areas (synced from the shared `BCOT_AREAS_LIST_V1`)
+- Assign a SAR budget to each area
+- Save to localStorage + Firestore cloud sync
+
+---
+
+**New page: `BudgetReport.html`**
+- Reads the current rota from localStorage/Firestore
+- For each staff member: calculates OT hours, then splits OT cost (OT hrs × HRR) proportionally across the areas of their duty cells
+- Shows per area: Budget Allocated (SAR), OT Cost Consumed (SAR), Remaining (SAR)
+- Printable
+
+---
+
+**index.html:**
+- Add links to `Areas.html` and `BudgetReport.html` in the Pages & Tools section
+
+---
+
+Does this cover everything, or any changes before I start?
