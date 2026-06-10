@@ -227,10 +227,77 @@
     showScreen('changepwd');
   }
 
+  /* ── Custom dialogs (replaces alert / confirm / prompt) ───────────────── */
+  function _dialogBase(innerHtml) {
+    const ov = document.createElement('div');
+    ov.style.cssText =
+      'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:999999;' +
+      'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
+    ov.innerHTML =
+      `<div style="background:#fff;border-radius:14px;padding:28px 28px 24px;` +
+      `width:400px;max-width:92vw;box-shadow:0 10px 40px rgba(0,0,0,.22);">${innerHtml}</div>`;
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  function _bcotAlert(msg, title = 'Notice') {
+    return new Promise(resolve => {
+      const ov = _dialogBase(`
+        <h3 style="margin:0 0 10px;font-size:16px;color:#1a4f8b;">${title}</h3>
+        <p style="margin:0 0 22px;font-size:13px;color:#374151;line-height:1.6;">${msg}</p>
+        <div style="text-align:right;">
+          <button id="_ba_ok" style="padding:9px 26px;background:#1a4f8b;color:#fff;border:none;
+            border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">OK</button>
+        </div>`);
+      ov.querySelector('#_ba_ok').onclick = () => { ov.remove(); resolve(); };
+    });
+  }
+
+  function _bcotConfirm(msg, title = 'Confirm', { confirmLabel = 'Confirm', danger = false } = {}) {
+    return new Promise(resolve => {
+      const btnBg = danger ? '#dc2626' : '#1a4f8b';
+      const ov = _dialogBase(`
+        <h3 style="margin:0 0 10px;font-size:16px;color:#1a4f8b;">${title}</h3>
+        <p style="margin:0 0 22px;font-size:13px;color:#374151;line-height:1.6;">${msg}</p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="_bc_no" style="padding:9px 22px;background:#f3f4f6;color:#374151;
+            border:1px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>
+          <button id="_bc_yes" style="padding:9px 22px;background:${btnBg};color:#fff;border:none;
+            border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">${confirmLabel}</button>
+        </div>`);
+      ov.querySelector('#_bc_yes').onclick = () => { ov.remove(); resolve(true); };
+      ov.querySelector('#_bc_no').onclick  = () => { ov.remove(); resolve(false); };
+    });
+  }
+
+  function _bcotPrompt(msg, { title = 'Enter Value', placeholder = '', type = 'text',
+                               confirmLabel = 'Submit' } = {}) {
+    return new Promise(resolve => {
+      const ov = _dialogBase(`
+        <h3 style="margin:0 0 10px;font-size:16px;color:#1a4f8b;">${title}</h3>
+        <p style="margin:0 0 12px;font-size:13px;color:#374151;">${msg}</p>
+        <input id="_bp_inp" type="${type}" placeholder="${placeholder}"
+          style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
+                 font-size:13px;box-sizing:border-box;margin-bottom:18px;" />
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="_bp_no" style="padding:9px 22px;background:#f3f4f6;color:#374151;
+            border:1px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>
+          <button id="_bp_ok" style="padding:9px 22px;background:#1a4f8b;color:#fff;border:none;
+            border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">${confirmLabel}</button>
+        </div>`);
+      const inp = ov.querySelector('#_bp_inp');
+      const submit = () => { const v = inp.value; ov.remove(); resolve(v); };
+      inp.onkeydown = e => { if (e.key === 'Enter') submit(); };
+      setTimeout(() => inp.focus(), 50);
+      ov.querySelector('#_bp_ok').onclick = submit;
+      ov.querySelector('#_bp_no').onclick = () => { ov.remove(); resolve(null); };
+    });
+  }
+
   function doLogout() {
-    if (!confirm('Log out from BCOT Rota?\nYou will need to log in again.')) return;
-    clearSession();
-    location.reload();
+    _bcotConfirm('You will need to log in again to access the app.', 'Log Out?',
+      { confirmLabel: 'Log Out', danger: true })
+      .then(ok => { if (ok) { clearSession(); location.reload(); } });
   }
 
   /* ── After successful auth ─────────────────────────────────────────────── */
@@ -265,13 +332,12 @@
      User Manager — called from index.html admin panel
      ══════════════════════════════════════════════════════════════════════════ */
   async function openUserManager() {
-    if (!_key) { alert('Not initialized.'); return; }
-    // Reload users fresh from Firebase
+    if (!_key) { await _bcotAlert('Authentication module is not initialized.', 'Error'); return; }
     try {
       let t = 0;
       while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
       await loadUsers();
-    } catch (e) { alert('Could not load users: ' + e.message); return; }
+    } catch (e) { await _bcotAlert('Could not load users — check your connection.', 'Connection Error'); return; }
 
     _renderUserManagerModal();
   }
@@ -375,24 +441,30 @@
   async function umResetPwd(id) {
     const u = _users.find(u => u.id === id);
     if (!u) return;
-    if (!confirm(`Reset password for "${u.name}" to 12345?\nThey will be asked to change it on next login.`)) return;
-    u.password  = '12345';
+    const ok = await _bcotConfirm(
+      `Reset password for <strong>${u.name}</strong> to the default <strong>12345</strong>?<br>They will be required to set a new password on their next login.`,
+      'Reset Password', { confirmLabel: 'Reset', danger: false });
+    if (!ok) return;
+    u.password   = '12345';
     u.firstLogin = true;
     try {
       await saveUsers();
       _renderUserList();
-    } catch (e) { alert('Save failed: ' + e.message); }
+    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
   }
 
   async function umRemoveUser(id) {
     const u = _users.find(u => u.id === id);
     if (!u) return;
-    if (!confirm(`Remove "${u.name}" from login users?\nThey will no longer be able to access the app.`)) return;
+    const ok = await _bcotConfirm(
+      `Remove <strong>${u.name}</strong> from the login users list?<br>They will no longer be able to access the app.`,
+      'Remove User', { confirmLabel: 'Remove', danger: true });
+    if (!ok) return;
     _users = _users.filter(u => u.id !== id);
     try {
       await saveUsers();
       _renderUserList();
-    } catch (e) { alert('Save failed: ' + e.message); }
+    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -458,6 +530,9 @@
     umAddUser,
     umResetPwd,
     umRemoveUser,
+    alert  : _bcotAlert,
+    confirm: _bcotConfirm,
+    prompt : _bcotPrompt,
   };
 
 })();

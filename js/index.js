@@ -1,16 +1,21 @@
     // ── Auth Admin ────────────────────────────────────────────────────────────
-    function openAuthAdmin() {
+    async function openAuthAdmin() {
       const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-      if (!pwd) { alert('config.js not loaded.'); return; }
-      const entered = prompt('Enter OT override password to access user management:');
-      if (entered === null) return;
-      if (entered.trim() !== pwd) { alert('Incorrect password.'); return; }
-      if (typeof BCOT_AUTH !== 'undefined') {
-        closeSettingsModal();
-        BCOT_AUTH.openUserManager();
-      } else {
-        alert('Auth module not loaded.');
+      if (!pwd || typeof BCOT_AUTH === 'undefined') {
+        showStatusMessage('Authentication module is not available.', 'error');
+        return;
       }
+      const entered = await BCOT_AUTH.prompt(
+        'Enter the OT override password to access user management.',
+        { title: '🔒 Admin Access', placeholder: 'Password', type: 'password', confirmLabel: 'Unlock' }
+      );
+      if (entered === null) return;
+      if (entered.trim() !== pwd) {
+        showStatusMessage('Incorrect password — access denied.', 'error');
+        return;
+      }
+      closeSettingsModal();
+      BCOT_AUTH.openUserManager();
     }
 
     // ── Storage keys ──────────────────────────────────────────────────────────
