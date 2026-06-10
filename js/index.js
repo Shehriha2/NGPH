@@ -2593,12 +2593,17 @@
         if(status==="saved")setTimeout(()=>{el.textContent="";el.style.background="transparent";},3000);
       }
       function schedSave() {
+        if (!records.length) return;   // never overwrite cloud with an empty list
         clearTimeout(_saveTimer); setStatus("pending");
         _saveTimer=setTimeout(async()=>{
           setStatus("saving");
-          try{const key=(window.BCOT_APP_KEY||"").trim();if(!key){setStatus("error");return;}
-          await window.FB.setDoc(getDocRef(key),{savedAt:new Date().toISOString(),records},{merge:true});
-          setStatus("saved");}
+          try{
+            const key=(window.BCOT_APP_KEY||"").trim(); if(!key){setStatus("error");return;}
+            // Wait for Firebase if not yet ready (ES module loads async)
+            let t=0; while(!window.FB&&t++<40) await new Promise(r=>setTimeout(r,50));
+            if(!window.FB){setStatus("error");return;}
+            await window.FB.setDoc(getDocRef(key),{savedAt:new Date().toISOString(),records},{merge:true});
+            setStatus("saved");}
           catch(e){console.error(e);setStatus("error");}
         },1500);
       }
@@ -2878,6 +2883,8 @@
         const area=getCurrentArea(), sel=document.getElementById("sm-areaFilter");
         if(sel&&area&&(area==="ALL"||getAreasList().includes(area)))sel.value=area;
         applyFilter();
+        // Auto-load from cloud when no local data (e.g. first visit on new domain)
+        if(!records.length) loadFromCloud();
       }
       function close() { document.getElementById("staffModal").style.display="none"; }
 
