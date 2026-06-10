@@ -21,8 +21,13 @@
 
     // ── Area helpers ───────────────────────────────────────────────────────────
     function getAreasList() {
-      try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || []; }
-      catch { return []; }
+      try {
+        const all     = JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || [];
+        const allowed = window.BCOT_AUTH_ALLOWED_AREAS;
+        if (!allowed || allowed === 'ALL') return all;
+        if (Array.isArray(allowed)) return all.filter(a => allowed.includes(a));
+        return all;
+      } catch { return []; }
     }
     function saveAreaToList(area) {
       const list = getAreasList();

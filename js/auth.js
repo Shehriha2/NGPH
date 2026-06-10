@@ -37,7 +37,8 @@
   }
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      id: user.id, name: user.name, ts: Date.now()
+      id: user.id, name: user.name, ts: Date.now(),
+      areas: user.areas || 'ALL'
     }));
   }
   function clearSession() { localStorage.removeItem(SESSION_KEY); }
@@ -343,6 +344,7 @@
   /* ── After successful auth ─────────────────────────────────────────────── */
   function _finishLogin(user) {
     setSession(user);
+    window.BCOT_AUTH_ALLOWED_AREAS = user.areas || 'ALL';
     _removeOverlay();
     _addLogoutButton(user.name);
     _pendingUser = null;
@@ -791,6 +793,331 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
+     Area Manager — manage areas list + per-area user access
+     ══════════════════════════════════════════════════════════════════════════ */
+  const _AREAS_LS   = 'BCOT_AREAS_LIST_V1';
+  const _STAFF_LS   = 'BCOT_STAFF_RECORDS_V2';
+
+  function _getLocalAreas() {
+    try { return JSON.parse(localStorage.getItem(_AREAS_LS) || '[]') || []; } catch { return []; }
+  }
+  function _setLocalAreas(list) {
+    localStorage.setItem(_AREAS_LS, JSON.stringify(list.sort()));
+  }
+
+  /** Save area list into the cloud staff document (merge — does not touch records). */
+  async function _saveAreasToCloud(areas) {
+    if (!window.FB || typeof window.FB.setDoc !== 'function' || !_key) return;
+    await window.FB.setDoc(
+      window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'staff_named', 'STAFF_POOL'),
+      { areasList: areas },
+      { merge: true }
+    );
+  }
+
+  async function openAreaManager() {
+    if (!_key) { await _bcotAlert('Authentication module is not initialized.', 'Error'); return; }
+    try {
+      let t = 0;
+      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+      await loadUsers();
+    } catch (e) {
+      await _bcotAlert('Could not load users — check your connection.', 'Connection Error');
+      return;
+    }
+    _renderAreaManagerModal();
+  }
+
+  function _renderAreaManagerModal() {
+    const ex = $id('bcot-ar-modal'); if (ex) ex.remove();
+    const modal = document.createElement('div');
+    modal.id = 'bcot-ar-modal';
+    modal.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;' +
+      'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
+
+    modal.innerHTML = `
+<div style="background:#fff;border-radius:14px;padding:28px 28px 22px;width:600px;
+            max-width:94vw;max-height:86vh;overflow-y:auto;
+            box-shadow:0 8px 32px rgba(0,0,0,.2);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+    <h3 style="margin:0;font-size:16px;color:#1a4f8b;">🗂️ Area Management</h3>
+    <button onclick="document.getElementById('bcot-ar-modal').remove();"
+      style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;
+             line-height:1;padding:0 4px;">&times;</button>
+  </div>
+
+  <div id="bcot-ar-list" style="margin-bottom:20px;"></div>
+
+  <div style="border-top:1px solid #e5e7eb;padding-top:16px;">
+    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">ADD NEW AREA</div>
+    <div style="display:flex;gap:8px;">
+      <input id="bcot-ar-newname" type="text" placeholder="Area code (e.g. ACC, ICU, OPD)"
+        style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;
+               font-size:12px;text-transform:uppercase;"
+        onkeydown="if(event.key==='Enter') BCOT_AUTH.areaAdd();" />
+      <button onclick="BCOT_AUTH.areaAdd();"
+        style="padding:8px 16px;background:#1a4f8b;color:#fff;border:none;
+               border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+        + Add
+      </button>
+    </div>
+    <div id="bcot-ar-err" style="color:#dc2626;font-size:11px;min-height:16px;margin-top:5px;"></div>
+    <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">
+      Areas are used to filter staff and rota views.
+      Use <strong>🔒 Access</strong> to restrict which users can see each area.
+    </p>
+  </div>
+</div>`;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    _renderAreaList();
+  }
+
+  function _renderAreaList() {
+    const list = $id('bcot-ar-list'); if (!list) return;
+    const areas = _getLocalAreas();
+
+    if (!areas.length) {
+      list.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">No areas yet — add one below.</p>';
+      return;
+    }
+
+    const anyRestricted = _users.some(u => Array.isArray(u.areas));
+
+    list.innerHTML = areas.map(area => {
+      const withAccess = _users.filter(u =>
+        !u.areas || u.areas === 'ALL' || (Array.isArray(u.areas) && u.areas.includes(area))
+      );
+      let accessLabel, accessColor;
+      if (!anyRestricted || withAccess.length === _users.length) {
+        accessLabel = 'All users'; accessColor = '#16a34a';
+      } else {
+        accessLabel = `${withAccess.length} / ${_users.length} users`;
+        accessColor = withAccess.length === 0 ? '#dc2626' : '#d97706';
+      }
+      const safeArea = area.replace(/'/g, "\\'");
+      return `
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;
+            padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:7px;
+            background:#f9fafb;">
+  <div style="flex:1;min-width:0;">
+    <span style="font-size:13px;font-weight:700;color:#1f2937;font-family:monospace;">${area}</span>
+    <span style="font-size:11px;color:${accessColor};margin-left:10px;">👤 ${accessLabel}</span>
+  </div>
+  <div style="display:flex;gap:5px;flex-shrink:0;">
+    <button onclick="BCOT_AUTH.areaAccess('${safeArea}');"
+      style="padding:5px 10px;background:#1a4f8b;color:#fff;border:none;
+             border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">
+      🔒 Access
+    </button>
+    <button onclick="BCOT_AUTH.areaRename('${safeArea}');"
+      style="padding:5px 10px;background:#d97706;color:#fff;border:none;
+             border-radius:6px;font-size:11px;cursor:pointer;">
+      Rename
+    </button>
+    <button onclick="BCOT_AUTH.areaRemove('${safeArea}');"
+      style="padding:5px 10px;background:#dc2626;color:#fff;border:none;
+             border-radius:6px;font-size:11px;cursor:pointer;">
+      Remove
+    </button>
+  </div>
+</div>`;
+    }).join('');
+  }
+
+  async function areaAdd() {
+    const raw   = ($id('bcot-ar-newname')?.value || '').trim().toUpperCase()
+                    .replace(/[^A-Z0-9_\-]/g, '').slice(0, 20);
+    const errEl = $id('bcot-ar-err');
+    if (errEl) errEl.textContent = '';
+    if (!raw) { if (errEl) errEl.textContent = 'Enter a valid area code.'; return; }
+    const areas = _getLocalAreas();
+    if (areas.includes(raw)) { if (errEl) errEl.textContent = `"${raw}" already exists.`; return; }
+    areas.push(raw);
+    _setLocalAreas(areas);
+    try {
+      await _saveAreasToCloud(_getLocalAreas());
+      if ($id('bcot-ar-newname')) $id('bcot-ar-newname').value = '';
+      _renderAreaList();
+    } catch (e) { if (errEl) errEl.textContent = 'Cloud save failed: ' + e.message; }
+  }
+
+  async function areaRename(oldName) {
+    const input = await _bcotPrompt(
+      `Enter a new code for area <strong>${oldName}</strong>:`,
+      { title: '✏️ Rename Area', placeholder: 'New area code', confirmLabel: 'Rename' }
+    );
+    if (input === null) return;
+    const newName = input.trim().toUpperCase().replace(/[^A-Z0-9_\-]/g, '').slice(0, 20);
+    if (!newName || newName === oldName) return;
+
+    const areas = _getLocalAreas();
+    if (areas.includes(newName)) { await _bcotAlert(`Area "${newName}" already exists.`, 'Error'); return; }
+
+    // Update areas list
+    const idx = areas.indexOf(oldName);
+    if (idx >= 0) areas[idx] = newName;
+    _setLocalAreas(areas);
+
+    // Rename in staff records in localStorage
+    try {
+      const staff = JSON.parse(localStorage.getItem(_STAFF_LS) || '[]');
+      let changed = false;
+      staff.forEach(s => {
+        if (!s.area) return;
+        const parts = s.area.split(',').map(a => a.trim().toUpperCase());
+        if (parts.includes(oldName)) {
+          s.area = parts.map(a => a === oldName ? newName : a).join(',');
+          changed = true;
+        }
+      });
+      if (changed) localStorage.setItem(_STAFF_LS, JSON.stringify(staff));
+    } catch {}
+
+    // Update user area permissions
+    let usersChanged = false;
+    _users.forEach(u => {
+      if (Array.isArray(u.areas)) {
+        const i = u.areas.indexOf(oldName);
+        if (i >= 0) { u.areas[i] = newName; usersChanged = true; }
+      }
+    });
+
+    try {
+      await _saveAreasToCloud(_getLocalAreas());
+      if (usersChanged) await saveUsers();
+      _renderAreaList();
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
+  }
+
+  async function areaRemove(name) {
+    let staffCount = 0;
+    try {
+      const staff = JSON.parse(localStorage.getItem(_STAFF_LS) || '[]');
+      staffCount = staff.filter(s =>
+        (s.area || '').split(',').map(a => a.trim().toUpperCase()).includes(name)
+      ).length;
+    } catch {}
+
+    const ok = await _bcotConfirm(
+      `Remove area <strong>${name}</strong> from the list?` +
+      (staffCount ? `<br><br>⚠️ ${staffCount} staff member(s) are tagged with this area.` +
+        ` Their records are not deleted, but this area will no longer appear in filters.` : ''),
+      'Remove Area', { confirmLabel: 'Remove', danger: true }
+    );
+    if (!ok) return;
+
+    const areas = _getLocalAreas().filter(a => a !== name);
+    _setLocalAreas(areas);
+
+    // Remove from user permissions
+    let usersChanged = false;
+    _users.forEach(u => {
+      if (Array.isArray(u.areas)) {
+        const before = u.areas.length;
+        u.areas = u.areas.filter(a => a !== name);
+        if (u.areas.length !== before) usersChanged = true;
+      }
+    });
+
+    try {
+      await _saveAreasToCloud(areas);
+      if (usersChanged) await saveUsers();
+      _renderAreaList();
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
+  }
+
+  /** Open the per-area access dialog — check/uncheck which users can see this area. */
+  async function areaAccess(areaName) {
+    if (!_users.length) { await _bcotAlert('No users configured yet.', 'Notice'); return; }
+    const allAreas = _getLocalAreas();
+
+    return new Promise(resolve => {
+      const userRows = _users.map(u => {
+        const hasAccess = !u.areas || u.areas === 'ALL' ||
+                          (Array.isArray(u.areas) && u.areas.includes(areaName));
+        return `
+<div style="display:flex;align-items:center;gap:10px;padding:8px 0;
+            border-bottom:1px solid #f3f4f6;">
+  <input type="checkbox" id="ar-chk-${u.id}" ${hasAccess ? 'checked' : ''}
+    style="width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#1a4f8b;" />
+  <label for="ar-chk-${u.id}"
+    style="font-size:13px;color:#374151;cursor:pointer;flex:1;">${u.name}</label>
+</div>`;
+      }).join('');
+
+      const ov = _dialogBase(`
+        <h3 style="margin:0 0 6px;font-size:16px;color:#1a4f8b;">🔒 Access — ${areaName}</h3>
+        <p style="margin:0 0 12px;font-size:12px;color:#6b7280;">
+          Unchecked users will not see <strong>${areaName}</strong> in any page filter.
+        </p>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button onclick="BCOT_AUTH._arCheckAll(true);"
+            style="flex:1;padding:5px;background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;
+                   border-radius:6px;font-size:11px;cursor:pointer;">✓ All</button>
+          <button onclick="BCOT_AUTH._arCheckAll(false);"
+            style="flex:1;padding:5px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;
+                   border-radius:6px;font-size:11px;cursor:pointer;">✗ None</button>
+        </div>
+        <div style="max-height:240px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;
+                    padding:0 12px;margin-bottom:18px;">
+          ${userRows}
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="_ar_cancel" style="padding:9px 22px;background:#f3f4f6;color:#374151;
+            border:1px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>
+          <button id="_ar_save" style="padding:9px 22px;background:#1a4f8b;color:#fff;border:none;
+            border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Save Access</button>
+        </div>`);
+
+      ov.querySelector('#_ar_save').onclick = async () => {
+        const checkedIds = new Set(_users.filter(u => $id('ar-chk-' + u.id)?.checked).map(u => u.id));
+        const allChecked = checkedIds.size === _users.length;
+
+        _users.forEach(u => {
+          const shouldHave = checkedIds.has(u.id);
+          if (!u.areas || u.areas === 'ALL') {
+            if (!shouldHave) {
+              // Convert from unrestricted to specific: all areas EXCEPT this one
+              u.areas = allAreas.filter(a => a !== areaName);
+            }
+            // If shouldHave: keep 'ALL', no change
+          } else if (Array.isArray(u.areas)) {
+            if (shouldHave && !u.areas.includes(areaName)) {
+              u.areas.push(areaName); u.areas.sort();
+            } else if (!shouldHave) {
+              u.areas = u.areas.filter(a => a !== areaName);
+            }
+          }
+          // If user now has all areas → simplify back to 'ALL'
+          if (Array.isArray(u.areas) && allAreas.length &&
+              allAreas.every(a => u.areas.includes(a))) {
+            u.areas = 'ALL';
+          }
+        });
+
+        try {
+          await saveUsers();
+          ov.remove();
+          _renderAreaList();
+          resolve();
+        } catch (e) {
+          await _bcotAlert('Save failed — ' + e.message, 'Error');
+          ov.remove(); resolve();
+        }
+      };
+      ov.querySelector('#_ar_cancel').onclick = () => { ov.remove(); resolve(); };
+    });
+  }
+
+  /** Called by "✓ All" / "✗ None" buttons inside the access dialog. */
+  function _arCheckAll(checked) {
+    _users.forEach(u => { const el = $id('ar-chk-' + u.id); if (el) el.checked = checked; });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
      Main init — runs automatically on every page
      ══════════════════════════════════════════════════════════════════════════ */
   (async function init() {
@@ -809,6 +1136,7 @@
     // 3. Fast path: valid session — skip IP check (device already authenticated)
     const session = getSession();
     if (session) {
+      window.BCOT_AUTH_ALLOWED_AREAS = session.areas || 'ALL';
       _removeOverlay();
       _addLogoutButton(session.name);
       return;
@@ -868,6 +1196,13 @@
     ipRemove,
     ipManualAdd,
     _adminBypass,
+    // Area manager
+    openAreaManager,
+    areaAdd,
+    areaRename,
+    areaRemove,
+    areaAccess,
+    _arCheckAll,
     // Dialogs
     alert  : _bcotAlert,
     confirm: _bcotConfirm,

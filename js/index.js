@@ -18,6 +18,25 @@
       BCOT_AUTH.openUserManager();
     }
 
+    async function openAreaAdmin() {
+      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
+      if (!pwd || typeof BCOT_AUTH === 'undefined') {
+        showStatusMessage('Authentication module is not available.', 'error');
+        return;
+      }
+      const entered = await BCOT_AUTH.prompt(
+        'Enter the OT override password to access area management.',
+        { title: '🔒 Admin Access', placeholder: 'Password', type: 'password', confirmLabel: 'Unlock' }
+      );
+      if (entered === null) return;
+      if (entered.trim() !== pwd) {
+        showStatusMessage('Incorrect password — access denied.', 'error');
+        return;
+      }
+      closeSettingsModal();
+      BCOT_AUTH.openAreaManager();
+    }
+
     async function openIPAdmin() {
       const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
       if (!pwd || typeof BCOT_AUTH === 'undefined') {
@@ -468,8 +487,13 @@
     }
 
     function getAreasList() {
-      try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || []; }
-      catch { return []; }
+      try {
+        const all     = JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || [];
+        const allowed = window.BCOT_AUTH_ALLOWED_AREAS;
+        if (!allowed || allowed === 'ALL') return all;
+        if (Array.isArray(allowed)) return all.filter(a => allowed.includes(a));
+        return all;
+      } catch { return []; }
     }
 
     function saveAreaToList(area) {
