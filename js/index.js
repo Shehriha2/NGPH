@@ -18,6 +18,25 @@
       BCOT_AUTH.openUserManager();
     }
 
+    async function openIPAdmin() {
+      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
+      if (!pwd || typeof BCOT_AUTH === 'undefined') {
+        showStatusMessage('Authentication module is not available.', 'error');
+        return;
+      }
+      const entered = await BCOT_AUTH.prompt(
+        'Enter the OT override password to access IP access control.',
+        { title: '🔒 Admin Access', placeholder: 'Password', type: 'password', confirmLabel: 'Unlock' }
+      );
+      if (entered === null) return;
+      if (entered.trim() !== pwd) {
+        showStatusMessage('Incorrect password — access denied.', 'error');
+        return;
+      }
+      closeSettingsModal();
+      BCOT_AUTH.openIPManager();
+    }
+
     // ── Storage keys ──────────────────────────────────────────────────────────
     const AREA_KEY           = "BCOT_CURRENT_AREA_V1";
     const AREAS_LIST_KEY     = "BCOT_AREAS_LIST_V1";
