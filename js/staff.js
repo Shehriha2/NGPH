@@ -157,6 +157,7 @@
       if (status === 'saved') setTimeout(() => { el.textContent=''; el.style.background='transparent'; }, 3000);
     }
     function scheduleCloudSave() {
+      if (!staffRecords.length) return;   // never overwrite cloud with an empty list
       clearTimeout(_cloudSaveTimer);
       setCloudSaveStatus('pending');
       _cloudSaveTimer = setTimeout(async () => {
@@ -767,11 +768,14 @@
 
       staffRecords = readRecordsFromLocal();
       renderTable();
-      writeLocalKeys();
 
-      if (!staffRecords.length) {
-        // Nothing in localStorage (e.g. first visit on pharmacywr.com) — auto-load from cloud
-        showStatusMessage("No local data found — loading from cloud…");
+      if (staffRecords.length) {
+        writeLocalKeys();   // has data — safe to write + schedule cloud save
+      } else {
+        // Empty localStorage (e.g. first visit on pharmacywr.com).
+        // Do NOT call writeLocalKeys() here — that would trigger scheduleCloudSave()
+        // with an empty array and wipe any existing cloud data.
+        showStatusMessage("No local data — loading from cloud…");
         (async () => {
           let t = 0;
           while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
