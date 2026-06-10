@@ -3,48 +3,133 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Area Budgets</title>
+  <title>Cost Centers</title>
   <style>
-    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --bg:#f5f5f5; --card:#fff; }
+    :root{
+      --primary:#1a4f8b; --secondary:#2e8b57;
+      --bg:#f5f5f5; --card:#fff; --border:#e2e8f0;
+    }
+    *{ box-sizing:border-box; }
     body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; }
 
+    /* ── Header ──────────────────────────────────────────────────────── */
     .header{
       display:flex; justify-content:space-between; align-items:center;
       background:linear-gradient(135deg,var(--primary),var(--secondary));
-      padding:10px 14px; border-radius:10px; box-shadow:0 2px 4px rgba(0,0,0,.1); margin-bottom:14px;
+      padding:10px 14px; border-radius:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,.12); margin-bottom:14px;
     }
     .header-text{ text-align:center; flex-grow:1; color:#fff; }
     .header-text h1{ margin:3px 0; font-size:14px; }
     .header-text h2{ margin:2px 0; font-size:12px; }
-    .logo{ width:70px; height:70px; background:#fff; border-radius:5px; padding:4px; display:flex; justify-content:center; align-items:center; margin-right:12px; }
+    .logo{
+      width:70px; height:70px; background:#fff; border-radius:5px; padding:4px;
+      display:flex; justify-content:center; align-items:center; margin-right:12px;
+    }
     .logo img{ width:100%; height:100%; object-fit:contain; }
 
-    .card{ background:var(--card); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.12); padding:12px; margin-bottom:12px; }
+    /* ── Generic card ─────────────────────────────────────────────────── */
+    .card{
+      background:var(--card); border-radius:10px;
+      box-shadow:0 1px 3px rgba(0,0,0,.12); padding:14px; margin-bottom:14px;
+    }
     .btn-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .hint{ color:#6b7280; font-size:11px; margin-top:8px; }
 
     input,select,button{ padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
-    button{ background:var(--primary); color:#fff; border:none; cursor:pointer; transition:background-color .2s; font-weight:700; }
+    button{
+      background:var(--primary); color:#fff; border:none; cursor:pointer;
+      font-weight:700; transition:background .2s;
+    }
     button:hover{ background:var(--secondary); }
-    .btn-green{ background:#28a745; } .btn-green:hover{ background:#218838; }
+    .btn-green { background:#28a745; } .btn-green:hover { background:#218838; }
     .btn-purple{ background:#6f42c1; } .btn-purple:hover{ background:#5a35a1; }
     .btn-orange{ background:#d97706; } .btn-orange:hover{ background:#b45309; }
-    .hint{ color:#666; font-size:11px; }
+    .btn-gray  { background:#6b7280; } .btn-gray:hover  { background:#4b5563; }
 
-    table{ width:100%; border-collapse:collapse; margin-top:10px; }
-    th,td{ border:1px solid #e5e7eb; padding:8px 10px; text-align:left; font-size:12px; }
-    th{ background:var(--primary); color:#fff; }
-    td input[type="number"]{ width:160px; padding:5px 8px; border:1px solid #cdd5df; border-radius:5px; font-size:12px; }
-    tr:nth-child(even){ background:#f9fbfd; }
+    /* ── Cost-center card grid ────────────────────────────────────────── */
+    .cc-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+      gap:12px; margin-top:12px;
+    }
+    .cc-card{
+      background:#f9fbfd; border:1px solid var(--border);
+      border-radius:10px; padding:14px; transition:box-shadow .2s;
+    }
+    .cc-card:hover{ box-shadow:0 3px 10px rgba(0,0,0,.1); }
+    .cc-card-header{
+      display:flex; justify-content:space-between;
+      align-items:flex-start; margin-bottom:8px;
+    }
+    .cc-card-name{
+      font-size:14px; font-weight:800; color:#0f172a;
+      word-break:break-word; flex:1; margin-right:8px;
+    }
+    .cc-card-btns{ display:flex; gap:6px; flex-shrink:0; }
+    .cc-edit-btn{
+      background:#0284c7; color:#fff; border:none; border-radius:6px;
+      padding:4px 10px; font-size:11px; cursor:pointer; font-weight:700;
+    }
+    .cc-edit-btn:hover{ background:#0369a1; }
+    .cc-del-btn{
+      background:#dc2626; color:#fff; border:none; border-radius:6px;
+      padding:4px 8px; font-size:11px; cursor:pointer; font-weight:700;
+    }
+    .cc-del-btn:hover{ background:#b91c1c; }
+    .cc-card-areas{ margin-bottom:8px; min-height:22px; }
+    .area-chip{
+      display:inline-block; background:#e0e7ff; color:#3730a3;
+      border-radius:4px; padding:2px 8px; font-size:10px;
+      font-weight:700; margin:2px 3px 2px 0;
+    }
+    .cc-card-budget{ color:#475569; font-size:11px; margin-top:4px; }
+    .cc-card-budget strong{ color:#0f172a; }
 
-    .empty-msg{ padding:20px; color:#888; text-align:center; font-size:13px; }
+    /* ── Modal ────────────────────────────────────────────────────────── */
+    #ccModal{
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,.45); z-index:1000;
+      justify-content:center; align-items:center;
+    }
+    .cc-modal-inner{
+      background:#fff; border-radius:14px; padding:22px;
+      width:min(480px,95vw); max-height:90vh; overflow-y:auto;
+      box-shadow:0 8px 32px rgba(0,0,0,.22);
+    }
+    .cc-modal-inner h3{
+      margin:0 0 16px; font-size:15px; color:#1a4f8b;
+      border-bottom:2px solid #e2e8f0; padding-bottom:8px;
+    }
+    .form-group{ margin-bottom:12px; }
+    .form-group label{
+      display:block; font-weight:700; color:#374151;
+      margin-bottom:4px; font-size:12px;
+    }
+    .form-group input[type=text],
+    .form-group input[type=number]{
+      width:100%; padding:8px 10px; border:1px solid #d1d5db;
+      border-radius:6px; font-size:12px;
+    }
+    .form-group input:focus{
+      border-color:#1a4f8b; outline:none;
+      box-shadow:0 0 0 2px rgba(26,79,139,.15);
+    }
+    .areas-check-box{
+      border:1px solid #d1d5db; border-radius:6px;
+      padding:8px 12px; max-height:160px; overflow-y:auto; background:#f9fbfd;
+    }
+    .modal-btn-row{ display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
 
+    /* ── Toast ────────────────────────────────────────────────────────── */
     .status-message{
-      position:fixed; top:18px; right:18px; padding:10px 16px; border-radius:6px;
-      color:#fff; display:none; z-index:1000; max-width:520px; white-space:nowrap;
-      overflow:hidden; text-overflow:ellipsis; box-shadow:0 4px 12px rgba(0,0,0,.18); font-size:12px;
+      position:fixed; top:18px; right:18px; padding:10px 16px;
+      border-radius:6px; color:#fff; display:none; z-index:2000;
+      max-width:520px; white-space:nowrap; overflow:hidden;
+      text-overflow:ellipsis; box-shadow:0 4px 12px rgba(0,0,0,.18); font-size:12px;
     }
     .status-success{ background:#28a745; }
-    .status-error{ background:#dc3545; }
+    .status-error  { background:#dc3545; }
 
     @media print{
       .no-print{ display:none !important; }
@@ -55,6 +140,7 @@
 </head>
 <body>
 
+  <!-- Header -->
   <div class="header">
     <div class="logo">
       <img src="MNGHA-Logo.png" alt="MNGHA Logo"
@@ -63,32 +149,71 @@
     <div class="header-text">
       <h1>Ministry of National Guard Health Affairs</h1>
       <h2>KAMC-WR — Pharmaceutical Care Department</h2>
-      <h2>Area SAR Budget Management</h2>
+      <h2>💰 Cost Centers Management</h2>
     </div>
   </div>
 
+  <!-- Toolbar -->
   <div class="card no-print">
     <div class="btn-row">
-      <button class="btn-green" onclick="saveBudgetsLocal()">Save Local</button>
-      <button onclick="loadBudgetsLocal()">Load Local</button>
-      <button class="btn-purple" onclick="saveBudgetsToCloud()">Save to Cloud</button>
-      <button class="btn-purple" onclick="loadBudgetsFromCloud()">Load from Cloud</button>
-      <button class="btn-orange" onclick="window.print()">Print</button>
-      <a href="index.html" style="margin-left:auto;text-decoration:none">
-        <button type="button">Back to Rota</button>
+      <button onclick="ccNew()" class="btn-green">+ New Cost Center</button>
+      <button onclick="ccSaveCloud()" class="btn-purple">☁ Save to Cloud</button>
+      <button onclick="ccLoadCloud()">☁ Load from Cloud</button>
+      <button onclick="window.print()" class="btn-orange">Print</button>
+      <a href="index.html" style="margin-left:auto;text-decoration:none;">
+        <button type="button">← Back to Rota</button>
       </a>
     </div>
-    <div class="hint" style="margin-top:8px;">
-      Areas are read from <code>BCOT_AREAS_LIST_V1</code>. Add areas in Staff.html or index.html, then return here to assign budgets.
+    <div class="hint">
+      Each cost center groups one or more areas under a shared SAR budget.
+      The rota dashboard shows live OT consumption per cost center (OT hours × HRR × 1.5).
     </div>
   </div>
 
+  <!-- List -->
   <div class="card">
-    <b>SAR Budgets per Area</b>
-    <div id="tableWrapper"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <b style="font-size:13px;">Cost Centers</b>
+      <button onclick="ccNew()" style="padding:5px 14px;font-size:11px;">+ New</button>
+    </div>
+    <div id="ccList" style="padding:20px;text-align:center;color:#9ca3af;">
+      Loading…
+    </div>
   </div>
 
   <div class="status-message" id="statusBox"></div>
+
+  <!-- Create / Edit Modal -->
+  <div id="ccModal">
+    <div class="cc-modal-inner" onclick="event.stopPropagation()">
+      <h3 id="ccModalTitle">New Cost Center</h3>
+      <input type="hidden" id="ccEditId"/>
+
+      <div class="form-group">
+        <label>Name <span style="color:#dc2626;">*</span></label>
+        <input type="text" id="ccName" placeholder="e.g. Emergency Services" maxlength="80"
+               onkeydown="if(event.key==='Enter')ccModalSave()"/>
+      </div>
+
+      <div class="form-group">
+        <label>SAR Budget</label>
+        <input type="number" id="ccBudget" min="0" step="0.01" placeholder="e.g. 50000"/>
+      </div>
+
+      <div class="form-group">
+        <label>Areas</label>
+        <div class="areas-check-box" id="ccAreaChecks">
+          <span style="color:#9ca3af;font-size:11px;">Loading…</span>
+        </div>
+        <div class="hint">Tick every area whose OT costs count toward this cost center's budget.</div>
+      </div>
+
+      <div class="modal-btn-row">
+        <button onclick="ccModalClose()" class="btn-gray">Cancel</button>
+        <button onclick="ccModalSave()" class="btn-green">✔ Save</button>
+      </div>
+    </div>
+  </div>
 
   <script src="config.js"></script>
   <script src="js/auth.js"></script>
@@ -96,11 +221,12 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
     const firebaseConfig = {
-      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
-      authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
-      storageBucket:"bcotrota.firebasestorage.app",
+      apiKey:           "AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:       "bcotrota.firebaseapp.com",
+      projectId:        "bcotrota",
+      storageBucket:    "bcotrota.firebasestorage.app",
       messagingSenderId:"659421824894",
-      appId:"1:659421824894:web:f0546879df8808491ad52f"
+      appId:            "1:659421824894:web:f0546879df8808491ad52f"
     };
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
@@ -108,5 +234,16 @@
   </script>
 
   <script src="js/areas.js"></script>
+
+  <script>
+    // Close modal by clicking the dark backdrop
+    document.getElementById('ccModal').addEventListener('click', function(e){
+      if (e.target === this) ccModalClose();
+    });
+    // ESC key
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') ccModalClose();
+    });
+  </script>
 </body>
 </html>

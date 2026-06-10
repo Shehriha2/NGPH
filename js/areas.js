@@ -1,102 +1,276 @@
-    const AREAS_LIST_KEY   = "BCOT_AREAS_LIST_V1";
-    const AREA_BUDGETS_KEY = "BCOT_AREA_BUDGETS_V1";
+// ═══════════════════════════════════════════════════════════════════════════
+//  Cost Centers Manager  •  js/areas.js
+//  Replaces old area-budgets system.
+//  Cost centers group one or more areas together with a shared SAR budget.
+//  Data lives in localStorage (BCOT_COST_CENTERS_V1) and Firestore
+//  (bcot_overtime_secure/[KEY]/cost_centers/LIST).
+// ═══════════════════════════════════════════════════════════════════════════
 
-    function showStatus(msg, isErr = false) {
-      const el = document.getElementById("statusBox");
-      el.textContent = msg;
-      el.className = "status-message " + (isErr ? "status-error" : "status-success");
-      el.style.display = "block";
-      setTimeout(() => el.style.display = "none", 3200);
-    }
+const CC_LS_KEY = 'BCOT_COST_CENTERS_V1';   // localStorage key
+const CC_FB_DOC = 'LIST';                    // Firestore document id
 
-    function getKeyOrWarn() {
-      const key = (window.BCOT_APP_KEY || "").trim();
-      if (!key) { showStatus("config.js not found — cloud sync disabled.", true); return null; }
-      return key;
-    }
+let _centers   = [];       // in-memory array  [{id,name,budget,areas:[]}]
+let _saveTimer = null;     // debounce handle for cloud save
 
-    function getAreasList() {
-      try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || []; } catch { return []; }
-    }
+// ── Status toast ─────────────────────────────────────────────────────────────
+function _ccStatus(msg, isErr) {
+  const el = document.getElementById('statusBox');
+  if (!el) return;
+  el.textContent = msg;
+  el.className   = 'status-message ' + (isErr ? 'status-error' : 'status-success');
+  el.style.display = 'block';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 3400);
+}
 
-    function getBudgets() {
-      try { return JSON.parse(localStorage.getItem(AREA_BUDGETS_KEY) || "{}") || {}; } catch { return {}; }
-    }
+// ── App key ───────────────────────────────────────────────────────────────────
+function _ccKey() {
+  const k = (window.BCOT_APP_KEY || '').trim();
+  if (!k) { _ccStatus('config.js not found — cloud sync disabled.', true); }
+  return k || null;
+}
 
-    function readBudgetsFromTable() {
-      const out = {};
-      document.querySelectorAll("#budgetTable tbody tr").forEach(tr => {
-        const area = tr.dataset.area;
-        const val  = parseFloat(tr.querySelector("input").value || "0") || 0;
-        out[area]  = val;
-      });
-      return out;
-    }
+// ── Areas list (from Staff pool metadata) ────────────────────────────────────
+function _ccAreasList() {
+  try { return JSON.parse(localStorage.getItem('BCOT_AREAS_LIST_V1') || '[]') || []; }
+  catch { return []; }
+}
 
-    function renderTable(budgets) {
-      const areas = getAreasList();
-      const wrapper = document.getElementById("tableWrapper");
-      if (!areas.length) {
-        wrapper.innerHTML = '<div class="empty-msg">No areas found. Add areas in Staff.html or index.html first.</div>';
-        return;
-      }
-      let html = `<table id="budgetTable">
-        <thead><tr><th>#</th><th>Area</th><th>SAR Budget</th></tr></thead>
-        <tbody>`;
-      areas.forEach((area, idx) => {
-        const val = budgets[area] != null ? Number(budgets[area]) : 0;
-        html += `<tr data-area="${area}">
-          <td>${idx + 1}</td>
-          <td><b>${area}</b></td>
-          <td><input type="number" min="0" step="0.01" value="${val}" placeholder="0.00"/></td>
-        </tr>`;
-      });
-      html += "</tbody></table>";
-      wrapper.innerHTML = html;
-    }
+// ── Firestore ref helper ─────────────────────────────────────────────────────
+function _ccDocRef(key) {
+  return window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'cost_centers', CC_FB_DOC);
+}
 
-    function saveBudgetsLocal() {
-      const budgets = readBudgetsFromTable();
-      localStorage.setItem(AREA_BUDGETS_KEY, JSON.stringify(budgets));
-      showStatus(`Saved budgets for ${Object.keys(budgets).length} area(s) locally ✅`);
-    }
+// ── UID ──────────────────────────────────────────────────────────────────────
+function _ccUID() {
+  return 'cc_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
+}
 
-    function loadBudgetsLocal() {
-      const budgets = getBudgets();
-      renderTable(budgets);
-      showStatus("Loaded from local storage ✅");
-    }
+// ── Wait for Firebase ────────────────────────────────────────────────────────
+async function _waitFB() {
+  let t = 0;
+  while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+  return !!window.FB;
+}
 
-    function getBudgetDocRef(key) {
-      return window.FB.doc(window.FB.db, "bcot_overtime_secure", key, "area_budgets", "main");
-    }
+// ── Local storage ─────────────────────────────────────────────────────────────
+function _ccLoadLocal() {
+  try { return JSON.parse(localStorage.getItem(CC_LS_KEY) || '[]') || []; }
+  catch { return []; }
+}
+function _ccSaveLocal(centers) {
+  localStorage.setItem(CC_LS_KEY, JSON.stringify(centers));
+}
 
-    async function saveBudgetsToCloud() {
-      const key = getKeyOrWarn(); if (!key) return;
-      try {
-        const budgets = readBudgetsFromTable();
-        await window.FB.setDoc(getBudgetDocRef(key), { budgets, savedAt: new Date().toISOString() }, { merge: true });
-        showStatus("Saved budgets to cloud ✅");
-      } catch(e) { console.error(e); showStatus("Cloud save failed: " + (e?.message||e), true); }
-    }
+// ── Cloud save ────────────────────────────────────────────────────────────────
+async function _ccSaveCloud(centers) {
+  const key = _ccKey(); if (!key) return;
+  if (!await _waitFB()) { _ccStatus('Firebase not ready.', true); return; }
+  await window.FB.setDoc(
+    _ccDocRef(key),
+    { centers, savedAt: new Date().toISOString() }
+  );
+}
 
-    async function loadBudgetsFromCloud() {
-      const key = getKeyOrWarn(); if (!key) return;
-      showStatus("Loading from cloud…");
-      try {
-        const snap = await window.FB.getDoc(getBudgetDocRef(key));
-        if (!snap.exists()) { showStatus("No budget data in cloud yet.", true); return; }
-        const budgets = snap.data()?.budgets || {};
-        localStorage.setItem(AREA_BUDGETS_KEY, JSON.stringify(budgets));
-        renderTable(budgets);
-        showStatus("Loaded budgets from cloud ✅");
-      } catch(e) { console.error(e); showStatus("Cloud load failed: " + (e?.message||e), true); }
-    }
+// ── Cloud load ────────────────────────────────────────────────────────────────
+async function _ccLoadCloud() {
+  const key = _ccKey(); if (!key) return null;
+  if (!await _waitFB()) return null;
+  try {
+    const snap = await window.FB.getDoc(_ccDocRef(key));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return Array.isArray(data?.centers) ? data.centers : null;
+  } catch (e) {
+    console.error('[CC] cloud load error:', e);
+    return null;
+  }
+}
 
-    // Init
-    (function init() {
-      const budgets = getBudgets();
-      renderTable(budgets);
-      if (!getAreasList().length) showStatus("No areas found — add areas in Staff.html or index.html first.", true);
-    })();
-  
+// ── Persist (local + debounced cloud) ────────────────────────────────────────
+function _ccPersist(centers) {
+  _centers = centers;
+  _ccSaveLocal(centers);
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    _ccSaveCloud(centers)
+      .then(() => _ccStatus('Cost centers saved to cloud ✅'))
+      .catch(e => _ccStatus('Cloud save failed: ' + (e?.message || e), true));
+  }, 1500);
+}
+
+// ── Render list ───────────────────────────────────────────────────────────────
+function _ccRender() {
+  const wrapper = document.getElementById('ccList');
+  if (!wrapper) return;
+
+  if (!_centers.length) {
+    wrapper.style.cssText = 'padding:32px;text-align:center;color:#6b7280;font-size:13px;';
+    wrapper.innerHTML = `
+      No cost centers yet.<br>
+      <button onclick="ccNew()" style="margin-top:12px;background:#1a4f8b;color:#fff;border:none;
+              border-radius:8px;padding:8px 18px;font-size:12px;cursor:pointer;font-weight:700;">
+        + Create First Cost Center
+      </button>`;
+    return;
+  }
+
+  // Make ccList the grid container
+  wrapper.style.cssText =
+    'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px;padding:0;';
+
+  let html = '';
+  _centers.forEach(c => {
+    const areas  = Array.isArray(c.areas) ? c.areas : [];
+    const budget = Number(c.budget) || 0;
+    const chips  = areas.length
+      ? areas.map(a => `<span class="area-chip">${a}</span>`).join('')
+      : '<em style="color:#9ca3af;font-size:11px;">No areas assigned</em>';
+
+    html += `
+      <div class="cc-card">
+        <div class="cc-card-header">
+          <div class="cc-card-name">💰 ${_esc(c.name)}</div>
+          <div class="cc-card-btns">
+            <button class="cc-edit-btn" onclick="ccEdit('${c.id}')">✏️ Edit</button>
+            <button class="cc-del-btn"  onclick="ccDelete('${c.id}')">🗑️</button>
+          </div>
+        </div>
+        <div class="cc-card-areas">${chips}</div>
+        <div class="cc-card-budget">
+          Budget: <strong>${budget.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} SAR</strong>
+        </div>
+      </div>`;
+  });
+
+  wrapper.innerHTML = html;
+}
+
+// ── Safe HTML escape ──────────────────────────────────────────────────────────
+function _esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Modal open (create or edit) ───────────────────────────────────────────────
+function ccNew() { _openModal(null); }
+
+function ccEdit(id) {
+  const c = _centers.find(x => x.id === id);
+  if (c) _openModal(c);
+}
+
+function _openModal(existing) {
+  const areas = _ccAreasList();
+
+  document.getElementById('ccModalTitle').textContent = existing ? 'Edit Cost Center' : 'New Cost Center';
+  document.getElementById('ccEditId').value  = existing ? existing.id : '';
+  document.getElementById('ccName').value    = existing ? (existing.name   || '') : '';
+  document.getElementById('ccBudget').value  = existing ? (existing.budget || '') : '';
+
+  // Area checkboxes
+  const box = document.getElementById('ccAreaChecks');
+  if (!areas.length) {
+    box.innerHTML = '<div style="color:#9ca3af;padding:6px 0;font-size:11px;">No areas found. Add areas in Staff.html first.</div>';
+  } else {
+    const sel = new Set(existing ? (existing.areas || []) : []);
+    box.innerHTML = areas.map(a => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;">
+        <input type="checkbox" value="${_esc(a)}" ${sel.has(a) ? 'checked' : ''}
+               style="width:15px;height:15px;cursor:pointer;accent-color:#1a4f8b;">
+        <span style="font-size:12px;">${_esc(a)}</span>
+      </label>`).join('');
+  }
+
+  document.getElementById('ccModal').style.display = 'flex';
+  document.getElementById('ccName').focus();
+}
+
+// ── Modal close ───────────────────────────────────────────────────────────────
+function ccModalClose() {
+  document.getElementById('ccModal').style.display = 'none';
+}
+
+// ── Modal save ────────────────────────────────────────────────────────────────
+function ccModalSave() {
+  const nameEl   = document.getElementById('ccName');
+  const budgetEl = document.getElementById('ccBudget');
+  const editId   = document.getElementById('ccEditId').value.trim();
+
+  const name   = nameEl.value.trim();
+  const budget = parseFloat(budgetEl.value) || 0;
+  const areas  = Array.from(
+    document.querySelectorAll('#ccAreaChecks input[type=checkbox]:checked')
+  ).map(cb => cb.value);
+
+  if (!name) {
+    nameEl.style.borderColor = '#dc2626';
+    nameEl.focus();
+    return;
+  }
+  nameEl.style.borderColor = '';
+
+  const updated = _centers.slice();
+  if (editId) {
+    const idx = updated.findIndex(c => c.id === editId);
+    if (idx >= 0) updated[idx] = { ...updated[idx], name, budget, areas };
+    else           updated.push({ id: _ccUID(), name, budget, areas });
+  } else {
+    updated.push({ id: _ccUID(), name, budget, areas });
+  }
+
+  _ccPersist(updated);
+  _ccRender();
+  ccModalClose();
+  _ccStatus(editId ? `"${name}" updated ✅` : `"${name}" created ✅`);
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function ccDelete(id) {
+  const c = _centers.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete "${c.name}"?\nThis cannot be undone.`)) return;
+  _ccPersist(_centers.filter(x => x.id !== id));
+  _ccRender();
+  _ccStatus(`"${c.name}" deleted.`);
+}
+
+// ── Manual cloud buttons (in toolbar) ────────────────────────────────────────
+async function ccSaveCloud() {
+  if (!_ccKey()) return;
+  _ccStatus('Saving to cloud…');
+  try {
+    await _ccSaveCloud(_centers);
+    _ccStatus('Saved to cloud ✅');
+  } catch (e) {
+    _ccStatus('Save failed: ' + (e?.message || e), true);
+  }
+}
+
+async function ccLoadCloud() {
+  _ccStatus('Loading from cloud…');
+  const data = await _ccLoadCloud();
+  if (!Array.isArray(data)) { _ccStatus('No cost centers found in cloud.', true); return; }
+  _centers = data;
+  _ccSaveLocal(data);
+  _ccRender();
+  _ccStatus(`Loaded ${data.length} cost center(s) from cloud ✅`);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async function ccInit() {
+  // 1. Show local data immediately
+  _centers = _ccLoadLocal();
+  _ccRender();
+
+  // 2. Load from cloud and override if available
+  const cloudData = await _ccLoadCloud();
+  if (Array.isArray(cloudData)) {
+    _centers = cloudData;
+    _ccSaveLocal(cloudData);
+    _ccRender();
+  }
+  // Show hint if no areas exist yet
+  if (!_ccAreasList().length) {
+    _ccStatus('No areas found in your staff pool yet — add areas in Staff.html first.', true);
+  }
+})();

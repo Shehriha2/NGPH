@@ -561,7 +561,7 @@
               <button type="button" class="btn-green" onclick="openStatisticsPage()">Statistics</button>
               <a href="Staff.html"         class="ghost-link"><button type="button">Open Staff</button></a>
               <a href="Duties.html"        class="ghost-link"><button type="button" class="btn-green">Open Duties</button></a>
-              <a href="Areas.html"         class="ghost-link"><button type="button" class="btn-orange">Area Budgets</button></a>
+              <a href="Areas.html"         class="ghost-link"><button type="button" class="btn-orange">💰 Cost Centers</button></a>
               <a href="BudgetReport.html"  class="ghost-link"><button type="button" class="btn-purple">Budget Report</button></a>
               <button type="button" onclick="openOTPreApproval()" style="background:#be185d;">OT Pre-Approval</button>
               <a href="Extension.html" class="ghost-link"><button type="button" style="background:#7c3aed;">📋 Extensions</button></a>
@@ -620,6 +620,9 @@
             <div class="metric-sub">Staff members below the monthly target</div>
           </div>
         </div>
+
+        <!-- Cost-center OT consumption — rendered by updateCallCenterCards() -->
+        <div id="callCenterSection" style="display:none;"></div>
 
       </div>
     </div>

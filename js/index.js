@@ -1974,6 +1974,7 @@
       document.getElementById('pageMainTitle').textContent=document.getElementById('rotaTitleInput').value.trim()||'Business Center Rota';
       _scheduleCoverage();  // rebuild coverage panel
       updateBannerBudget();
+      updateCallCenterCards();
       scheduleDraftSave();
     }
 
@@ -2019,40 +2020,152 @@
       showStatusMessage('Table cleared.', 'info');
     }
 
-    // ── Banner budget indicator ───────────────────────────────────────────────
+    // ── Banner budget indicator (cost-center aware) ───────────────────────────
     function updateBannerBudget() {
       const el = document.getElementById('bannerBudget');
       if (!el) return;
       const area = getCurrentArea();
-      // Hide if no specific area selected
       if (!area || area === 'ALL') { el.style.display = 'none'; return; }
-      // Load area budget
-      let budgets = {};
-      try { budgets = JSON.parse(localStorage.getItem('BCOT_AREA_BUDGETS_V1') || '{}') || {}; } catch {}
-      const areaBudget = Number(budgets[area]) || 0;
-      if (!areaBudget) { el.style.display = 'none'; return; }
-      // Load staff HRR lookup
+
+      // Find the cost center that contains the current area
+      let centers = [];
+      try { centers = JSON.parse(localStorage.getItem('BCOT_COST_CENTERS_V1') || '[]') || []; } catch {}
+      const center = centers.find(c =>
+        (c.areas || []).map(a => a.toUpperCase()).includes(area.toUpperCase())
+      );
+      if (!center || !Number(center.budget)) { el.style.display = 'none'; return; }
+
+      const budget   = Number(center.budget);
+      const cAreaSet = new Set((center.areas || []).map(a => a.toUpperCase()));
+
+      // Staff HRR + area lookup
       let staffRecs = [];
       try { staffRecs = JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2') || '[]') || []; } catch {}
-      const hrrByName = {};
-      staffRecs.forEach(s => { if (s.name && s.hrr) hrrByName[s.name.trim()] = Number(s.hrr) || 0; });
-      // Sum OT cost across all rows
+      const hrrByName   = {};
+      const areasByName = {};
+      staffRecs.forEach(s => {
+        if (!s.name) return;
+        const n = s.name.trim();
+        hrrByName[n]   = Number(s.hrr) || 0;
+        areasByName[n] = (s.area || '').split(',').map(a => a.trim().toUpperCase()).filter(Boolean);
+      });
+
+      // Sum OT cost for all staff whose area is in the cost center
       let totalSpent = 0;
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name = row.cells[0]?.querySelector('input')?.value?.trim();
         if (!name) return;
         const hrr = hrrByName[name] || 0;
         if (!hrr) return;
+        const staffAreas = areasByName[name] || [];
+        if (!staffAreas.some(a => cAreaSet.has(a))) return;
         const otText = row.querySelector('.ot-val')?.textContent || '—';
         const ot = parseFloat(otText.replace('+', ''));
         if (Number.isFinite(ot) && ot > 0) totalSpent += ot * hrr * 1.5;
       });
-      const pct = (totalSpent / areaBudget) * 100;
-      const cls  = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok';
-      const dot  = pct >= 100 ? '🔴' : pct >= 75 ? '🟡' : '🟢';
-      const amt  = totalSpent.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-      el.innerHTML = `<span class="budget-tag ${cls}">${dot} ${amt} SAR</span>`;
+
+      const pct = (totalSpent / budget) * 100;
+      const cls = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok';
+      const dot = pct >= 100 ? '🔴' : pct >= 75 ? '🟡' : '🟢';
+      const amt = totalSpent.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      el.innerHTML = `<span class="budget-tag ${cls}">${dot} ${center.name}: ${amt} SAR</span>`;
       el.style.display = 'inline';
+    }
+
+    // ── Cost-center consumption cards ────────────────────────────────────────
+    function updateCallCenterCards() {
+      const el = document.getElementById('callCenterSection');
+      if (!el) return;
+
+      let centers = [];
+      try { centers = JSON.parse(localStorage.getItem('BCOT_COST_CENTERS_V1') || '[]') || []; } catch {}
+      if (!centers.length) { el.style.display = 'none'; return; }
+
+      // Build staff lookup once
+      let staffRecs = [];
+      try { staffRecs = JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2') || '[]') || []; } catch {}
+      const hrrByName   = {};
+      const areasByName = {};
+      staffRecs.forEach(s => {
+        if (!s.name) return;
+        const n = s.name.trim();
+        hrrByName[n]   = Number(s.hrr) || 0;
+        areasByName[n] = (s.area || '').split(',').map(a => a.trim().toUpperCase()).filter(Boolean);
+      });
+
+      // Calculate SAR consumed per cost center (scan ALL rota rows, including hidden)
+      const consumed = {};
+      centers.forEach(c => { consumed[c.id] = 0; });
+
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const name = row.cells[0]?.querySelector('input')?.value?.trim();
+        if (!name) return;
+        const hrr = hrrByName[name] || 0;
+        if (!hrr) return;
+        const staffAreas = areasByName[name] || [];
+        const otText = row.querySelector('.ot-val')?.textContent || '';
+        const ot = parseFloat(otText.replace('+', ''));
+        if (!Number.isFinite(ot) || ot <= 0) return;
+        const otCost = ot * hrr * 1.5;
+        centers.forEach(c => {
+          const cSet = new Set((c.areas || []).map(a => a.toUpperCase()));
+          if (staffAreas.some(a => cSet.has(a))) consumed[c.id] += otCost;
+        });
+      });
+
+      // Render cards
+      const fmt = v => v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+      let html = `
+        <div style="margin-top:16px;">
+          <div style="font-size:12px;font-weight:700;color:#1a4f8b;text-transform:uppercase;
+                      letter-spacing:.5px;margin-bottom:10px;">
+            💰 Cost Centers — OT Budget
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">`;
+
+      centers.forEach(c => {
+        const budget    = Number(c.budget) || 0;
+        const used      = consumed[c.id] || 0;
+        const remaining = budget - used;
+        const pct       = budget > 0 ? Math.min((used / budget) * 100, 100) : 0;
+        const isOver    = budget > 0 && used > budget;
+        const isWarn    = !isOver && pct >= 75;
+        const barClr    = isOver ? '#dc2626' : isWarn ? '#d97706' : '#2e8b57';
+        const dot       = isOver ? '🔴' : isWarn ? '🟡' : '🟢';
+        const areaChips = (c.areas || []).map(a =>
+          `<span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 7px;
+                        font-size:10px;font-weight:700;margin-right:3px;">${a}</span>`
+        ).join('');
+
+        html += `
+          <div style="background:#f9fbfd;border:1px solid #e2e8f0;border-radius:12px;padding:13px;">
+            <div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:5px;">
+              ${dot} ${c.name}
+            </div>
+            <div style="margin-bottom:7px;min-height:18px;">
+              ${areaChips || '<span style="color:#9ca3af;font-size:10px;">No areas</span>'}
+            </div>
+            <div style="background:#e2e8f0;border-radius:4px;height:7px;margin-bottom:7px;overflow:hidden;">
+              <div style="background:${barClr};height:100%;border-radius:4px;
+                          width:${pct}%;transition:width .4s;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;
+                        font-size:11px;margin-bottom:4px;">
+              <span style="font-weight:700;color:${barClr};">${fmt(used)} SAR used</span>
+              <span style="color:#6b7280;">of ${budget > 0 ? fmt(budget) : '—'} SAR</span>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:${isOver ? '#dc2626' : '#2e8b57'};">
+              ${isOver
+                ? '⚠️ Over budget by ' + fmt(used - budget) + ' SAR'
+                : (budget > 0 ? fmt(remaining) + ' SAR remaining' : 'No budget set')}
+            </div>
+          </div>`;
+      });
+
+      html += `</div></div>`;
+      el.innerHTML = html;
+      el.style.display = 'block';
     }
 
     // ── Auto balance ──────────────────────────────────────────────────────────
