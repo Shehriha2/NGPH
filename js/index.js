@@ -1082,6 +1082,18 @@
         if (!filtered.length) { showStatusMessage(`No staff found for "${areaTag}" in cloud.`, "info"); return; }
         // Update local cache + staffList
         localStorage.setItem(STAFF_RECORDS_KEY, JSON.stringify(records));
+        // Also sync areas list from cloud so the area filter is populated
+        const cloudAreas = Array.isArray(snap.data()?.areasList) ? snap.data().areasList : [];
+        if (cloudAreas.length) {
+          localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(cloudAreas));
+        } else {
+          // Derive areas from staff records if areasList not stored yet
+          const derived = [...new Set(
+            records.flatMap(s => (s.area||'').split(',').map(x => x.trim().toUpperCase()).filter(Boolean))
+          )].sort();
+          if (derived.length) localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(derived));
+        }
+        rebuildAreaSelect();
         staffList = filtered.map(s => s.name).filter(Boolean);
         // Only add staff not already present — preserve existing rows and their duties
         const tbody = document.querySelector('#rotaTable tbody');
@@ -2895,6 +2907,14 @@
 
       renderHolidayList();
       staffList=loadStaffList();
+      // Auto-load staff + areas from cloud when localStorage is empty (e.g. first visit on new domain)
+      if (!staffList.length && window.BCOT_APP_KEY) {
+        (async () => {
+          let t = 0;
+          while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+          if (window.FB) populateStaff();
+        })();
+      }
       DUTIES=loadDuties()||{};
       injectDutyStyles();
       buildLegend();

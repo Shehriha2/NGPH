@@ -164,7 +164,7 @@
         try {
           const key = getKeyOrWarn(); if (!key) { setCloudSaveStatus('error'); return; }
           await window.FB.setDoc(getStaffDocRef(key, STAFF_CLOUD_DOC), {
-            savedAt: new Date().toISOString(), records: staffRecords
+            savedAt: new Date().toISOString(), records: staffRecords, areasList: getAreasList()
           }, { merge: true });
           setCloudSaveStatus('saved');
         } catch(e) { console.error(e); setCloudSaveStatus('error'); }
@@ -769,7 +769,19 @@
       renderTable();
       writeLocalKeys();
 
-      if (!staffRecords.length) showStatusMessage("No staff yet. Add staff using the form above.", true);
+      if (!staffRecords.length) {
+        // Nothing in localStorage (e.g. first visit on pharmacywr.com) — auto-load from cloud
+        showStatusMessage("No local data found — loading from cloud…");
+        (async () => {
+          let t = 0;
+          while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+          if (window.FB) {
+            await loadStaffFromCloud();
+          } else {
+            showStatusMessage("No staff yet. Add staff using the form above.", true);
+          }
+        })();
+      }
 
       // Wire up area picker button for new-staff form
       document.getElementById("stAreaBtn").addEventListener("click", () => {
