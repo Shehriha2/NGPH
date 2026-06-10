@@ -1,3 +1,18 @@
+    // ── Auth Admin ────────────────────────────────────────────────────────────
+    function openAuthAdmin() {
+      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
+      if (!pwd) { alert('config.js not loaded.'); return; }
+      const entered = prompt('Enter OT override password to access user management:');
+      if (entered === null) return;
+      if (entered.trim() !== pwd) { alert('Incorrect password.'); return; }
+      if (typeof BCOT_AUTH !== 'undefined') {
+        closeSettingsModal();
+        BCOT_AUTH.openUserManager();
+      } else {
+        alert('Auth module not loaded.');
+      }
+    }
+
     // ── Storage keys ──────────────────────────────────────────────────────────
     const AREA_KEY           = "BCOT_CURRENT_AREA_V1";
     const AREAS_LIST_KEY     = "BCOT_AREAS_LIST_V1";
