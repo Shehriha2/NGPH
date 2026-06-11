@@ -3056,7 +3056,26 @@
         (async () => {
           let t = 0;
           while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
-          if (window.FB) populateStaff();
+          if (window.FB) populateStaff();  // populateStaff also syncs areas
+        })();
+      } else if (!getAreasList().length && window.BCOT_APP_KEY) {
+        // Staff is cached but areas list is missing — sync areas from cloud only
+        (async () => {
+          let t = 0;
+          while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+          if (!window.FB) return;
+          try {
+            const key = (window.BCOT_APP_KEY || '').trim(); if (!key) return;
+            const snap = await window.FB.getDoc(
+              window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'staff_named', 'STAFF_POOL')
+            );
+            if (!snap.exists()) return;
+            const cloudAreas = snap.data()?.areasList;
+            if (Array.isArray(cloudAreas) && cloudAreas.length) {
+              localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(cloudAreas));
+              rebuildAreaSelect();
+            }
+          } catch(e) { console.warn('[init] areas sync:', e); }
         })();
       }
       DUTIES=loadDuties()||{};
