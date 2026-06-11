@@ -36,6 +36,22 @@ function _ccAreasList() {
   catch { return []; }
 }
 
+/** Fetch areasList from the cloud staff document and cache it locally. */
+async function _ccSyncAreasList() {
+  const key = _ccKey(); if (!key) return;
+  if (!await _waitFB()) return;
+  try {
+    const snap = await window.FB.getDoc(
+      window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'staff_named', 'STAFF_POOL')
+    );
+    if (!snap.exists()) return;
+    const cloudAreas = snap.data()?.areasList;
+    if (Array.isArray(cloudAreas) && cloudAreas.length) {
+      localStorage.setItem('BCOT_AREAS_LIST_V1', JSON.stringify(cloudAreas.sort()));
+    }
+  } catch (e) { console.warn('[CC] areas list sync:', e); }
+}
+
 // ── Firestore ref helper ─────────────────────────────────────────────────────
 function _ccDocRef(key) {
   return window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'cost_centers', CC_FB_DOC);
@@ -262,15 +278,20 @@ async function ccLoadCloud() {
   _centers = _ccLoadLocal();
   _ccRender();
 
-  // 2. Load from cloud and override if available
-  const cloudData = await _ccLoadCloud();
+  // 2. Load cost centers and areas list from cloud in parallel
+  const [cloudData] = await Promise.all([
+    _ccLoadCloud(),
+    _ccAreasList().length ? Promise.resolve() : _ccSyncAreasList()
+  ]);
+
   if (Array.isArray(cloudData)) {
     _centers = cloudData;
     _ccSaveLocal(cloudData);
     _ccRender();
   }
-  // Show hint if no areas exist yet
+
+  // Warn only if areas are still missing after the cloud fetch
   if (!_ccAreasList().length) {
-    _ccStatus('No areas found in your staff pool yet — add areas in Staff.html first.', true);
+    _ccStatus('No areas found yet — add areas in Staff.html first.', true);
   }
 })();

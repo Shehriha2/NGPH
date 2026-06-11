@@ -825,6 +825,20 @@
       await _bcotAlert('Could not load users — check your connection.', 'Connection Error');
       return;
     }
+    // If no local areas on this device, fetch from cloud before rendering
+    if (!_getLocalAreas().length && window.FB && _key) {
+      try {
+        const snap = await window.FB.getDoc(
+          window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'staff_named', 'STAFF_POOL')
+        );
+        if (snap.exists()) {
+          const cloudAreas = snap.data()?.areasList;
+          if (Array.isArray(cloudAreas) && cloudAreas.length) {
+            _setLocalAreas(cloudAreas);
+          }
+        }
+      } catch (e) { console.warn('[AreaMgr] cloud area load:', e); }
+    }
     _renderAreaManagerModal();
   }
 
