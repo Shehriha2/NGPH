@@ -2242,6 +2242,7 @@
     }
 
     // ── Banner budget indicator (cost-center aware) ───────────────────────────
+    // Shows two figures: current area (live) + full cost center (live + saved snapshots).
     function updateBannerBudget() {
       const el = document.getElementById('bannerBudget');
       if (!el) return;
@@ -2258,6 +2259,7 @@
 
       const budget   = Number(center.budget);
       const cAreaSet = new Set((center.areas || []).map(a => a.toUpperCase()));
+      const fmt = v => Number(v||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 
       // Staff HRR + area lookup
       let staffRecs = [];
@@ -2271,26 +2273,49 @@
         areasByName[n] = (s.area || '').split(',').map(a => a.trim().toUpperCase()).filter(Boolean);
       });
 
-      // Sum OT SAR for all staff in this cost center (only 💰 OT-type rows count toward SAR)
-      let totalSpent = 0;
+      // Live OT SAR for current area only (what's in the visible rota rows)
+      let areaLive = 0;
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name = row.cells[0]?.querySelector('input')?.value?.trim();
         if (!name) return;
-        if ((row.dataset.compType || 'OT') !== 'OT') return; // COMP rows don't charge SAR
+        if ((row.dataset.compType || 'OT') !== 'OT') return;
         const hrr = hrrByName[name] || 0;
         if (!hrr) return;
         const staffAreas = areasByName[name] || [];
-        if (!staffAreas.some(a => cAreaSet.has(a))) return;
-        const otText = row.querySelector('.ot-val')?.textContent || '—';
-        const ot = parseFloat(otText.replace('+', ''));
-        if (Number.isFinite(ot) && ot > 0) totalSpent += ot * hrr * 1.5;
+        if (!staffAreas.some(a => a === area.toUpperCase())) return;
+        const ot = parseFloat((row.querySelector('.ot-val')?.textContent || '').replace('+', ''));
+        if (Number.isFinite(ot) && ot > 0) areaLive += ot * hrr * 1.5;
       });
 
-      const pct = (totalSpent / budget) * 100;
-      const cls = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : 'ok';
-      const dot = pct >= 100 ? '🔴' : pct >= 75 ? '🟡' : '🟢';
-      const amt = totalSpent.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-      el.innerHTML = `<span class="budget-tag ${cls}">${dot} ${center.name}: ${amt} SAR</span>`;
+      // Cost center total = current area live + other areas from saved snapshots
+      const month = String(document.getElementById('monthSelect')?.value || '1').padStart(2,'0');
+      const year  = String(document.getElementById('yearInput')?.value || new Date().getFullYear());
+      let savedRecs = [];
+      try { savedRecs = _loadConsumptionLocal(); } catch {}
+      let ccTotal = areaLive;
+      cAreaSet.forEach(a => {
+        if (a === area.toUpperCase()) return; // already counted via live
+        const rec = savedRecs.find(r =>
+          r.area === a &&
+          String(r.year) === year &&
+          String(r.month).padStart(2,'0') === month
+        );
+        if (rec) ccTotal += Number(rec.otAmount) || 0;
+      });
+
+      const pctArea = (areaLive / budget) * 100;
+      const pctCC   = (ccTotal  / budget) * 100;
+      const dot     = pctCC >= 100 ? '🔴' : pctCC >= 75 ? '🟡' : '🟢';
+      const cls     = pctCC >= 100 ? 'over' : pctCC >= 75 ? 'warn' : 'ok';
+
+      const multiArea = cAreaSet.size > 1;
+
+      el.innerHTML = multiArea
+        ? `<span class="budget-tag ${cls}" title="Cost center budget: ${fmt(budget)} SAR">` +
+          `${dot} ${area}: ${fmt(areaLive)} SAR` +
+          ` &nbsp;|&nbsp; ${center.name}: ${fmt(ccTotal)} / ${fmt(budget)} SAR` +
+          `</span>`
+        : `<span class="budget-tag ${cls}">${dot} ${center.name}: ${fmt(areaLive)} / ${fmt(budget)} SAR</span>`;
       el.style.display = 'inline';
     }
 
