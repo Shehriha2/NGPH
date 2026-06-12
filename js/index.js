@@ -187,6 +187,35 @@
       } catch (e) { console.warn('[Consumption] cloud load:', e); return null; }
     }
 
+    // ── Real-time consumption listener (Option A) ──────────────────────────────
+    let _consumptionUnsubscribe = null;
+
+    async function _startConsumptionListener() {
+      const key = (window.BCOT_APP_KEY || '').trim();
+      if (!key) return;
+      // Wait for Firebase bridge
+      let t = 0;
+      while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+      if (!window.FB?.onSnapshot) return;
+
+      // Clean up any existing listener first
+      if (_consumptionUnsubscribe) { _consumptionUnsubscribe(); _consumptionUnsubscribe = null; }
+
+      const docRef = window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'area_consumption', 'RECORDS');
+      _consumptionUnsubscribe = window.FB.onSnapshot(docRef,
+        (snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data();
+          if (!Array.isArray(data?.records) || !data.records.length) return;
+          localStorage.setItem(CONSUMPTION_LS_KEY, JSON.stringify(data.records));
+          updateConsumptionBar();
+          updateBannerBudget();
+          updateCallCenterCards();
+        },
+        (err) => { console.warn('[Consumption] onSnapshot error:', err); }
+      );
+    }
+
     /** Calculate and save area consumption for current area+month+year. */
     async function saveAreaConsumption() {
       const area = getCurrentArea();
@@ -3431,16 +3460,19 @@
 
       updateDashboard();
 
-      // Background: sync consumption records from cloud (non-blocking)
+      // Real-time consumption sync: onSnapshot (A) + tab-focus refresh (C)
       if (window.BCOT_APP_KEY) {
-        (async () => {
-          const recs = await loadConsumptionFromCloud();
-          if (Array.isArray(recs) && recs.length) {
-            localStorage.setItem(CONSUMPTION_LS_KEY, JSON.stringify(recs));
+        _startConsumptionListener();
+
+        // Option C — when tab comes back into focus, refresh UI from latest data
+        // (handles edge cases where the onSnapshot listener lagged while tab was hidden)
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
             updateConsumptionBar();
+            updateBannerBudget();
             updateCallCenterCards();
           }
-        })();
+        });
       }
     })();
   
