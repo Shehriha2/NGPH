@@ -428,10 +428,10 @@
         otCell.title    = `BC — all ${totalHours}h are overtime (charged to Business Center)`;
         return;
       }
-      const ot = Math.round((totalHours - standard) * 10) / 10;
-      val.textContent = (ot>0?'+':'')+ot;
-      val.className = 'ot-val'+(ot>0?' ot-positive':ot<0?' ot-negative':'');
-      otCell.title = `Actual: ${totalHours}h | Standard: ${standard}h | OT: ${ot>0?'+':''}${ot}h\n${tipDetail}`;
+      const ot = Math.max(0, Math.round((totalHours - standard) * 10) / 10);
+      val.textContent = ot > 0 ? '+' + ot : '0';
+      val.className = 'ot-val' + (ot > 0 ? ' ot-positive' : '');
+      otCell.title = `Actual: ${totalHours}h | Standard: ${standard}h | OT: ${ot > 0 ? '+' : ''}${ot}h\n${tipDetail}`;
     }
     function recalculateAllOT() {
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => calcOT(row));
@@ -1625,7 +1625,7 @@
         const rotaName=(document.getElementById('saveName').value||defaultName).trim();
         const safeFile=rotaName.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'_')||defaultName;
         const monthNames=['','January','February','March','April','May','June','July','August','September','October','November','December'];
-        const titleText=document.getElementById('rotaTitleInput').value||'Business Center Rota';
+        const titleText=document.getElementById('rotaTitleInput').value||'Pharmacy Management';
 
         // ── Build styled HTML table for Excel ──────────────────────────────────
         const hdrCells=table.tHead.rows[0].cells;
@@ -2191,7 +2191,7 @@
       document.getElementById('metricCoverage').textContent=cov+'%';
       document.getElementById('metricOverTarget').textContent=String(over);
       document.getElementById('metricUnderTarget').textContent=String(under);
-      document.getElementById('pageMainTitle').textContent=document.getElementById('rotaTitleInput').value.trim()||'Business Center Rota';
+      document.getElementById('pageMainTitle').textContent=document.getElementById('rotaTitleInput').value.trim()||'Pharmacy Management';
       _scheduleCoverage();  // rebuild coverage panel
       updateBannerBudget();
       updateCallCenterCards();
