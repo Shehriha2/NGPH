@@ -3410,6 +3410,20 @@
       releaseNum = loadReleaseNum(getCurrentArea());
       updateRotaLabel();
 
+      // Populate print footer from logged-in session
+      try {
+        const _sess = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || 'null');
+        if (_sess) {
+          const nameEl  = document.getElementById('printPreparedByName');
+          const titleEl = document.getElementById('printPreparedByTitle');
+          const dateEl  = document.getElementById('printDate');
+          if (nameEl)  nameEl.textContent  = _sess.name  || '—';
+          if (titleEl) titleEl.textContent = _sess.title || '';
+          if (dateEl)  dateEl.textContent  = new Date().toLocaleDateString(undefined,
+            { year:'numeric', month:'long', day:'numeric' });
+        }
+      } catch(e) { console.warn('Print footer session read failed:', e); }
+
       updateDashboard();
 
       // Background: sync consumption records from cloud (non-blocking)

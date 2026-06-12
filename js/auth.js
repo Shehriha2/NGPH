@@ -37,7 +37,7 @@
   }
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      id: user.id, name: user.name, ts: Date.now(),
+      id: user.id, name: user.name, title: user.title || '', ts: Date.now(),
       areas: user.areas || 'ALL'
     }));
   }
@@ -523,8 +523,16 @@
     ${u.firstLogin
       ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;margin-left:6px;">First login pending</span>'
       : ''}
+    <div style="font-size:11px;color:#6b7280;margin-top:2px;">
+      ${u.title
+        ? `<span style="color:#1a4f8b;font-weight:600;">📋 ${u.title}</span>`
+        : '<span style="color:#d1d5db;font-style:italic;">No title set</span>'}
+    </div>
   </div>
   <div style="display:flex;gap:6px;">
+    <button onclick="BCOT_AUTH.umSetTitle('${u.id}');"
+      style="padding:5px 10px;background:#0284c7;color:#fff;border:none;
+             border-radius:6px;font-size:11px;cursor:pointer;">✏ Title</button>
     <button onclick="BCOT_AUTH.umResetPwd('${u.id}');"
       style="padding:5px 10px;background:#d97706;color:#fff;border:none;
              border-radius:6px;font-size:11px;cursor:pointer;">Reset</button>
@@ -543,12 +551,28 @@
     if (_users.find(u => u.name.toLowerCase() === name.toLowerCase())) {
       if (errEl) errEl.textContent = 'A user with that name already exists.'; return;
     }
-    _users.push({ id: _uid(), name, password: '12345', firstLogin: true });
+    _users.push({ id: _uid(), name, title: '', password: '12345', firstLogin: true });
     try {
       await saveUsers();
       if ($id('bcot-um-newname')) $id('bcot-um-newname').value = '';
       _renderUserList();
     } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function umSetTitle(id) {
+    const u = _users.find(u => u.id === id);
+    if (!u) return;
+    const newTitle = await _bcotPrompt(
+      `Set the position / title for <strong>${u.name}</strong>.<br>
+       This appears on every printed rota page.`,
+      { title: '📋 Position / Title', placeholder: 'e.g. Clinical Pharmacist', confirmLabel: 'Save' }
+    );
+    if (newTitle === null) return;
+    u.title = newTitle.trim();
+    try {
+      await saveUsers();
+      _renderUserList();
+    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
   }
 
   async function umResetPwd(id) {
@@ -1199,9 +1223,11 @@
     doChangePwd,
     doSetup,
     doLogout,
+    getSession,
     // User manager
     openUserManager,
     umAddUser,
+    umSetTitle,
     umResetPwd,
     umRemoveUser,
     // IP manager
