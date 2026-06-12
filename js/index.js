@@ -428,7 +428,8 @@
         otCell.title    = `BC — all ${totalHours}h are overtime (charged to Business Center)`;
         return;
       }
-      const ot = Math.max(0, Math.round((totalHours - standard) * 10) / 10);
+      const rawOT = totalHours - standard;
+      const ot = Math.max(0, schedType === '12 Hours' ? Math.ceil(rawOT) : Math.round(rawOT * 10) / 10);
       val.textContent = ot > 0 ? '+' + ot : '0';
       val.className = 'ot-val' + (ot > 0 ? ' ot-positive' : '');
       otCell.title = `Actual: ${totalHours}h | Standard: ${standard}h | OT: ${ot > 0 ? '+' : ''}${ot}h\n${tipDetail}`;
