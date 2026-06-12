@@ -379,9 +379,18 @@
       .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,#activeStaffBanner,.print-area-box,#bcot-logout-btn,.header-right{ display:none !important; }
       .print-only{ display:block !important; }
       .page-top{ box-shadow:none; border:none; }
-      .header-banner{ padding:6px 10px; grid-template-columns:90px 1fr; }
+      .header-banner{
+        background-color:#1a4f8b !important;
+        border-bottom:5px solid #2f7d57 !important;
+        padding:8px 12px;
+        grid-template-columns:90px 1fr;
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
+        color-adjust:exact !important;
+      }
+      .header-text{ color:#fff !important; }
       .header-text h1,.header-text h2{ color:#fff !important; }
-      .logo{ border:1px solid #ccc; }
+      .logo{ border:2px solid rgba(255,255,255,.4) !important; background:#fff !important; border-radius:5px; }
       .area-badge{ background:#eee !important; color:#000 !important; border:1px solid #999 !important; }
       .summary-strip{ display:none; }
       .summary-pill{ color:#000 !important; border:1px solid #000; background:#fff !important; }
