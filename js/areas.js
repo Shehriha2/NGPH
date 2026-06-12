@@ -6,11 +6,13 @@
 //  (bcot_overtime_secure/[KEY]/cost_centers/LIST).
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CC_LS_KEY = 'BCOT_COST_CENTERS_V1';   // localStorage key
-const CC_FB_DOC = 'LIST';                    // Firestore document id
+const CC_LS_KEY         = 'BCOT_COST_CENTERS_V1';    // localStorage key
+const CC_FB_DOC         = 'LIST';                    // Firestore document id
+const CONSUMPTION_KEY   = 'BCOT_AREA_CONSUMPTION_V1'; // consumption snapshots
 
 let _centers   = [];       // in-memory array  [{id,name,budget,areas:[]}]
 let _saveTimer = null;     // debounce handle for cloud save
+let _consumption = [];     // cached consumption records
 
 // ── Status toast ─────────────────────────────────────────────────────────────
 function _ccStatus(msg, isErr) {
@@ -67,6 +69,32 @@ async function _waitFB() {
   let t = 0;
   while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
   return !!window.FB;
+}
+
+// ── Consumption helpers ───────────────────────────────────────────────────────
+function _loadConsumptionLocal() {
+  try { return JSON.parse(localStorage.getItem(CONSUMPTION_KEY) || '[]') || []; }
+  catch { return []; }
+}
+
+async function _loadConsumptionCloud() {
+  const key = _ccKey(); if (!key) return null;
+  if (!await _waitFB()) return null;
+  try {
+    const snap = await window.FB.getDoc(
+      window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'area_consumption', 'RECORDS')
+    );
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return Array.isArray(data?.records) ? data.records : null;
+  } catch (e) { console.warn('[CC] consumption load:', e); return null; }
+}
+
+/** Get the selected month+year from the filter selects (returns {month:'06', year:'2026'}). */
+function _getMonthFilter() {
+  const m = document.getElementById('ccMonthFilter')?.value || String(new Date().getMonth()+1);
+  const y = document.getElementById('ccYearFilter')?.value  || String(new Date().getFullYear());
+  return { month: m.padStart(2,'0'), year: y };
 }
 
 // ── Local storage ─────────────────────────────────────────────────────────────
@@ -133,7 +161,17 @@ function _ccRender() {
 
   // Make ccList the grid container
   wrapper.style.cssText =
-    'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px;padding:0;';
+    'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px;padding:0;';
+
+  const { month, year } = _getMonthFilter();
+  const fmt = v => Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  // Build a lookup: area -> consumption record for selected month+year
+  const savedMap = {};
+  _consumption.forEach(r => {
+    const k = r.area + '|' + r.year + '|' + String(r.month).padStart(2,'0');
+    savedMap[k] = r;
+  });
 
   let html = '';
   _centers.forEach(c => {
@@ -143,10 +181,51 @@ function _ccRender() {
       ? areas.map(a => `<span class="area-chip">${a}</span>`).join('')
       : '<em style="color:#9ca3af;font-size:11px;">No areas assigned</em>';
 
+    // Per-area consumption for selected month
+    let totalOT   = 0;
+    let totalComp = 0;
+    let areaRows  = '';
+    areas.forEach(a => {
+      const rec = savedMap[`${a}|${year}|${month}`];
+      if (rec) {
+        const ot   = Number(rec.otAmount)  || 0;
+        const comp = Number(rec.compHours) || 0;
+        totalOT   += ot;
+        totalComp += comp;
+        const ts = rec.savedAt
+          ? new Date(rec.savedAt).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+          : '';
+        const compPart = comp > 0 ? ` &nbsp; 📅 ${comp.toFixed(1)} hrs` : '';
+        areaRows += `
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;
+                      padding:4px 0;border-top:1px solid #f1f5f9;font-size:10px;">
+            <span style="font-weight:700;min-width:40px;color:#0f172a;">${a}</span>
+            <span style="color:#1a4f8b;">💰 ${fmt(ot)} SAR${compPart}</span>
+            ${ts ? `<span style="color:#9ca3af;font-size:9px;">⏱ ${ts}</span>` : ''}
+          </div>`;
+      } else {
+        areaRows += `
+          <div style="display:flex;align-items:center;gap:4px;
+                      padding:4px 0;border-top:1px solid #f1f5f9;font-size:10px;">
+            <span style="font-weight:700;min-width:40px;color:#9ca3af;">${a}</span>
+            <span style="color:#d1d5db;">— not saved for ${month}/${year}</span>
+          </div>`;
+      }
+    });
+
+    const remaining = budget - totalOT;
+    const pct       = budget > 0 ? Math.min((totalOT / budget) * 100, 100) : 0;
+    const isOver    = budget > 0 && totalOT > budget;
+    const isWarn    = !isOver && pct >= 75;
+    const barClr    = isOver ? '#dc2626' : isWarn ? '#d97706' : '#2e8b57';
+    const dot       = isOver ? '🔴' : isWarn ? '🟡' : '🟢';
+
+    const hasData = totalOT > 0 || totalComp > 0;
+
     html += `
       <div class="cc-card">
         <div class="cc-card-header">
-          <div class="cc-card-name">💰 ${_esc(c.name)}</div>
+          <div class="cc-card-name">${dot} ${_esc(c.name)}</div>
           <div class="cc-card-btns">
             <button class="cc-edit-btn" onclick="ccEdit('${c.id}')">✏️ Edit</button>
             <button class="cc-del-btn"  onclick="ccDelete('${c.id}')">🗑️</button>
@@ -156,10 +235,27 @@ function _ccRender() {
         <div class="cc-card-budget">
           Budget: <strong>${budget.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} SAR</strong>
         </div>
+        ${hasData ? `
+        <div style="background:#e2e8f0;border-radius:4px;height:6px;margin:8px 0 6px;overflow:hidden;">
+          <div style="background:${barClr};height:100%;border-radius:4px;width:${pct}%;"></div>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:${barClr};margin-bottom:4px;">
+          💰 ${fmt(totalOT)} SAR used
+          ${totalComp > 0 ? `&nbsp;&nbsp;📅 ${totalComp.toFixed(1)} comp hrs` : ''}
+        </div>
+        <div style="font-size:10px;color:${isOver?'#dc2626':'#16a34a'};font-weight:700;margin-bottom:6px;">
+          ${isOver ? '⚠️ Over by '+fmt(totalOT-budget)+' SAR' : (budget>0?fmt(remaining)+' SAR remaining':'')}
+        </div>` : `<div style="font-size:10px;color:#9ca3af;margin:6px 0;">No data saved for ${month}/${year}</div>`}
+        <div style="margin-top:4px;">${areaRows}</div>
       </div>`;
   });
 
   wrapper.innerHTML = html;
+}
+
+/** Re-render with latest filter (called by month/year select onchange). */
+function ccFilterChanged() {
+  _ccRender();
 }
 
 // ── Safe HTML escape ──────────────────────────────────────────────────────────
@@ -274,21 +370,36 @@ async function ccLoadCloud() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function ccInit() {
-  // 1. Show local data immediately
-  _centers = _ccLoadLocal();
+  // Set default month+year filter to current month
+  const now = new Date();
+  const mf = document.getElementById('ccMonthFilter');
+  const yf = document.getElementById('ccYearFilter');
+  if (mf) mf.value = String(now.getMonth() + 1);
+  if (yf) yf.value = String(now.getFullYear());
+
+  // 1. Show local data immediately (with local consumption data)
+  _centers     = _ccLoadLocal();
+  _consumption = _loadConsumptionLocal();
   _ccRender();
 
-  // 2. Load cost centers and areas list from cloud in parallel
-  const [cloudData] = await Promise.all([
+  // 2. Load cost centers, areas list, and consumption from cloud in parallel
+  const [cloudData, , cloudConsumption] = await Promise.all([
     _ccLoadCloud(),
-    _ccAreasList().length ? Promise.resolve() : _ccSyncAreasList()
+    _ccAreasList().length ? Promise.resolve() : _ccSyncAreasList(),
+    _loadConsumptionCloud()
   ]);
 
   if (Array.isArray(cloudData)) {
     _centers = cloudData;
     _ccSaveLocal(cloudData);
-    _ccRender();
   }
+
+  if (Array.isArray(cloudConsumption) && cloudConsumption.length) {
+    _consumption = cloudConsumption;
+    localStorage.setItem(CONSUMPTION_KEY, JSON.stringify(cloudConsumption));
+  }
+
+  _ccRender();
 
   // Warn only if areas are still missing after the cloud fetch
   if (!_ccAreasList().length) {

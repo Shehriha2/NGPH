@@ -154,6 +154,8 @@
     .ot-override{ color:var(--accent-color); }
     .ot-lock-btn{ font-size:10px; padding:1px 5px; margin-left:3px; background:var(--muted); border-radius:4px; border:none; cursor:pointer; color:#fff; }
     .ot-lock-btn:hover{ background:#374151; }
+    .comp-type-btn{ font-size:12px; padding:0 2px; margin-left:2px; background:none; border:none; cursor:pointer; opacity:.7; vertical-align:middle; }
+    .comp-type-btn:hover{ opacity:1; }
 
     .holiday-row{ display:flex; gap:6px; align-items:center; margin-bottom:5px; flex-wrap:wrap; font-size:11px; }
     .holiday-row input[type="text"]{ width:110px; font-size:11px; padding:3px 6px; }
@@ -485,6 +487,11 @@
               </select>
             </div>
             <div class="field-row">
+              <label>Year</label>
+              <input type="number" id="yearInput" class="number-input" value="2026" min="2020" max="2050" style="width:70px;"
+                     onchange="recalculateAllOT(); updateDashboard();"/>
+            </div>
+            <div class="field-row">
               <label>Name Width</label>
               <input type="number" id="nameWidth" class="number-input" value="220" min="120"/>
             </div>
@@ -619,6 +626,36 @@
             <div class="metric" id="metricUnderTarget">0</div>
             <div class="metric-sub">Staff members below the monthly target</div>
           </div>
+        </div>
+
+        <!-- Consumption save bar — shown when a specific area is selected -->
+        <div id="consumptionBar" style="display:none;background:#fff;border-radius:10px;
+             box-shadow:0 1px 4px rgba(15,23,42,.1);border:1px solid #e2e8f0;
+             padding:12px 16px;margin-top:12px;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:12px;font-weight:700;color:#1a4f8b;white-space:nowrap;">
+              💾 Save Consumption
+            </span>
+            <span style="font-size:11px;color:#6b7280;" id="consumptionAreaLabel">Area:</span>
+            <span style="font-size:11px;color:#6b7280;">Comp type:</span>
+            <button id="compTypeToggle" type="button" onclick="toggleCompType()"
+              style="background:#1a4f8b;color:#fff;border:none;border-radius:20px;
+                     padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;
+                     transition:background .2s;white-space:nowrap;">
+              💰 OT Pay
+            </button>
+            <span style="font-size:11px;color:#9ca3af;margin-left:2px;" id="consumptionHint">
+              Each row inherits this default; click 💰/📅 on any row to override.
+            </span>
+            <button type="button" onclick="saveAreaConsumption()"
+              style="margin-left:auto;background:#16a34a;color:#fff;border:none;border-radius:8px;
+                     padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;
+                     white-space:nowrap;transition:background .2s;"
+              onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+              💾 Save Consumption
+            </button>
+          </div>
+          <div id="consumptionLastSaved" style="font-size:10px;color:#9ca3af;margin-top:6px;display:none;"></div>
         </div>
 
         <!-- Cost-center OT consumption — rendered by updateCallCenterCards() -->

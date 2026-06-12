@@ -62,6 +62,178 @@
     const TARGET_STORAGE_KEY = "BCOT_MONTHLY_TARGET_V1";
     const STAFF_RECORDS_KEY  = "BCOT_STAFF_RECORDS_V2";   // unified pool
     const DUTIES_ALL_KEY     = "BCOT_DUTIES_ALL_V1";      // unified pool
+    const COMP_TYPE_LS_KEY   = "BCOT_COMP_TYPE_V1";       // per-area comp type
+    const CONSUMPTION_LS_KEY = "BCOT_AREA_CONSUMPTION_V1"; // saved monthly consumption
+
+    // ── Per-area comp type helpers ────────────────────────────────────────────
+    /** Returns 'OT' or 'COMP' for the given area (default: 'OT'). */
+    function getAreaCompType(area) {
+      if (!area || area === 'ALL') return 'OT';
+      try {
+        const map = JSON.parse(localStorage.getItem(COMP_TYPE_LS_KEY) || '{}') || {};
+        return map[area.toUpperCase()] === 'COMP' ? 'COMP' : 'OT';
+      } catch { return 'OT'; }
+    }
+
+    function setAreaCompType(area, type) {
+      if (!area || area === 'ALL') return;
+      try {
+        const map = JSON.parse(localStorage.getItem(COMP_TYPE_LS_KEY) || '{}') || {};
+        map[area.toUpperCase()] = (type === 'COMP') ? 'COMP' : 'OT';
+        localStorage.setItem(COMP_TYPE_LS_KEY, JSON.stringify(map));
+      } catch {}
+    }
+
+    /** Toggle the comp type for current area and update all row buttons. */
+    function toggleCompType() {
+      const area = getCurrentArea();
+      if (!area || area === 'ALL') return;
+      const cur = getAreaCompType(area);
+      const nxt = cur === 'OT' ? 'COMP' : 'OT';
+      setAreaCompType(area, nxt);
+      // Update the banner toggle button
+      const btn = document.getElementById('compTypeToggle');
+      if (btn) btn.textContent = nxt === 'COMP' ? '📅 COMP Day' : '💰 OT Pay';
+      // Update ALL rows that still match the old default (not individually overridden)
+      // We consider a row as "using area default" if its compType matches the OLD default
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        if ((row.dataset.compType || 'OT') === cur) {
+          row.dataset.compType = nxt;
+          const ctBtn = row.querySelector('.comp-type-btn');
+          if (ctBtn) {
+            ctBtn.textContent = nxt === 'COMP' ? '📅' : '💰';
+            ctBtn.title = nxt === 'COMP'
+              ? '📅 COMP Day — click to switch to OT Pay'
+              : '💰 OT Pay — click to switch to COMP Day';
+          }
+        }
+      });
+    }
+
+    /** Update the consumption bar visibility and state for current area. */
+    function updateConsumptionBar() {
+      const bar   = document.getElementById('consumptionBar');
+      const lbl   = document.getElementById('consumptionAreaLabel');
+      const btn   = document.getElementById('compTypeToggle');
+      const saved = document.getElementById('consumptionLastSaved');
+      if (!bar) return;
+      const area = getCurrentArea();
+      if (!area || area === 'ALL') { bar.style.display = 'none'; return; }
+      bar.style.display = 'block';
+      if (lbl) lbl.textContent = `Area: ${area}`;
+      // Refresh toggle button label
+      const ct = getAreaCompType(area);
+      if (btn) btn.textContent = ct === 'COMP' ? '📅 COMP Day' : '💰 OT Pay';
+      // Show last saved info for this area+month+year
+      const month = String(document.getElementById('monthSelect')?.value || '1').padStart(2,'0');
+      const year  = String(document.getElementById('yearInput')?.value || new Date().getFullYear());
+      let recs = [];
+      try { recs = JSON.parse(localStorage.getItem(CONSUMPTION_LS_KEY) || '[]') || []; } catch {}
+      const prev = recs.find(r => r.area === area && String(r.month).padStart(2,'0') === month && String(r.year) === year);
+      if (saved) {
+        if (prev) {
+          const ts = prev.savedAt ? new Date(prev.savedAt).toLocaleString() : '';
+          saved.textContent = `Last saved: OT ${prev.otAmount?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} SAR  |  Comp ${prev.compHours?.toFixed(1)} hrs  —  ${ts}`;
+          saved.style.display = 'block';
+        } else {
+          saved.style.display = 'none';
+        }
+      }
+    }
+
+    // ── Consumption records helpers ────────────────────────────────────────────
+    function _loadConsumptionLocal() {
+      try { return JSON.parse(localStorage.getItem(CONSUMPTION_LS_KEY) || '[]') || []; }
+      catch { return []; }
+    }
+
+    function _upsertConsumptionLocal(record) {
+      let recs = _loadConsumptionLocal();
+      const idx = recs.findIndex(r =>
+        r.area === record.area &&
+        String(r.month).padStart(2,'0') === String(record.month).padStart(2,'0') &&
+        String(r.year) === String(record.year)
+      );
+      if (idx >= 0) recs[idx] = record; else recs.push(record);
+      localStorage.setItem(CONSUMPTION_LS_KEY, JSON.stringify(recs));
+      return recs;
+    }
+
+    async function _saveConsumptionCloud(recs) {
+      const key = (window.BCOT_APP_KEY || '').trim();
+      if (!key) return;
+      let t = 0;
+      while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+      if (!window.FB) return;
+      await window.FB.setDoc(
+        window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'area_consumption', 'RECORDS'),
+        { records: recs, updatedAt: new Date().toISOString() }
+      );
+    }
+
+    async function loadConsumptionFromCloud() {
+      const key = (window.BCOT_APP_KEY || '').trim();
+      if (!key) return null;
+      let t = 0;
+      while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+      if (!window.FB) return null;
+      try {
+        const snap = await window.FB.getDoc(
+          window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'area_consumption', 'RECORDS')
+        );
+        if (!snap.exists()) return null;
+        const data = snap.data();
+        return Array.isArray(data?.records) ? data.records : null;
+      } catch (e) { console.warn('[Consumption] cloud load:', e); return null; }
+    }
+
+    /** Calculate and save area consumption for current area+month+year. */
+    async function saveAreaConsumption() {
+      const area = getCurrentArea();
+      if (!area || area === 'ALL') {
+        showStatusMessage('Select a specific area first.', 'error'); return;
+      }
+      const monthEl = document.getElementById('monthSelect');
+      const yearEl  = document.getElementById('yearInput');
+      const month   = String(monthEl?.value || '1').padStart(2,'0');
+      const year    = String(yearEl?.value || new Date().getFullYear());
+
+      // Build staff lookup
+      let staffRecs = [];
+      try { staffRecs = JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY) || '[]') || []; } catch {}
+      const hrrByName = {};
+      staffRecs.forEach(s => { if (s.name) hrrByName[s.name.trim()] = Number(s.hrr) || 0; });
+
+      let otAmount  = 0;
+      let compHours = 0;
+
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const name = row.cells[0]?.querySelector('input')?.value?.trim();
+        if (!name) return;
+        const otText = row.querySelector('.ot-val')?.textContent || '—';
+        const ot = parseFloat(otText.replace('+', ''));
+        if (!Number.isFinite(ot) || ot <= 0) return;
+        const ct = row.dataset.compType || 'OT';
+        if (ct === 'COMP') {
+          compHours += ot;
+        } else {
+          const hrr = hrrByName[name] || 0;
+          if (hrr) otAmount += ot * hrr * 1.5;
+        }
+      });
+
+      const record = { area, month, year, otAmount, compHours, savedAt: new Date().toISOString() };
+      const allRecs = _upsertConsumptionLocal(record);
+      showStatusMessage('Saving consumption…', 'info');
+      try {
+        await _saveConsumptionCloud(allRecs);
+        showStatusMessage(`Saved: ${area} ${year}-${month} — OT ${otAmount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} SAR, Comp ${compHours.toFixed(1)} hrs ✅`);
+      } catch (e) {
+        showStatusMessage('Saved locally. Cloud save failed: ' + (e?.message || e), 'error');
+      }
+      updateConsumptionBar();
+      updateCallCenterCards();
+    }
 
     // Rota index is still area-scoped (ACC rota list ≠ ICU rota list)
     function rotaIndexLocalKey() { return `BCOT_NAMED_ROTAS_LOCAL_V1_${getCurrentArea()}`; }
@@ -225,7 +397,7 @@
       if (!schedType) { val.textContent='—'; val.className='ot-val'; otCell.title=''; return; }
       const totalHours = Number(row.querySelector('.hours-cell')?.textContent)||0;
       const month = Number(document.getElementById('monthSelect').value);
-      const year  = new Date().getFullYear();
+      const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
       const leave = countLeaveDays(row, month, year);
       let standard = 0;
       let tipDetail = '';
@@ -387,7 +559,30 @@
       btn.title = isOverride ? 'Reset to calculated' : 'Override manually';
       btn.onclick = () => handleOTLock(td);
 
-      td.appendChild(span); td.appendChild(btn);
+      // Comp-type toggle button (💰 OT vs 📅 COMP) — inherits area default when row created
+      const ctBtn = document.createElement('button');
+      ctBtn.type = 'button';
+      ctBtn.className = 'comp-type-btn';
+      ctBtn.title = 'Click to toggle: 💰 OT Pay vs 📅 COMP Day';
+      ctBtn.style.cssText =
+        'background:none;border:none;cursor:pointer;font-size:13px;padding:0 1px;' +
+        'line-height:1;vertical-align:middle;opacity:.75;transition:opacity .15s;';
+      ctBtn.textContent = '💰'; // default; overridden after row is added to DOM
+      ctBtn.onmouseenter = () => { ctBtn.style.opacity='1'; };
+      ctBtn.onmouseleave = () => { ctBtn.style.opacity='.75'; };
+      ctBtn.onclick = () => {
+        const row = ctBtn.closest('tr');
+        if (!row) return;
+        const cur = row.dataset.compType || 'OT';
+        const nxt = cur === 'OT' ? 'COMP' : 'OT';
+        row.dataset.compType = nxt;
+        ctBtn.textContent = nxt === 'OT' ? '💰' : '📅';
+        ctBtn.title = nxt === 'OT'
+          ? '💰 OT Pay — click to switch to COMP Day'
+          : '📅 COMP Day — click to switch to OT Pay';
+      };
+
+      td.appendChild(span); td.appendChild(btn); td.appendChild(ctBtn);
       return td;
     }
 
@@ -1069,7 +1264,7 @@
       const tr    = document.createElement('tr');
       tr.appendChild(buildNameCell(tr,''));
       const month = parseInt(document.getElementById('monthSelect').value,10);
-      const year  = new Date().getFullYear();
+      const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
       const days  = getDaysInMonth(month);
       for (let i=1; i<=days; i++) {
         const td = createDayCell();
@@ -1080,6 +1275,16 @@
       tr.appendChild(buildSchedCell());
       tr.appendChild(buildOTCell());
       tr.appendChild(buildExtCell());
+      // Inherit comp type from area default
+      const areaDefault = getAreaCompType(getCurrentArea());
+      tr.dataset.compType = areaDefault;
+      const ctBtn = tr.querySelector('.comp-type-btn');
+      if (ctBtn) {
+        ctBtn.textContent = areaDefault === 'COMP' ? '📅' : '💰';
+        ctBtn.title = areaDefault === 'COMP'
+          ? '📅 COMP Day — click to switch to OT Pay'
+          : '💰 OT Pay — click to switch to COMP Day';
+      }
       tbody.appendChild(tr);
       applyColumnWidths(); updateDashboard(); filterRota();
     }
@@ -1546,7 +1751,7 @@
       const table=document.getElementById('rotaTable');
       const rows=Array.from(table.tBodies[0].rows);
       const month=Number(document.getElementById('monthSelect').value);
-      const year=new Date().getFullYear();
+      const year=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
       const area=getCurrentArea();
       const payload={ area, month, year, savedAt:new Date().toISOString(),
         rotaTitle:(document.getElementById('rotaTitleInput').value||'').trim(),
@@ -1566,7 +1771,8 @@
         const otCell=row.querySelector('.ot-cell');
         const otOverride=otCell?.dataset?.override==='true' ? (otCell.querySelector('.ot-val')?.textContent||null) : null;
         const extension=Number(row.querySelector('.ext-cell input')?.value)||0;
-        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, extension});
+        const compType=row.dataset.compType||'OT';
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, extension, compType});
       }
       return payload;
     }
@@ -1575,6 +1781,7 @@
       if (!fromDraft) clearDraft();  // loading from cloud/file clears the draft
       const records=Array.isArray(payload?.records)?payload.records:[];
       if (payload?.month) document.getElementById('monthSelect').value=String(payload.month);
+      if (payload?.year) { const yi=document.getElementById('yearInput'); if(yi) yi.value=String(payload.year); }
       document.getElementById('rotaTitleInput').value=(payload?.rotaTitle||'').trim();
       if (payload?.monthlyTarget!=null) document.getElementById('monthlyTarget').value=String(payload.monthlyTarget);
       if (payload?.mixedStdHours!=null) {
@@ -1601,6 +1808,17 @@
           v.textContent=rec.otOverride; v.className='ot-val ot-override';
           otCell.querySelector('.ot-lock-btn').textContent='🔓';
           otCell.querySelector('.ot-lock-btn').title='Reset to calculated';
+        }
+        // Restore per-row comp type
+        if (rec.compType) {
+          row.dataset.compType = rec.compType;
+          const ctBtn = row.querySelector('.comp-type-btn');
+          if (ctBtn) {
+            ctBtn.textContent = rec.compType === 'COMP' ? '📅' : '💰';
+            ctBtn.title = rec.compType === 'COMP'
+              ? '📅 COMP Day — click to switch to OT Pay'
+              : '💰 OT Pay — click to switch to COMP Day';
+          }
         }
       }
       if (!records.length) addNewRow();
@@ -1975,6 +2193,7 @@
       _scheduleCoverage();  // rebuild coverage panel
       updateBannerBudget();
       updateCallCenterCards();
+      updateConsumptionBar();
       scheduleDraftSave();
     }
 
@@ -2050,11 +2269,12 @@
         areasByName[n] = (s.area || '').split(',').map(a => a.trim().toUpperCase()).filter(Boolean);
       });
 
-      // Sum OT cost for all staff whose area is in the cost center
+      // Sum OT SAR for all staff in this cost center (only 💰 OT-type rows count toward SAR)
       let totalSpent = 0;
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name = row.cells[0]?.querySelector('input')?.value?.trim();
         if (!name) return;
+        if ((row.dataset.compType || 'OT') !== 'OT') return; // COMP rows don't charge SAR
         const hrr = hrrByName[name] || 0;
         if (!hrr) return;
         const staffAreas = areasByName[name] || [];
@@ -2072,7 +2292,8 @@
       el.style.display = 'inline';
     }
 
-    // ── Cost-center consumption cards ────────────────────────────────────────
+    // ── Cost-center consumption cards ─────────────────────────────────────────
+    // Hybrid: current area = live calculation; other areas = last saved snapshot.
     function updateCallCenterCards() {
       const el = document.getElementById('callCenterSection');
       if (!el) return;
@@ -2081,7 +2302,11 @@
       try { centers = JSON.parse(localStorage.getItem('BCOT_COST_CENTERS_V1') || '[]') || []; } catch {}
       if (!centers.length) { el.style.display = 'none'; return; }
 
-      // Build staff lookup once
+      const currentArea = getCurrentArea(); // 'ALL' or specific area
+      const month = String(document.getElementById('monthSelect')?.value || '1').padStart(2,'0');
+      const year  = String(document.getElementById('yearInput')?.value || new Date().getFullYear());
+
+      // Build staff lookup
       let staffRecs = [];
       try { staffRecs = JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2') || '[]') || []; } catch {}
       const hrrByName   = {};
@@ -2093,71 +2318,130 @@
         areasByName[n] = (s.area || '').split(',').map(a => a.trim().toUpperCase()).filter(Boolean);
       });
 
-      // Calculate SAR consumed per cost center (scan ALL rota rows, including hidden)
-      const consumed = {};
-      centers.forEach(c => { consumed[c.id] = 0; });
-
+      // Live calculation for all areas currently visible in rota (split by comp type)
+      const liveOT    = {};  // area -> SAR
+      const liveComp  = {};  // area -> hours
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name = row.cells[0]?.querySelector('input')?.value?.trim();
         if (!name) return;
-        const hrr = hrrByName[name] || 0;
-        if (!hrr) return;
         const staffAreas = areasByName[name] || [];
         const otText = row.querySelector('.ot-val')?.textContent || '';
         const ot = parseFloat(otText.replace('+', ''));
         if (!Number.isFinite(ot) || ot <= 0) return;
-        const otCost = ot * hrr * 1.5;
-        centers.forEach(c => {
-          const cSet = new Set((c.areas || []).map(a => a.toUpperCase()));
-          if (staffAreas.some(a => cSet.has(a))) consumed[c.id] += otCost;
+        const ct = row.dataset.compType || 'OT';
+        staffAreas.forEach(a => {
+          if (ct === 'COMP') {
+            liveComp[a] = (liveComp[a] || 0) + ot;
+          } else {
+            const hrr = hrrByName[name] || 0;
+            if (hrr) liveOT[a] = (liveOT[a] || 0) + ot * hrr * 1.5;
+          }
         });
       });
 
-      // Render cards
-      const fmt = v => v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      // Saved snapshots
+      let savedRecs = [];
+      try { savedRecs = _loadConsumptionLocal(); } catch {}
+      const savedMap = {}; // "AREA|YYYY|MM" -> record
+      savedRecs.forEach(r => {
+        const k = `${r.area}|${r.year}|${String(r.month).padStart(2,'0')}`;
+        savedMap[k] = r;
+      });
+
+      const fmt = v => Number(v||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 
       let html = `
         <div style="margin-top:16px;">
           <div style="font-size:12px;font-weight:700;color:#1a4f8b;text-transform:uppercase;
                       letter-spacing:.5px;margin-bottom:10px;">
-            💰 Cost Centers — OT Budget
+            💰 Cost Centers — OT Budget &nbsp;<span style="font-size:10px;color:#9ca3af;
+            text-transform:none;letter-spacing:0;font-weight:400;">${month}/${year}</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">`;
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">`;
 
       centers.forEach(c => {
-        const budget    = Number(c.budget) || 0;
-        const used      = consumed[c.id] || 0;
-        const remaining = budget - used;
-        const pct       = budget > 0 ? Math.min((used / budget) * 100, 100) : 0;
-        const isOver    = budget > 0 && used > budget;
+        const budget     = Number(c.budget) || 0;
+        const cAreas     = (c.areas || []).map(a => a.toUpperCase());
+
+        // Total OT SAR for this center: live for current area, saved for others
+        let totalUsedOT   = 0;
+        let totalCompHrs  = 0;
+        const areaRows    = [];
+
+        cAreas.forEach(a => {
+          const isLive = (currentArea === 'ALL') || (a === currentArea.toUpperCase());
+          let otAmt = 0, compHrs = 0, ts = '', source = '';
+          if (isLive) {
+            otAmt   = liveOT[a]   || 0;
+            compHrs = liveComp[a] || 0;
+            source  = 'live';
+          } else {
+            const rec = savedMap[`${a}|${year}|${month}`];
+            if (rec) {
+              otAmt   = Number(rec.otAmount)  || 0;
+              compHrs = Number(rec.compHours) || 0;
+              ts      = rec.savedAt ? new Date(rec.savedAt).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+              source  = 'saved';
+            } else {
+              source = 'none';
+            }
+          }
+          totalUsedOT  += otAmt;
+          totalCompHrs += compHrs;
+          areaRows.push({ a, otAmt, compHrs, ts, source });
+        });
+
+        const remaining = budget - totalUsedOT;
+        const pct       = budget > 0 ? Math.min((totalUsedOT / budget) * 100, 100) : 0;
+        const isOver    = budget > 0 && totalUsedOT > budget;
         const isWarn    = !isOver && pct >= 75;
         const barClr    = isOver ? '#dc2626' : isWarn ? '#d97706' : '#2e8b57';
         const dot       = isOver ? '🔴' : isWarn ? '🟡' : '🟢';
-        const areaChips = (c.areas || []).map(a =>
-          `<span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 7px;
-                        font-size:10px;font-weight:700;margin-right:3px;">${a}</span>`
-        ).join('');
+
+        // Per-area breakdown rows
+        let areaBreakdown = '';
+        areaRows.forEach(({ a, otAmt, compHrs, ts, source }) => {
+          let badge = '';
+          let rowColor = '#374151';
+          if (source === 'live') {
+            badge = `<span style="background:#dcfce7;color:#16a34a;border-radius:3px;
+                       padding:1px 5px;font-size:9px;font-weight:700;margin-left:4px;">LIVE</span>`;
+            rowColor = '#0f172a';
+          } else if (source === 'saved') {
+            badge = `<span style="background:#e0f2fe;color:#0369a1;border-radius:3px;
+                       padding:1px 5px;font-size:9px;font-weight:700;margin-left:4px;" title="Saved ${ts}">⏱ ${ts}</span>`;
+          } else {
+            badge = `<span style="color:#9ca3af;font-size:10px;margin-left:4px;">not saved</span>`;
+          }
+          const compPart = compHrs > 0 ? ` &nbsp;📅 ${compHrs.toFixed(1)} hrs` : '';
+          areaBreakdown += `
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;
+                        padding:3px 0;border-top:1px solid #f1f5f9;font-size:10px;color:${rowColor};">
+              <span style="font-weight:700;min-width:38px;">${a}</span>
+              <span>💰 ${fmt(otAmt)} SAR${compPart}</span>
+              ${badge}
+            </div>`;
+        });
 
         html += `
           <div style="background:#f9fbfd;border:1px solid #e2e8f0;border-radius:12px;padding:13px;">
             <div style="font-weight:800;font-size:13px;color:#0f172a;margin-bottom:5px;">
               ${dot} ${c.name}
             </div>
-            <div style="margin-bottom:7px;min-height:18px;">
-              ${areaChips || '<span style="color:#9ca3af;font-size:10px;">No areas</span>'}
-            </div>
-            <div style="background:#e2e8f0;border-radius:4px;height:7px;margin-bottom:7px;overflow:hidden;">
+            <div style="background:#e2e8f0;border-radius:4px;height:7px;margin-bottom:8px;overflow:hidden;">
               <div style="background:${barClr};height:100%;border-radius:4px;
                           width:${pct}%;transition:width .4s;"></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:baseline;
-                        font-size:11px;margin-bottom:4px;">
-              <span style="font-weight:700;color:${barClr};">${fmt(used)} SAR used</span>
+                        font-size:11px;margin-bottom:6px;">
+              <span style="font-weight:700;color:${barClr};">💰 ${fmt(totalUsedOT)} SAR</span>
               <span style="color:#6b7280;">of ${budget > 0 ? fmt(budget) : '—'} SAR</span>
             </div>
-            <div style="font-size:11px;font-weight:700;color:${isOver ? '#dc2626' : '#2e8b57'};">
+            ${totalCompHrs > 0 ? `<div style="font-size:10px;color:#0369a1;margin-bottom:5px;font-weight:700;">📅 ${totalCompHrs.toFixed(1)} comp hrs total</div>` : ''}
+            ${areaBreakdown}
+            <div style="font-size:11px;font-weight:700;color:${isOver ? '#dc2626' : '#2e8b57'};margin-top:6px;">
               ${isOver
-                ? '⚠️ Over budget by ' + fmt(used - budget) + ' SAR'
+                ? '⚠️ Over budget by ' + fmt(totalUsedOT - budget) + ' SAR'
                 : (budget > 0 ? fmt(remaining) + ' SAR remaining' : 'No budget set')}
             </div>
           </div>`;
@@ -3048,6 +3332,8 @@
 
       const m=new Date().getMonth()+1;
       document.getElementById('monthSelect').value=String(m);
+      const yi=document.getElementById('yearInput');
+      if (yi) yi.value=String(new Date().getFullYear());
 
       renderHolidayList();
       staffList=loadStaffList();
@@ -3098,5 +3384,17 @@
       updateRotaLabel();
 
       updateDashboard();
+
+      // Background: sync consumption records from cloud (non-blocking)
+      if (window.BCOT_APP_KEY) {
+        (async () => {
+          const recs = await loadConsumptionFromCloud();
+          if (Array.isArray(recs) && recs.length) {
+            localStorage.setItem(CONSUMPTION_LS_KEY, JSON.stringify(recs));
+            updateConsumptionBar();
+            updateCallCenterCards();
+          }
+        })();
+      }
     })();
   

@@ -168,6 +168,19 @@
       Each cost center groups one or more areas under a shared SAR budget.
       The rota dashboard shows live OT consumption per cost center (OT hours × HRR × 1.5).
     </div>
+    <!-- Month / Year filter for consumption breakdown -->
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:12px;font-weight:700;color:#1a4f8b;">📅 View consumption for:</span>
+      <select id="ccMonthFilter" onchange="ccFilterChanged()" style="font-size:12px;padding:5px 8px;">
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+        <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+        <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+      <input type="number" id="ccYearFilter" onchange="ccFilterChanged()"
+             min="2020" max="2050" style="width:72px;font-size:12px;padding:5px 8px;"/>
+      <span style="font-size:11px;color:#9ca3af;">Showing saved consumption figures per area for the selected month.</span>
+    </div>
   </div>
 
   <!-- List -->
