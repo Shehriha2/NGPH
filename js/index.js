@@ -3418,7 +3418,7 @@
           const titleEl = document.getElementById('printPreparedByTitle');
           const dateEl  = document.getElementById('printDate');
           if (nameEl)  nameEl.textContent  = _sess.name  || '—';
-          if (titleEl) titleEl.textContent = _sess.title || '';
+          if (titleEl) titleEl.textContent = _sess.title ? ' · ' + _sess.title : '';
           if (dateEl)  dateEl.textContent  = new Date().toLocaleDateString(undefined,
             { year:'numeric', month:'long', day:'numeric' });
         }
