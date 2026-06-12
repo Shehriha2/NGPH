@@ -119,8 +119,8 @@
       if (!bar) return;
       const area = getCurrentArea();
       if (!area || area === 'ALL') { bar.style.display = 'none'; return; }
-      bar.style.display = 'block';
-      if (lbl) lbl.textContent = `Area: ${area}`;
+      bar.style.display = 'flex';
+      if (lbl) lbl.textContent = area;
       // Refresh toggle button label
       const ct = getAreaCompType(area);
       if (btn) btn.textContent = ct === 'COMP' ? '📅 COMP Day' : '💰 OT Pay';
@@ -1012,6 +1012,7 @@
     // SL has noLeaveCount:true → its days are NOT deducted from the OT standard.
     // All others count as off-days (reduce the OT standard like a leave day).
     const FIXED_LEAVE_DUTIES = {
+      OFF: { label:'Day Off',         hours:0, color:'#64748b', area:'', assignedSt:0, noLeaveCount:true  },
       SL:  { label:'Sick Leave',      hours:0, color:'#94a3b8', area:'', assignedSt:0, noLeaveCount:true  },
       AL:  { label:'Annual Leave',    hours:0, color:'#c084fc', area:'', assignedSt:0, noLeaveCount:false },
       HL:  { label:'Holiday Leave',   hours:0, color:'#a855f7', area:'', assignedSt:0, noLeaveCount:false },
@@ -1038,9 +1039,10 @@
           }
         }
         // Fixed leave duties are always merged in (user definitions take precedence
-        // for label/color, but SL's noLeaveCount flag is always enforced)
+        // for label/color, but OFF and SL's noLeaveCount flags are always enforced)
         const result = { ...FIXED_LEAVE_DUTIES, ...filtered };
-        if (result['SL']) result['SL'] = { ...result['SL'], noLeaveCount: true };
+        if (result['OFF']) result['OFF'] = { ...result['OFF'], noLeaveCount: true };
+        if (result['SL'])  result['SL']  = { ...result['SL'],  noLeaveCount: true };
         return result;
       } catch { return { ...FIXED_LEAVE_DUTIES }; }
     }

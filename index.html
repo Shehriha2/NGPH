@@ -453,6 +453,35 @@
     </div>
   </div>
 
+  <!-- ── Consumption bar — shown below header when a specific area is active ── -->
+  <div id="consumptionBar" class="no-print"
+    style="display:none;background:#1e3a5f;padding:8px 16px;
+           align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);
+                 white-space:nowrap;letter-spacing:.3px;">COMPENSATION</span>
+    <span style="font-size:12px;font-weight:800;color:#fff;white-space:nowrap;"
+          id="consumptionAreaLabel">—</span>
+    <button id="compTypeToggle" type="button" onclick="toggleCompType()"
+      style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);
+             color:#fff;border-radius:20px;padding:5px 16px;font-size:12px;
+             font-weight:700;cursor:pointer;white-space:nowrap;transition:background .2s;">
+      💰 OT Pay
+    </button>
+    <span style="font-size:10px;color:rgba(255,255,255,.45);">
+      All rows inherit this · click 💰/📅 on any row to override individually
+    </span>
+    <button type="button" onclick="saveAreaConsumption()"
+      style="margin-left:auto;background:#16a34a;border:none;color:#fff;
+             border-radius:8px;padding:7px 18px;font-size:12px;font-weight:700;
+             cursor:pointer;white-space:nowrap;transition:background .2s;"
+      onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+      💾 Save Consumption
+    </button>
+    <div id="consumptionLastSaved"
+      style="width:100%;font-size:10px;color:rgba(255,255,255,.45);
+             padding-top:2px;display:none;"></div>
+  </div>
+
   <!-- ── Settings & Tools Modal ─────────────────────────────────────── -->
   <div class="modal" id="settingsModal">
     <div class="modal-card" style="width:min(1100px,96%);max-height:92vh;">
@@ -626,36 +655,6 @@
             <div class="metric" id="metricUnderTarget">0</div>
             <div class="metric-sub">Staff members below the monthly target</div>
           </div>
-        </div>
-
-        <!-- Consumption save bar — shown when a specific area is selected -->
-        <div id="consumptionBar" style="display:none;background:#fff;border-radius:10px;
-             box-shadow:0 1px 4px rgba(15,23,42,.1);border:1px solid #e2e8f0;
-             padding:12px 16px;margin-top:12px;">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="font-size:12px;font-weight:700;color:#1a4f8b;white-space:nowrap;">
-              💾 Save Consumption
-            </span>
-            <span style="font-size:11px;color:#6b7280;" id="consumptionAreaLabel">Area:</span>
-            <span style="font-size:11px;color:#6b7280;">Comp type:</span>
-            <button id="compTypeToggle" type="button" onclick="toggleCompType()"
-              style="background:#1a4f8b;color:#fff;border:none;border-radius:20px;
-                     padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;
-                     transition:background .2s;white-space:nowrap;">
-              💰 OT Pay
-            </button>
-            <span style="font-size:11px;color:#9ca3af;margin-left:2px;" id="consumptionHint">
-              Each row inherits this default; click 💰/📅 on any row to override.
-            </span>
-            <button type="button" onclick="saveAreaConsumption()"
-              style="margin-left:auto;background:#16a34a;color:#fff;border:none;border-radius:8px;
-                     padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;
-                     white-space:nowrap;transition:background .2s;"
-              onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
-              💾 Save Consumption
-            </button>
-          </div>
-          <div id="consumptionLastSaved" style="font-size:10px;color:#9ca3af;margin-top:6px;display:none;"></div>
         </div>
 
         <!-- Cost-center OT consumption — rendered by updateCallCenterCards() -->
