@@ -839,22 +839,20 @@
   </div>
   <div class="legend" id="legendBox"></div>
 
-  <!-- ── Print footer — appears on every printed page ─────────────────────── -->
+  <!-- ── Print footer — centered block, appears on every printed page ────── -->
   <div id="printFooter" class="print-only"
     style="position:fixed;bottom:0;left:0;right:0;background:#fff;
-           border-top:1pt solid #1a4f8b;padding:5pt 12pt;
-           display:flex;justify-content:space-between;align-items:center;
-           font-family:Arial,sans-serif;font-size:8pt;">
-    <div>
-      <span style="color:#6b7280;">Prepared by: </span>
-      <strong id="printPreparedByName" style="color:#0f172a;">—</strong>
-      <span id="printPreparedByTitle" style="color:#1a4f8b;"></span>
-    </div>
-    <div style="color:#6b7280;font-size:7pt;" id="printDate"></div>
-    <div>
-      <span style="color:#6b7280;">Approved by: </span>
-      <span style="display:inline-block;min-width:160pt;">&nbsp;</span>
-    </div>
+           border-top:1pt solid #1a4f8b;padding:6pt 0 5pt;
+           text-align:center;font-family:Arial,sans-serif;font-size:8pt;">
+    <div style="font-size:7pt;color:#6b7280;text-transform:uppercase;
+                letter-spacing:.6pt;margin-bottom:3pt;">Approved by</div>
+    <div style="font-size:10pt;font-weight:700;color:#0f172a;"
+         id="printPreparedByName">—</div>
+    <div style="font-size:8pt;color:#1a4f8b;font-weight:600;margin-bottom:4pt;"
+         id="printPreparedByTitle"></div>
+    <div style="display:inline-block;width:140pt;border-bottom:1pt solid #374151;
+                margin-bottom:3pt;">&nbsp;</div>
+    <div style="font-size:7pt;color:#6b7280;" id="printDate"></div>
   </div>
 
   <!-- ── Active staff banner ─────────────────────────────────────────────── -->

@@ -37,8 +37,12 @@
   }
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      id: user.id, name: user.name, title: user.title || '', ts: Date.now(),
-      areas: user.areas || 'ALL'
+      id:        user.id,
+      name:      user.name,
+      nameTitle: user.nameTitle || '',
+      position:  user.position || user.title || '',   // backward compat: old 'title' → position
+      ts:        Date.now(),
+      areas:     user.areas || 'ALL'
     }));
   }
   function clearSession() { localStorage.removeItem(SESSION_KEY); }
@@ -484,8 +488,17 @@
 
   <div style="border-top:1px solid #e5e7eb;padding-top:16px;">
     <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">ADD USER</div>
-    <div style="display:flex;gap:8px;">
-      <input id="bcot-um-newname" type="text" placeholder="Full name"
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <select id="bcot-um-nametitle"
+        style="padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;background:#fff;min-width:90px;">
+        <option value="">Title *</option>
+        <option value="Dr.">Dr.</option>
+        <option value="Mr.">Mr.</option>
+        <option value="Ms.">Ms.</option>
+        <option value="Mrs.">Mrs.</option>
+        <option value="R.Ph.">R.Ph.</option>
+      </select>
+      <input id="bcot-um-newname" type="text" placeholder="Full name *"
         style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;"
         onkeydown="if(event.key==='Enter') BCOT_AUTH.umAddUser();" />
       <button onclick="BCOT_AUTH.umAddUser();"
@@ -514,25 +527,28 @@
       list.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">No users yet.</p>';
       return;
     }
-    list.innerHTML = _users.map(u => `
+    list.innerHTML = _users.map(u => {
+      const pos      = u.position || u.title || '';   // backward compat
+      const dispName = [u.nameTitle, u.name].filter(Boolean).join(' ');
+      return `
 <div style="display:flex;align-items:center;justify-content:space-between;
             padding:9px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:7px;
             background:#f9fafb;">
   <div>
-    <span style="font-size:13px;font-weight:600;color:#1f2937;">${u.name}</span>
+    <span style="font-size:13px;font-weight:600;color:#1f2937;">${dispName}</span>
     ${u.firstLogin
       ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;margin-left:6px;">First login pending</span>'
       : ''}
     <div style="font-size:11px;color:#6b7280;margin-top:2px;">
-      ${u.title
-        ? `<span style="color:#1a4f8b;font-weight:600;">📋 ${u.title}</span>`
-        : '<span style="color:#d1d5db;font-style:italic;">No title set</span>'}
+      ${pos
+        ? `<span style="color:#1a4f8b;font-weight:600;">📋 ${pos}</span>`
+        : '<span style="color:#d1d5db;font-style:italic;">No position set</span>'}
     </div>
   </div>
   <div style="display:flex;gap:6px;">
-    <button onclick="BCOT_AUTH.umSetTitle('${u.id}');"
+    <button onclick="BCOT_AUTH.umSetPosition('${u.id}');"
       style="padding:5px 10px;background:#0284c7;color:#fff;border:none;
-             border-radius:6px;font-size:11px;cursor:pointer;">✏ Title</button>
+             border-radius:6px;font-size:11px;cursor:pointer;">✏ Position</button>
     <button onclick="BCOT_AUTH.umResetPwd('${u.id}');"
       style="padding:5px 10px;background:#d97706;color:#fff;border:none;
              border-radius:6px;font-size:11px;cursor:pointer;">Reset</button>
@@ -540,18 +556,21 @@
       style="padding:5px 10px;background:#dc2626;color:#fff;border:none;
              border-radius:6px;font-size:11px;cursor:pointer;">Remove</button>
   </div>
-</div>`).join('');
+</div>`;
+    }).join('');
   }
 
   async function umAddUser() {
-    const name  = ($id('bcot-um-newname')?.value || '').trim();
-    const errEl = $id('bcot-um-err');
+    const nameTitle = ($id('bcot-um-nametitle')?.value || '').trim();
+    const name      = ($id('bcot-um-newname')?.value || '').trim();
+    const errEl     = $id('bcot-um-err');
     if (errEl) errEl.textContent = '';
-    if (!name) { if (errEl) errEl.textContent = 'Name is required.'; return; }
+    if (!nameTitle) { if (errEl) errEl.textContent = 'Title is required.'; return; }
+    if (!name)      { if (errEl) errEl.textContent = 'Name is required.';  return; }
     if (_users.find(u => u.name.toLowerCase() === name.toLowerCase())) {
       if (errEl) errEl.textContent = 'A user with that name already exists.'; return;
     }
-    _users.push({ id: _uid(), name, title: '', password: '12345', firstLogin: true });
+    _users.push({ id: _uid(), nameTitle, name, position: '', password: '12345', firstLogin: true });
     try {
       await saveUsers();
       if ($id('bcot-um-newname')) $id('bcot-um-newname').value = '';
@@ -559,16 +578,17 @@
     } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
   }
 
-  async function umSetTitle(id) {
+  async function umSetPosition(id) {
     const u = _users.find(u => u.id === id);
     if (!u) return;
-    const newTitle = await _bcotPrompt(
-      `Set the position / title for <strong>${u.name}</strong>.<br>
-       This appears on every printed rota page.`,
-      { title: '📋 Position / Title', placeholder: 'e.g. Clinical Pharmacist', confirmLabel: 'Save' }
+    const newPos = await _bcotPrompt(
+      `Set the position for <strong>${[u.nameTitle, u.name].filter(Boolean).join(' ')}</strong>.<br>
+       This appears on every printed rota page under the name.`,
+      { title: '📋 Position', placeholder: 'e.g. Clinical Pharmacist, Director', confirmLabel: 'Save' }
     );
-    if (newTitle === null) return;
-    u.title = newTitle.trim();
+    if (newPos === null) return;
+    u.position = newPos.trim();
+    delete u.title;   // remove old field if present
     try {
       await saveUsers();
       _renderUserList();
@@ -1227,7 +1247,7 @@
     // User manager
     openUserManager,
     umAddUser,
-    umSetTitle,
+    umSetPosition,
     umResetPwd,
     umRemoveUser,
     // IP manager
