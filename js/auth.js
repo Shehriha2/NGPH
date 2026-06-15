@@ -39,12 +39,16 @@
   }
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      id:        user.id,
-      name:      user.name,
-      nameTitle: user.nameTitle || '',
-      position:  user.position || user.title || '',
-      ts:        Date.now(),
-      areas:     user.areas || 'ALL'
+      id:             user.id,
+      name:           user.name,
+      nameTitle:      user.nameTitle || '',
+      position:       user.position || user.title || '',
+      ts:             Date.now(),
+      areas:          user.areas || 'ALL',
+      ext_role:       user.ext_role       || '',
+      ext_phone:      user.ext_phone      || '',
+      ext_areas:      user.ext_areas      || [],
+      ext_manager_id: user.ext_manager_id || ''
     }));
   }
   function clearSession() { localStorage.removeItem(SESSION_KEY); }
@@ -386,6 +390,7 @@
     _removeOverlay();
     _addLogoutButton(user.name);
     _pendingUser = null;
+    window.dispatchEvent(new CustomEvent('bcotAuth', { detail: getSession() }));
   }
 
   function _removeOverlay() {
@@ -406,6 +411,9 @@
       'box-shadow:0 2px 8px rgba(0,0,0,.22);';
     btn.onclick = doLogout;
     document.body.appendChild(btn);
+    const ps = document.createElement('style');
+    ps.textContent = '@media print{#bcot-logout-btn{display:none!important}}';
+    document.head.appendChild(ps);
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -578,34 +586,72 @@
       list.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">No users yet.</p>';
       return;
     }
+    const extRoleLabel = { staff:'Staff member', supervisor:'Supervisor', manager:'Manager / AD', director:'Director' };
     list.innerHTML = _users.map(u => {
-      const pos      = u.position || u.title || '';
-      const dispName = [u.nameTitle, u.name].filter(Boolean).join(' ');
+      const pos        = u.position || u.title || '';
+      const dispName   = [u.nameTitle, u.name].filter(Boolean).join(' ');
+      const extRole    = u.ext_role || '';
+      const extPhone   = u.ext_phone || '';
+      const extAreas   = (u.ext_areas || []).join(', ');
+      const extMgrId   = u.ext_manager_id || '';
+      const mOpts      = _users.filter(m => m.ext_role === 'manager')
+        .map(m => `<option value="${m.id}" ${extMgrId===m.id?'selected':''}>${[m.nameTitle,m.name].filter(Boolean).join(' ')}</option>`).join('');
       return `
-<div style="display:flex;align-items:center;justify-content:space-between;
-            padding:9px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:7px;
-            background:#f9fafb;">
-  <div>
-    <span style="font-size:13px;font-weight:600;color:#1f2937;">${dispName}</span>
-    ${u.firstLogin
-      ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;margin-left:6px;">First login pending</span>'
-      : ''}
-    <div style="font-size:11px;color:#6b7280;margin-top:2px;">
-      ${pos
-        ? `<span style="color:#1a4f8b;font-weight:600;">📋 ${pos}</span>`
-        : '<span style="color:#d1d5db;font-style:italic;">No position set</span>'}
+<div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:7px;background:#f9fafb;overflow:hidden;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;">
+    <div>
+      <span style="font-size:13px;font-weight:600;color:#1f2937;">${dispName}</span>
+      ${u.firstLogin ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:10px;margin-left:6px;">First login pending</span>' : ''}
+      <div style="font-size:11px;color:#6b7280;margin-top:2px;">
+        ${pos ? `<span style="color:#1a4f8b;font-weight:600;">📋 ${pos}</span>` : '<span style="color:#d1d5db;font-style:italic;">No position set</span>'}
+        ${extRole ? `&nbsp;·&nbsp;<span style="color:#0f766e;font-weight:600;">🔧 ${extRoleLabel[extRole]||extRole}</span>` : ''}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+      <button onclick="BCOT_AUTH.umSetPosition('${u.id}');"
+        style="padding:5px 10px;background:#0284c7;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">✏ Position</button>
+      <button onclick="BCOT_AUTH.umResetPwd('${u.id}');"
+        style="padding:5px 10px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Reset</button>
+      <button onclick="var s=document.getElementById('bcot-ext-${u.id}');s.style.display=s.style.display==='none'?'block':'none';"
+        style="padding:5px 10px;background:#0f766e;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">🔧 Ext</button>
+      <button onclick="BCOT_AUTH.umRemoveUser('${u.id}');"
+        style="padding:5px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">Remove</button>
     </div>
   </div>
-  <div style="display:flex;gap:6px;">
-    <button onclick="BCOT_AUTH.umSetPosition('${u.id}');"
-      style="padding:5px 10px;background:#0284c7;color:#fff;border:none;
-             border-radius:6px;font-size:11px;cursor:pointer;">✏ Position</button>
-    <button onclick="BCOT_AUTH.umResetPwd('${u.id}');"
-      style="padding:5px 10px;background:#d97706;color:#fff;border:none;
-             border-radius:6px;font-size:11px;cursor:pointer;">Reset</button>
-    <button onclick="BCOT_AUTH.umRemoveUser('${u.id}');"
-      style="padding:5px 10px;background:#dc2626;color:#fff;border:none;
-             border-radius:6px;font-size:11px;cursor:pointer;">Remove</button>
+  <div id="bcot-ext-${u.id}" style="display:none;background:#f0f9ff;border-top:1px solid #bae6fd;padding:12px;">
+    <div style="font-size:10px;font-weight:700;color:#0369a1;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">🔧 Extension Settings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#374151;margin-bottom:3px;">Role</label>
+        <select id="bcot-ext-role-${u.id}" style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+          <option value="" ${!extRole?'selected':''}>— None —</option>
+          <option value="staff"      ${extRole==='staff'?'selected':''}>Staff member</option>
+          <option value="supervisor" ${extRole==='supervisor'?'selected':''}>Supervisor</option>
+          <option value="manager"    ${extRole==='manager'?'selected':''}>Manager / AD</option>
+          <option value="director"   ${extRole==='director'?'selected':''}>Director</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#374151;margin-bottom:3px;">WhatsApp Phone</label>
+        <input id="bcot-ext-phone-${u.id}" value="${extPhone}" placeholder="+966…"
+          style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;"/>
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#374151;margin-bottom:3px;">Areas (comma-separated)</label>
+        <input id="bcot-ext-areas-${u.id}" value="${extAreas}" placeholder="ACC, ICU, …"
+          style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;"/>
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;font-weight:700;color:#374151;margin-bottom:3px;">Linked Manager (for Supervisors)</label>
+        <select id="bcot-ext-mgr-${u.id}" style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+          <option value="">— None —</option>${mOpts}
+        </select>
+      </div>
+    </div>
+    <button onclick="BCOT_AUTH.umSaveExt('${u.id}')"
+      style="padding:6px 16px;background:#0369a1;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+      💾 Save Extension Settings
+    </button>
   </div>
 </div>`;
     }).join('');
@@ -673,6 +719,36 @@
       await saveUsers();
       _renderUserList();
     } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+  }
+
+  async function umSaveExt(id) {
+    const u = _users.find(u => u.id === id);
+    if (!u) return;
+    u.ext_role       = ($id(`bcot-ext-role-${id}`)?.value  || '').trim();
+    u.ext_phone      = ($id(`bcot-ext-phone-${id}`)?.value || '').trim();
+    const areasRaw   = ($id(`bcot-ext-areas-${id}`)?.value || '').trim();
+    u.ext_areas      = areasRaw ? areasRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+    u.ext_manager_id = ($id(`bcot-ext-mgr-${id}`)?.value   || '').trim();
+    try {
+      await saveUsers();
+      _renderUserList();
+    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+  }
+
+  async function fetchExtUsers() {
+    if (!_users.length) {
+      let t = 0;
+      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+      await loadUsers();
+    }
+    return _users.map(u => ({
+      id:             u.id,
+      name:           [u.nameTitle, u.name].filter(Boolean).join(' '),
+      role:           u.ext_role       || '',
+      phone:          u.ext_phone      || '',
+      areas:          u.ext_areas      || [],
+      linkedManagerId: u.ext_manager_id || ''
+    }));
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -1386,6 +1462,7 @@
       window.BCOT_AUTH_ALLOWED_AREAS = session.areas || 'ALL';
       _removeOverlay();
       _addLogoutButton(session.name);
+      window.dispatchEvent(new CustomEvent('bcotAuth', { detail: session }));
       return;
     }
 
@@ -1442,6 +1519,8 @@
     umSetPosition,
     umResetPwd,
     umRemoveUser,
+    umSaveExt,
+    fetchExtUsers,
     // IP manager
     openIPManager,
     ipApprove,

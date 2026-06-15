@@ -9,11 +9,6 @@
     *{ box-sizing:border-box; margin:0; padding:0; }
     body{ font-family:Arial,sans-serif; background:var(--bg); font-size:13px; color:#1f2937; min-height:100vh; }
 
-    /* ── Center cards (login / init / change-pwd) ── */
-    .center-card{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
-    .card{ background:#fff; border-radius:16px; padding:36px; box-shadow:0 8px 32px rgba(15,23,42,.12); width:100%; max-width:440px; }
-    .card-title{ font-size:20px; font-weight:800; color:var(--primary); margin-bottom:6px; }
-    .card-sub{ color:#6b7280; font-size:12px; margin-bottom:24px; }
 
     /* ── Form elements ── */
     .fg{ margin-bottom:14px; }
@@ -106,56 +101,13 @@
 </head>
 <body>
 
-<!-- Loading -->
-<div id="screenLoading" class="center-card">
-  <div style="color:#6b7280;font-size:14px;">⏳ Loading…</div>
-</div>
-
-<!-- First-time init -->
-<div id="screenInit" class="center-card" style="display:none">
-  <div class="card">
-    <div class="card-title">🏥 First-Time Setup</div>
-    <div class="card-sub">Create the Director account. Default password is 12345 — you will be asked to change it on first login.</div>
-    <div class="fg"><label>Director Name</label><input id="initName" value="Dr. Mohammed Aseeri"/></div>
-    <div class="fg"><label>Phone (for WhatsApp)</label><input id="initPhone" placeholder="+966 5x xxx xxxx"/></div>
-    <div class="fg"><label>Email</label><input id="initEmail" type="email" placeholder="director@hospital.com"/></div>
-    <button class="btn btn-primary btn-full" onclick="initializeSystem()">Create Director Account</button>
-    <div class="err-msg" id="initErr"></div>
-  </div>
-</div>
-
-<!-- Login -->
-<div id="screenLogin" class="center-card" style="display:none">
-  <div class="card">
-    <div class="card-title">📋 Extension Requests</div>
-    <div class="card-sub">KAMC-WR — Pharmaceutical Care Department</div>
-    <div class="fg"><label>User</label><select id="loginUser"></select></div>
-    <div class="fg"><label>Password</label><input id="loginPwd" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
-    <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
-    <div class="err-msg" id="loginErr"></div>
-    <div style="margin-top:16px;text-align:center;"><a href="index.html" style="font-size:11px;color:#6b7280;">← Back to Rota</a></div>
-  </div>
-</div>
-
-<!-- Change password -->
-<div id="screenChangePwd" class="center-card" style="display:none">
-  <div class="card">
-    <div class="card-title">🔑 Set New Password</div>
-    <div class="card-sub">First login — please set a personal password (min 6 characters).</div>
-    <div class="fg"><label>New Password</label><input id="newPwd" type="password"/></div>
-    <div class="fg"><label>Confirm Password</label><input id="confirmPwd" type="password" onkeydown="if(event.key==='Enter')doChangePwd()"/></div>
-    <button class="btn btn-primary btn-full" onclick="doChangePwd()">Set Password</button>
-    <div class="err-msg" id="pwdErr"></div>
-  </div>
-</div>
-
 <!-- App shell -->
 <div id="appShell" style="display:none">
   <div class="app-header">
     <div class="title">📋 Staff Extension Requests</div>
     <span class="role-badge" id="roleBadge"></span>
     <span id="userNameBadge" style="font-size:12px;opacity:.82;"></span>
-    <button class="btn btn-sm btn-outline" onclick="doLogout()" style="border-color:rgba(255,255,255,.4);color:#fff;background:rgba(255,255,255,.1);">Logout</button>
+    <button class="btn btn-sm btn-outline" onclick="BCOT_AUTH.doLogout()" style="border-color:rgba(255,255,255,.4);color:#fff;background:rgba(255,255,255,.1);">Logout</button>
     <a href="index.html" style="color:rgba(255,255,255,.7);font-size:11px;text-decoration:none;">← Rota</a>
   </div>
   <div class="app-nav" id="appNav"></div>

@@ -4,16 +4,13 @@ let KEY = '';
 let users = [], requests = [], currentUser = null, currentTab = '';
 
 // ── Firebase refs ─────────────────────────────────────────────────────────────
-function usersDoc()    { return window.FB.doc(window.FB.db,'bcot_overtime_secure',KEY,'ext_config','USERS'); }
-function reqsCol()     { return window.FB.collection(window.FB.db,'bcot_overtime_secure',KEY,'ext_requests'); }
-function reqDoc(id)    { return window.FB.doc(window.FB.db,'bcot_overtime_secure',KEY,'ext_requests',id); }
+function reqsCol()    { return window.FB.collection(window.FB.db,'bcot_overtime_secure',KEY,'ext_requests'); }
+function reqDoc(id)   { return window.FB.doc(window.FB.db,'bcot_overtime_secure',KEY,'ext_requests',id); }
 
-async function saveUsers()       { await window.FB.setDoc(usersDoc(),{users}); }
 async function updateReq(id, d)  { await window.FB.updateDoc(reqDoc(id),d); const i=requests.findIndex(r=>r.id===id); if(i>=0) Object.assign(requests[i],d); }
 
 async function loadAll() {
-  const [u,r] = await Promise.all([window.FB.getDoc(usersDoc()), window.FB.getDocs(reqsCol())]);
-  users = u.exists() ? (u.data().users||[]) : [];
+  const r = await window.FB.getDocs(reqsCol());
   requests = [];
   r.forEach(d => requests.push({id:d.id,...d.data()}));
   requests.sort((a,b)=>(b.submittedAt||'').localeCompare(a.submittedAt||''));
@@ -57,66 +54,55 @@ function localStaff(area){
 function localAreas(){ try{ return JSON.parse(localStorage.getItem(AREAS_KEY)||'[]')||[]; }catch{ return []; } }
 
 // ── App init ──────────────────────────────────────────────────────────────────
-(async function init(){
+async function startExtension() {
   KEY = (window.BCOT_APP_KEY||'').trim();
   if(!KEY){ document.body.innerHTML='<div style="padding:40px;color:red;font-weight:700;text-align:center;">config.js not found.</div>'; return; }
-  // Wait for Firebase module
   let t=0; while(!window.FB && t++<50) await new Promise(r=>setTimeout(r,100));
   if(!window.FB){ document.body.innerHTML='<div style="padding:40px;color:red;">Firebase failed to load.</div>'; return; }
-  hide('screenLoading');
-  await loadAll();
-  if(!users.length){ show('screenInit'); return; }
-  buildLoginList();
-  show('screenLogin');
+
+  const session = window.BCOT_AUTH?.getSession();
+  if (!session) return; // auth.js handles the login overlay
+
+  const role = session.ext_role || '';
+  if (!role || role === 'staff') {
+    se('appShell').style.display = '';
+    se('roleBadge').textContent = '⛔ No Access';
+    se('userNameBadge').textContent = session.name;
+    se('appNav').innerHTML = '';
+    se('appBody').innerHTML = `<div style="text-align:center;padding:60px 20px;color:#6b7280;">
+      <div style="font-size:40px;margin-bottom:16px;">🔒</div>
+      <div style="font-size:15px;font-weight:700;color:#374151;margin-bottom:8px;">No Extension Access</div>
+      <div style="font-size:13px;">Your account has no Extension role assigned.<br>Contact the system administrator.</div>
+    </div>`;
+    return;
+  }
+
+  currentUser = {
+    id:              session.id,
+    name:            session.name,
+    role:            role,
+    phone:           session.ext_phone      || '',
+    areas:           session.ext_areas      || [],
+    linkedManagerId: session.ext_manager_id || ''
+  };
+
+  try {
+    users = await window.BCOT_AUTH.fetchExtUsers();
+    await loadAll();
+  } catch(e) {
+    se('appBody').innerHTML = '<div style="padding:40px;color:red;">Failed to load data. Check connection.</div>';
+    return;
+  }
+  launchApp();
+}
+
+(function(){
+  if (window.BCOT_AUTH && window.BCOT_AUTH.getSession()) {
+    startExtension();
+  } else {
+    window.addEventListener('bcotAuth', startExtension, { once: true });
+  }
 })();
-
-// ── First-time setup ──────────────────────────────────────────────────────────
-async function initializeSystem(){
-  const name=se('initName')?.value.trim();
-  const phone=se('initPhone')?.value.trim();
-  const email=se('initEmail')?.value.trim();
-  if(!name){ setErr('initErr','Director name is required.'); return; }
-  users=[{id:uid(),role:'director',name,phone,email,password:'12345',firstLogin:true,areas:[],linkedManagerId:''}];
-  await saveUsers();
-  hide('screenInit'); buildLoginList(); show('screenLogin');
-}
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-function buildLoginList(){
-  const sel=se('loginUser');
-  if(!sel) return;
-  const roleLabel={supervisor:'Supervisor',manager:'Manager/AD',director:'Director'};
-  sel.innerHTML='<option value="">— Select user —</option>'+
-    users.map(u=>`<option value="${esc(u.id)}">${esc(u.name)} · ${roleLabel[u.role]||u.role}</option>`).join('');
-}
-
-function doLogin(){
-  setErr('loginErr','');
-  const id=se('loginUser')?.value, pwd=se('loginPwd')?.value;
-  if(!id){ setErr('loginErr','Please select a user.'); return; }
-  const user=users.find(u=>u.id===id);
-  if(!user||user.password!==pwd){ setErr('loginErr','Incorrect password.'); return; }
-  currentUser=user;
-  if(se('loginPwd')) se('loginPwd').value='';
-  if(user.firstLogin){ hide('screenLogin'); show('screenChangePwd'); return; }
-  launchApp();
-}
-
-function doLogout(){ currentUser=null; hide('appShell'); buildLoginList(); show('screenLogin'); }
-
-async function doChangePwd(){
-  const np=se('newPwd')?.value, cp=se('confirmPwd')?.value;
-  setErr('pwdErr','');
-  if((np||'').length<6){ setErr('pwdErr','Minimum 6 characters.'); return; }
-  if(np!==cp){ setErr('pwdErr','Passwords do not match.'); return; }
-  currentUser.password=np; currentUser.firstLogin=false;
-  const i=users.findIndex(u=>u.id===currentUser.id); if(i>=0) users[i]={...currentUser};
-  await saveUsers();
-  hide('screenChangePwd');
-  if(se('newPwd')) se('newPwd').value='';
-  if(se('confirmPwd')) se('confirmPwd').value='';
-  launchApp();
-}
 
 // ── App shell ─────────────────────────────────────────────────────────────────
 function launchApp(){
@@ -133,7 +119,7 @@ function buildNav(){
   const tabs={
     supervisor:[{id:'sv_new',label:'➕ New Request'},{id:'sv_mine',label:'📋 My Requests'},{id:'report',label:'📊 Report'}],
     manager:   [{id:'mg_pend',label:'🕐 Pending'},{id:'mg_hist',label:'📁 History'},{id:'report',label:'📊 Report'}],
-    director:  [{id:'dr_pend',label:'🕐 Awaiting Approval'},{id:'dr_hist',label:'📁 History'},{id:'dr_setup',label:'⚙ Setup'},{id:'report',label:'📊 Report'}],
+    director:  [{id:'dr_pend',label:'🕐 Awaiting Approval'},{id:'dr_hist',label:'📁 History'},{id:'report',label:'📊 Report'}],
   };
   const myTabs=tabs[currentUser.role]||[];
   se('appNav').innerHTML=myTabs.map(t=>`<button class="nav-tab" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`).join('');
@@ -148,7 +134,7 @@ function switchTab(id){
 
 function renderTab(id){
   const body=se('appBody'); if(!body) return;
-  const map={sv_new:renderNewReq,sv_mine:renderMyReqs,mg_pend:renderMgrPending,mg_hist:renderMgrHist,dr_pend:renderDrPending,dr_hist:renderDrHist,dr_setup:renderSetup,report:renderReportTab};
+  const map={sv_new:renderNewReq,sv_mine:renderMyReqs,mg_pend:renderMgrPending,mg_hist:renderMgrHist,dr_pend:renderDrPending,dr_hist:renderDrHist,report:renderReportTab};
   body.innerHTML=(map[id]||(() =>''))();
   if(id==='sv_new') refreshStaffList();
 }
@@ -358,115 +344,6 @@ async function drReject(id){
   se('appBody').insertAdjacentHTML('afterbegin',notice);
 }
 
-// ── Setup (Director only) ─────────────────────────────────────────────────────
-function renderSetup(){
-  const dir=users.find(u=>u.role==='director');
-  const mgrs=users.filter(u=>u.role==='manager');
-  const sups=users.filter(u=>u.role==='supervisor');
-  const areas=localAreas();
-  const mgrOpts=mgrs.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
-
-  return `<div class="section-title">⚙ System Setup</div>
-
-  <!-- Director -->
-  <div class="panel">
-    <div class="panel-title" style="color:var(--purple);">🏆 Director</div>
-    <div style="font-size:12px;margin-bottom:10px;"><b>${esc(dir?.name||'')}</b> &nbsp;·&nbsp; ${esc(dir?.phone||'—')} &nbsp;·&nbsp; ${esc(dir?.email||'—')}</div>
-    <button class="btn btn-sm btn-purple" onclick="toggleEl('editDirForm')">Edit Director</button>
-    <div id="editDirForm" style="display:none;margin-top:12px;">
-      <div class="grid2">
-        <div class="fg" style="margin:0;"><label>Name</label><input id="dName" value="${esc(dir?.name||'')}"/></div>
-        <div class="fg" style="margin:0;"><label>Phone</label><input id="dPhone" value="${esc(dir?.phone||'')}"/></div>
-        <div class="fg" style="margin:0;"><label>Email</label><input id="dEmail" value="${esc(dir?.email||'')}"/></div>
-        <div class="fg" style="margin:0;"><label>New Password (blank = keep)</label><input id="dPwd" type="password"/></div>
-      </div>
-      <button class="btn btn-sm btn-purple" style="margin-top:8px;" onclick="saveDirEdit()">Save</button>
-    </div>
-  </div>
-
-  <!-- Managers -->
-  <div class="panel">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <div class="panel-title" style="color:var(--teal);margin:0;flex:1;">🗂 Managers / Assistant Directors</div>
-      <button class="btn btn-sm btn-teal" onclick="toggleEl('addMgrForm')">+ Add</button>
-    </div>
-    <div id="addMgrForm" style="display:none;background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:12px;">
-      <div class="grid2">
-        <div class="fg" style="margin:0;"><label>Name</label><input id="mName" placeholder="Full name"/></div>
-        <div class="fg" style="margin:0;"><label>Phone (WhatsApp)</label><input id="mPhone" placeholder="+966…"/></div>
-        <div class="fg" style="margin:0;"><label>Email</label><input id="mEmail" placeholder="email@hospital.com"/></div>
-        <div class="fg" style="margin:0;"><label>Password (default: 12345)</label><input id="mPwd" type="password" placeholder="12345"/></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="btn btn-sm btn-teal" onclick="addMgr()">Save</button>
-        <button class="btn btn-sm btn-outline" onclick="toggleEl('addMgrForm')">Cancel</button>
-      </div>
-      <div class="err-msg" id="mgrErr"></div>
-    </div>
-    ${mgrs.length?`<table class="setup-table"><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th></th></tr></thead><tbody>
-      ${mgrs.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.phone||'—')}</td><td>${esc(m.email||'—')}</td>
-      <td><button class="btn btn-sm btn-red" onclick="removeUser('${m.id}')">Remove</button></td></tr>`).join('')}
-    </tbody></table>`:`<div style="color:#9ca3af;font-size:12px;">No managers yet.</div>`}
-  </div>
-
-  <!-- Supervisors -->
-  <div class="panel">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <div class="panel-title" style="color:var(--primary);margin:0;flex:1;">👤 Supervisors</div>
-      <button class="btn btn-sm btn-primary" onclick="toggleEl('addSupForm')">+ Add</button>
-    </div>
-    <div id="addSupForm" style="display:none;background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:12px;">
-      <div class="grid2">
-        <div class="fg" style="margin:0;"><label>Name</label><input id="sName" placeholder="Full name"/></div>
-        <div class="fg" style="margin:0;"><label>Phone (WhatsApp)</label><input id="sPhone" placeholder="+966…"/></div>
-        <div class="fg" style="margin:0;"><label>Password (default: 12345)</label><input id="sPwd" type="password" placeholder="12345"/></div>
-        <div class="fg" style="margin:0;"><label>Linked Manager/AD</label><select id="sMgr"><option value="">— Select —</option>${mgrOpts}</select></div>
-      </div>
-      <div class="fg" style="margin-top:10px;"><label>Areas</label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
-          ${areas.map(a=>`<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="saCb" value="${esc(a)}"/> ${esc(a)}</label>`).join('')}
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-sm btn-primary" onclick="addSup()">Save</button>
-        <button class="btn btn-sm btn-outline" onclick="toggleEl('addSupForm')">Cancel</button>
-      </div>
-      <div class="err-msg" id="supErr"></div>
-    </div>
-    ${sups.length?`<table class="setup-table"><thead><tr><th>Name</th><th>Phone</th><th>Areas</th><th>Manager</th><th></th></tr></thead><tbody>
-      ${sups.map(s=>{ const m=users.find(u=>u.id===s.linkedManagerId);
-        return `<tr><td>${esc(s.name)}</td><td>${esc(s.phone||'—')}</td><td>${(s.areas||[]).join(', ')||'—'}</td>
-        <td>${esc(m?.name||'—')}</td><td><button class="btn btn-sm btn-red" onclick="removeUser('${s.id}')">Remove</button></td></tr>`; }).join('')}
-    </tbody></table>`:`<div style="color:#9ca3af;font-size:12px;">No supervisors yet.</div>`}
-  </div>`;
-}
-
-function toggleEl(id){ const e=se(id); if(e) e.style.display=e.style.display==='none'?'block':'none'; }
-
-async function addMgr(){
-  const name=(se('mName')?.value||'').trim();
-  if(!name){ setErr('mgrErr','Name required.'); return; }
-  users.push({id:uid(),role:'manager',name,phone:se('mPhone')?.value.trim(),email:se('mEmail')?.value.trim(),password:se('mPwd')?.value||'12345',firstLogin:true,areas:[],linkedManagerId:''});
-  await saveUsers(); renderTab('dr_setup');
-}
-
-async function addSup(){
-  const name=(se('sName')?.value||'').trim();
-  const mgrId=se('sMgr')?.value;
-  const areas=Array.from(document.querySelectorAll('.saCb:checked')).map(c=>c.value);
-  if(!name)        { setErr('supErr','Name required.'); return; }
-  if(!mgrId)       { setErr('supErr','Select a manager.'); return; }
-  if(!areas.length){ setErr('supErr','Select at least one area.'); return; }
-  users.push({id:uid(),role:'supervisor',name,phone:se('sPhone')?.value.trim(),email:'',password:se('sPwd')?.value||'12345',firstLogin:true,areas,linkedManagerId:mgrId});
-  await saveUsers(); renderTab('dr_setup');
-}
-
-async function removeUser(id){
-  if(!confirm('Remove this user?')) return;
-  users=users.filter(u=>u.id!==id);
-  await saveUsers(); renderTab('dr_setup');
-}
-
 // ── Report ────────────────────────────────────────────────────────────────────
 function renderReportTab(){
   const areas  = localAreas();
@@ -595,14 +472,3 @@ function generateReport(){
   if(printBtn) printBtn.style.display='inline-flex';
 }
 
-async function saveDirEdit(){
-  const dir=users.find(u=>u.role==='director'); if(!dir) return;
-  dir.name =(se('dName')?.value||'').trim()||dir.name;
-  dir.phone=(se('dPhone')?.value||'').trim();
-  dir.email=(se('dEmail')?.value||'').trim();
-  const np=(se('dPwd')?.value||'');
-  if(np.length>=6) dir.password=np;
-  const i=users.findIndex(u=>u.role==='director'); if(i>=0) users[i]=dir;
-  if(dir.id===currentUser.id) currentUser=dir;
-  await saveUsers(); renderTab('dr_setup');
-}

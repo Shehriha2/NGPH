@@ -268,7 +268,7 @@
         </div>
       </div>`;
 
-      html += mode === 'full' ? tableHeaderHtml() : tableHeaderNoSRHtml();
+      html += mode === 'noSR' ? tableHeaderNoSRHtml() : tableHeaderHtml();
 
       group.forEach(r => {
         if (mode === 'full') {
@@ -281,12 +281,23 @@
             <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
             <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
           </tr>`;
-        } else {
+        } else if (mode === 'noSR') {
           html += `<tr>
             <td class="num">${seq++}</td>
             <td class="num">${esc(r.badge)}</td>
             <td>${esc(stripBadge(r.name))}</td>
             <td class="num">${r.otHours}</td>
+            <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
+            <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
+          </tr>`;
+        } else {
+          /* totalOnly — 7-column layout, SR cell blank per row */
+          html += `<tr>
+            <td class="num">${seq++}</td>
+            <td class="num">${esc(r.badge)}</td>
+            <td>${esc(stripBadge(r.name))}</td>
+            <td class="num">${r.otHours}</td>
+            <td class="num"></td>
             <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
             <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
           </tr>`;
@@ -313,12 +324,15 @@
           <td colspan="2"></td>
         </tr>`;
       } else {
-        /* mode === 'totalOnly' — hours and grand SR total, no individual amounts */
+        /* mode === 'totalOnly' — 7-col layout, individual SR hidden, totals + legal text in total row */
         html += `<tr class="total-row">
-          <td colspan="2" style="text-align:right;font-weight:700;padding-right:6px;">Total Hours:</td>
+          <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/Cost</td>
           <td class="num" style="font-weight:900;">${pageHours}</td>
-          <td colspan="2" style="text-align:right;font-weight:700;padding-right:6px;">Total Amount:</td>
           <td class="num" style="font-weight:900;">${fmt(pageTotal)} SR</td>
+          <td colspan="2" class="total-note">
+            The overtime amount is _______ the ceiling that is defined through the formula to practice,
+            fig#1, which was mentioned in the approved minutes of the meeting, JED-16-029120-99492.
+          </td>
         </tr>`;
       }
 
