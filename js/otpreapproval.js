@@ -137,6 +137,9 @@
 
   let _selectedReleaseArea = null;
 
+  // Cache for printNoSR — populated by every buildForm() call
+  let _cachedRows = null, _cachedArea = null, _cachedMeta = null;
+
   // ── HTML helpers ──────────────────────────────────────────────────────────
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function fmt(n){ return (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}); }
@@ -153,6 +156,18 @@
         <th style="width:11%;">Total Cost</th>
         <th style="width:9%;">Location</th>
         <th style="width:26%;">Justification</th>
+      </tr></thead><tbody>`;
+  }
+
+  function tableHeaderNoSRHtml(){
+    return `<table class="ot-table">
+      <thead><tr>
+        <th style="width:5%;">No.</th>
+        <th style="width:10%;">Badge no.</th>
+        <th style="width:38%;">Name</th>
+        <th style="width:12%;">No. of<br>Hours</th>
+        <th style="width:10%;">Location</th>
+        <th style="width:25%;">Justification</th>
       </tr></thead><tbody>`;
   }
 
@@ -187,12 +202,16 @@
   }
 
   // ── Main form builder with pagination ────────────────────────────────────
-  function buildForm(rows, area, meta) {
+  // mode: 'full'      → individual cost column + cost in total row (default)
+  //       'noSR'      → no cost column, total hours only in total row
+  //       'totalOnly' → no cost column per row, but total row shows hours + total SR amount
+  function buildForm(rows, area, meta, mode = 'full') {
+    if (mode === 'full') { _cachedRows = rows; _cachedArea = area; _cachedMeta = meta; }
+
     const wrapper  = document.getElementById('formWrapper');
     const rp1 = Math.max(5, parseInt(document.getElementById('rowsPage1').value,10)||18);
     const rpN = Math.max(5, parseInt(document.getElementById('rowsPageN').value,10)||24);
 
-    // Split rows into page-sized groups
     const groups = [];
     if (rows.length <= rp1) {
       groups.push(rows);
@@ -205,7 +224,6 @@
       }
     }
 
-    const grandTotal = rows.reduce((s,r) => s + r.totalCost, 0);
     const totalPages = groups.length;
     let seq = 1, html = '';
 
@@ -214,11 +232,8 @@
       const isLast  = gi === totalPages - 1;
       const pageNum = gi + 1;
 
-      // page-break-after on all but the last section
       html += `<div class="print-page${isLast ? '' : ' page-break-after'}">`;
 
-      // ── Full header on EVERY page ─────────────────────────────────
-      // Page-number badge (top-right, only when multi-page)
       const pgBadge = totalPages > 1
         ? `<div style="position:absolute;top:0;right:0;font-size:9px;color:#888;font-style:italic;">
              Page ${pageNum} / ${totalPages}</div>`
@@ -253,47 +268,101 @@
         </div>
       </div>`;
 
-      // ── Table for this page ────────────────────────────────────────
-      html += tableHeaderHtml();
+      html += mode === 'full' ? tableHeaderHtml() : tableHeaderNoSRHtml();
 
       group.forEach(r => {
-        html += `<tr>
-          <td class="num">${seq++}</td>
-          <td class="num">${esc(r.badge)}</td>
-          <td>${esc(stripBadge(r.name))}</td>
-          <td class="num">${r.otHours}</td>
-          <td class="num">${fmt(r.totalCost)}</td>
-          <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
-          <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
-        </tr>`;
+        if (mode === 'full') {
+          html += `<tr>
+            <td class="num">${seq++}</td>
+            <td class="num">${esc(r.badge)}</td>
+            <td>${esc(stripBadge(r.name))}</td>
+            <td class="num">${r.otHours}</td>
+            <td class="num">${fmt(r.totalCost)}</td>
+            <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
+            <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
+          </tr>`;
+        } else {
+          html += `<tr>
+            <td class="num">${seq++}</td>
+            <td class="num">${esc(r.badge)}</td>
+            <td>${esc(stripBadge(r.name))}</td>
+            <td class="num">${r.otHours}</td>
+            <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
+            <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
+          </tr>`;
+        }
       });
 
-      // ── Per-page subtotal — only the rows on this page ────────────
+      const pageHours = group.reduce((s,r) => s + r.otHours, 0);
       const pageTotal = group.reduce((s,r) => s + r.totalCost, 0);
-      html += `<tr class="total-row">
-        <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/Cost</td>
-        <td class="num"></td>
-        <td class="num" style="font-weight:900;">${fmt(pageTotal)}</td>
-        <td colspan="2" class="total-note">
-          The overtime amount is _______ the ceiling that is defined through the formula to practice,
-          fig#1, which was mentioned in the approved minutes of the meeting, JED-16-029120-99492.
-        </td>
-      </tr>`;
+
+      if (mode === 'full') {
+        html += `<tr class="total-row">
+          <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/Cost</td>
+          <td class="num"></td>
+          <td class="num" style="font-weight:900;">${fmt(pageTotal)}</td>
+          <td colspan="2" class="total-note">
+            The overtime amount is _______ the ceiling that is defined through the formula to practice,
+            fig#1, which was mentioned in the approved minutes of the meeting, JED-16-029120-99492.
+          </td>
+        </tr>`;
+      } else if (mode === 'noSR') {
+        html += `<tr class="total-row">
+          <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours</td>
+          <td class="num" style="font-weight:900;">${pageHours}</td>
+          <td colspan="2"></td>
+        </tr>`;
+      } else {
+        /* mode === 'totalOnly' — hours and grand SR total, no individual amounts */
+        html += `<tr class="total-row">
+          <td colspan="2" style="text-align:right;font-weight:700;padding-right:6px;">Total Hours:</td>
+          <td class="num" style="font-weight:900;">${pageHours}</td>
+          <td colspan="2" style="text-align:right;font-weight:700;padding-right:6px;">Total Amount:</td>
+          <td class="num" style="font-weight:900;">${fmt(pageTotal)} SR</td>
+        </tr>`;
+      }
 
       html += `</tbody></table>`;
-
-      // ── Signature on every page ────────────────────────────────────
       html += sigHtml(meta);
-
       html += `</div>`;  // end .print-page
     });
 
-    // Single footer appended once outside all page sections.
-    // On screen: flows naturally after the last signature block.
-    // In print: position:fixed keeps it at the bottom of every printed page.
     html += formFooterHtml();
-
     wrapper.innerHTML = html;
+  }
+
+  // ── Shared helper: snapshot current meta field values ─────────────────────
+  function _snapMeta() {
+    return {
+      dept:     document.getElementById('deptName')?.value     || _cachedMeta.dept,
+      period:   document.getElementById('periodCovered')?.value || _cachedMeta.period,
+      cost:     document.getElementById('costCenter')?.value    || _cachedMeta.cost,
+      tel:      document.getElementById('inchargeTel')?.value   || _cachedMeta.tel,
+      reqName:  document.getElementById('reqName')?.value       || _cachedMeta.reqName,
+      reqTitle: document.getElementById('reqTitle')?.value      || _cachedMeta.reqTitle,
+      reqID:    document.getElementById('reqID')?.value         || _cachedMeta.reqID,
+      appName:  document.getElementById('appName')?.value       || _cachedMeta.appName,
+      appTitle: document.getElementById('appTitle')?.value      || _cachedMeta.appTitle,
+      appID:    document.getElementById('appID')?.value         || _cachedMeta.appID,
+    };
+  }
+
+  // ── Print without SR column (hours only) ─────────────────────────────────
+  function printNoSR() {
+    if (!_cachedRows) { showStatus('Build the form first before printing.', false); return; }
+    const meta = _snapMeta();
+    buildForm(_cachedRows, _cachedArea, meta, 'noSR');
+    window.print();
+    buildForm(_cachedRows, _cachedArea, meta, 'full');
+  }
+
+  // ── Print hours per person + total SR amount only (no individual amounts) ─
+  function printTotalSR() {
+    if (!_cachedRows) { showStatus('Build the form first before printing.', false); return; }
+    const meta = _snapMeta();
+    buildForm(_cachedRows, _cachedArea, meta, 'totalOnly');
+    window.print();
+    buildForm(_cachedRows, _cachedArea, meta, 'full');
   }
 
   // ── Fetch approved extensions from Extension.html's Firestore data ───────
