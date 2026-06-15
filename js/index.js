@@ -1426,16 +1426,17 @@
       return parts;
     }
 
-    function applyPatternMode(startCell, patternText) {
+    function applyPatternMode(startCell, patternText, reps=0) {
       if (!startCell) return false;
       const row=startCell.parentElement; if (!row) return false;
       const parsed=parsePatternSequence(patternText); if (parsed===null) return false;
       const seq=[]; parsed.forEach(p=>{ for(let i=0;i<p.count;i++) seq.push(p.code); });
       if (!seq.length) return false;
+      const maxCells = (reps>0) ? reps*seq.length : Infinity;
       let cell=startCell, idx=0;
       const hCell=row.querySelector('.hours-cell');
       // Stop at hours cell AND guard against sched/OT cells in case hCell is null
-      while (cell && cell!==hCell &&
+      while (cell && cell!==hCell && idx<maxCells &&
              !cell.classList.contains('hours-cell') &&
              !cell.classList.contains('sched-cell') &&
              !cell.classList.contains('ot-cell')) {
@@ -1569,12 +1570,15 @@
 
     function startSimplePatternFill(cell) {
       if (!cell) return;
-      const userInput=window.prompt('Enter pattern (use duty codes for this filter). E.g.: 4NC2L',cell.textContent.trim()||'');
+      const userInput=window.prompt('Enter pattern. E.g.: 4NC2L  or  4NC2L(3) to repeat 3×',cell.textContent.trim()||'');
       if (userInput===null) { patternModeArmed=false; setPatternIndicator(false); showStatusMessage('Pattern cancelled','info'); return; }
-      const cleaned=(userInput||'').toUpperCase().replace(/\s+/g,'');
+      let cleaned=(userInput||'').toUpperCase().replace(/\s+/g,'');
+      let reps=0;
+      const repMatch=cleaned.match(/^(.*)\((\d+)\)$/);
+      if (repMatch) { cleaned=repMatch[1]; reps=parseInt(repMatch[2],10); }
       const parsed=parsePatternSequence(cleaned);
       if (!parsed||!parsed.length) { patternModeArmed=false; setPatternIndicator(false); showStatusMessage('Invalid pattern or unknown duty code','error'); return; }
-      const ok=applyPatternMode(cell,cleaned);
+      const ok=applyPatternMode(cell,cleaned,reps);
       patternModeArmed=false; setPatternIndicator(false);
       showStatusMessage(ok?'Pattern applied ✅':'Pattern failed',ok?'success':'error');
     }
