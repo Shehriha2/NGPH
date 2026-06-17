@@ -10,6 +10,89 @@
       "#be185d","#4f46e5","#65a30d","#6b7280","#374151"
     ];
 
+    // ── Adobe Color import ────────────────────────────────────────────────────
+    let _stagedColor = null;
+
+    function clearStaged() {
+      _stagedColor = null;
+      document.querySelectorAll('.eyedropper-btn').forEach(b => {
+        b.style.background=''; b.style.color=''; b.style.borderColor='#d1d5db';
+        b.title = 'Pick color from screen';
+      });
+      const inf = document.getElementById('adobe-info');
+      if (inf) inf.style.display = 'none';
+    }
+
+    function stageColor(hex) {
+      _stagedColor = hex;
+      document.querySelectorAll('.eyedropper-btn').forEach(b => {
+        b.style.background = hex; b.style.color = '#fff'; b.style.borderColor = hex;
+        b.title = `Apply ${hex.toUpperCase()} — click 🔬 on any duty row`;
+      });
+      const inf = document.getElementById('adobe-info');
+      if (inf) { inf.textContent = `✅ ${hex.toUpperCase()} staged — click 🔬 on any duty row to apply`; inf.style.display = 'block'; }
+    }
+
+    function extractAdobeColors() {
+      const urlVal = (document.getElementById('adobe-url')?.value || '').trim();
+      const out = document.getElementById('adobe-swatches');
+      if (!out) return;
+      try {
+        const p = new URL(urlVal).searchParams;
+        const raw = p.get('rgbvalues');
+        if (!raw) { out.innerHTML = '<span style="color:#dc2626;font-size:11px;">No color data found. Copy the URL from the browser address bar while on the color wheel page.</span>'; return; }
+        const v = raw.split(',').map(Number);
+        if (v.length < 15) { out.innerHTML = '<span style="color:#dc2626;font-size:11px;">Unexpected URL format.</span>'; return; }
+        const cols = [];
+        for (let i=0; i<5; i++) {
+          const r=Math.round(v[i*3]*255).toString(16).padStart(2,'0');
+          const g=Math.round(v[i*3+1]*255).toString(16).padStart(2,'0');
+          const b=Math.round(v[i*3+2]*255).toString(16).padStart(2,'0');
+          cols.push('#'+r+g+b);
+        }
+        out.innerHTML = cols.map(c=>`
+          <div onclick="stageColor('${c}')" title="Use ${c.toUpperCase()}" style="cursor:pointer;text-align:center;">
+            <div style="width:44px;height:44px;border-radius:8px;background:${c};border:2px solid #e5e7eb;margin-bottom:3px;transition:transform .1s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform=''"></div>
+            <span style="font-size:9px;font-family:monospace;color:#374151;">${c.toUpperCase()}</span>
+          </div>`).join('');
+      } catch {
+        out.innerHTML = '<span style="color:#dc2626;font-size:11px;">Invalid URL. Paste the full URL from Adobe Color.</span>';
+      }
+    }
+
+    function openAdobeColorPanel() {
+      let panel = document.getElementById('adobe-panel');
+      if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'adobe-panel';
+        panel.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 8px 32px rgba(0,0,0,.25);z-index:10000;min-width:340px;max-width:480px;width:92%;';
+        panel.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <b style="font-size:13px;color:#1a4f8b;">🎨 Adobe Color Import</b>
+            <button onclick="document.getElementById('adobe-panel').style.display='none';clearStaged();" style="background:none;border:none;font-size:16px;cursor:pointer;color:#6b7280;line-height:1;">✕</button>
+          </div>
+          <ol style="font-size:11px;color:#6b7280;margin:0 0 10px 18px;line-height:2;">
+            <li><a href="https://color.adobe.com/create/color-wheel" target="_blank" style="color:#1a4f8b;font-weight:700;">Open Adobe Color →</a></li>
+            <li>Design your palette on the color wheel</li>
+            <li>Copy the URL from your browser address bar</li>
+            <li>Paste it below and click Extract</li>
+            <li>Click a color swatch to stage it, then click 🔬 on any duty row</li>
+          </ol>
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <input id="adobe-url" type="text" placeholder="https://color.adobe.com/create/color-wheel?…"
+              style="flex:1;padding:6px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:11px;min-width:0;"/>
+            <button onclick="extractAdobeColors()" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap;">Extract</button>
+          </div>
+          <div id="adobe-swatches" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;min-height:60px;align-items:center;padding:10px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
+            <span style="color:#9ca3af;font-size:11px;">Paste a URL and click Extract</span>
+          </div>
+          <div id="adobe-info" style="display:none;font-size:11px;color:#16a34a;font-weight:700;margin-top:8px;text-align:center;"></div>`;
+        document.body.appendChild(panel);
+      } else {
+        panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
+      }
+    }
+
     // ── Area helpers ──────────────────────────────────────────────────────────
     function getAreasList() {
       try { return JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || []; }
@@ -186,6 +269,11 @@
       colorInput.addEventListener("input", () => swatch.style.background = colorInput.value);
       if (window.EyeDropper) {
         eyeBtn.addEventListener("click", async () => {
+          if (_stagedColor) {
+            colorInput.value = _stagedColor;
+            swatch.style.background = _stagedColor;
+            clearStaged(); return;
+          }
           try {
             const { sRGBHex } = await new EyeDropper().open();
             colorInput.value = sRGBHex;
