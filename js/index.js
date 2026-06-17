@@ -2874,88 +2874,6 @@
       const DAYS = ["Any","Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
       const PALETTE = ["#1a4f8b","#2e8b57","#dc3545","#d97706","#6f42c1","#0f766e","#7c2d12","#c93c5d","#2563eb","#b8860b","#0284c7","#16a34a","#9333ea","#ea580c","#0891b2","#be185d","#4f46e5","#65a30d","#6b7280","#374151"];
 
-      let _stagedColor = null;
-
-      function clearStaged() {
-        _stagedColor = null;
-        document.querySelectorAll('.dm-eye').forEach(b => {
-          b.style.background=''; b.style.color=''; b.style.borderColor='#d1d5db';
-          b.title = 'Pick color from screen';
-        });
-        const inf = document.getElementById('dm-adobe-info');
-        if (inf) inf.style.display = 'none';
-      }
-
-      function stageColor(hex) {
-        _stagedColor = hex;
-        document.querySelectorAll('.dm-eye').forEach(b => {
-          b.style.background = hex; b.style.color = '#fff'; b.style.borderColor = hex;
-          b.title = `Apply ${hex.toUpperCase()} — click 🔬 on any duty row`;
-        });
-        const inf = document.getElementById('dm-adobe-info');
-        if (inf) { inf.textContent = `✅ ${hex.toUpperCase()} staged — click 🔬 on any duty row to apply`; inf.style.display = 'block'; }
-      }
-
-      function extractAdobeColors() {
-        const urlVal = (document.getElementById('dm-adobe-url')?.value || '').trim();
-        const out = document.getElementById('dm-adobe-swatches');
-        if (!out) return;
-        try {
-          const p = new URL(urlVal).searchParams;
-          const raw = p.get('rgbvalues');
-          if (!raw) { out.innerHTML = '<span style="color:#dc2626;font-size:11px;">No color data found. Copy the URL from the browser address bar while on the color wheel page.</span>'; return; }
-          const v = raw.split(',').map(Number);
-          if (v.length < 15) { out.innerHTML = '<span style="color:#dc2626;font-size:11px;">Unexpected URL format.</span>'; return; }
-          const cols = [];
-          for (let i=0; i<5; i++) {
-            const r=Math.round(v[i*3]*255).toString(16).padStart(2,'0');
-            const g=Math.round(v[i*3+1]*255).toString(16).padStart(2,'0');
-            const b=Math.round(v[i*3+2]*255).toString(16).padStart(2,'0');
-            cols.push('#'+r+g+b);
-          }
-          out.innerHTML = cols.map(c=>`
-            <div onclick="DM.stageColor('${c}')" title="Use ${c.toUpperCase()}" style="cursor:pointer;text-align:center;">
-              <div style="width:44px;height:44px;border-radius:8px;background:${c};border:2px solid #e5e7eb;margin-bottom:3px;transition:transform .1s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform=''"></div>
-              <span style="font-size:9px;font-family:monospace;color:#374151;">${c.toUpperCase()}</span>
-            </div>`).join('');
-        } catch {
-          out.innerHTML = '<span style="color:#dc2626;font-size:11px;">Invalid URL. Paste the full URL from Adobe Color.</span>';
-        }
-      }
-
-      function openAdobeColorPanel() {
-        let panel = document.getElementById('dm-adobe-panel');
-        if (!panel) {
-          panel = document.createElement('div');
-          panel.id = 'dm-adobe-panel';
-          panel.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 8px 32px rgba(0,0,0,.25);z-index:10000;min-width:340px;max-width:480px;width:92%;';
-          panel.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-              <b style="font-size:13px;color:#1a4f8b;">🎨 Adobe Color Import</b>
-              <button onclick="document.getElementById('dm-adobe-panel').style.display='none';DM.clearStaged();" style="background:none;border:none;font-size:16px;cursor:pointer;color:#6b7280;line-height:1;">✕</button>
-            </div>
-            <ol style="font-size:11px;color:#6b7280;margin:0 0 10px 18px;line-height:2;">
-              <li><a href="https://color.adobe.com/create/color-wheel" target="_blank" style="color:#1a4f8b;font-weight:700;">Open Adobe Color →</a></li>
-              <li>Design your palette on the color wheel</li>
-              <li>Copy the URL from your browser address bar</li>
-              <li>Paste it below and click Extract</li>
-              <li>Click a color swatch to stage it, then click 🔬 on any duty row</li>
-            </ol>
-            <div style="display:flex;gap:6px;margin-bottom:10px;">
-              <input id="dm-adobe-url" type="text" placeholder="https://color.adobe.com/create/color-wheel?…"
-                style="flex:1;padding:6px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:11px;min-width:0;"/>
-              <button onclick="DM.extractAdobeColors()" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap;">Extract</button>
-            </div>
-            <div id="dm-adobe-swatches" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;min-height:60px;align-items:center;padding:10px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
-              <span style="color:#9ca3af;font-size:11px;">Paste a URL and click Extract</span>
-            </div>
-            <div id="dm-adobe-info" style="display:none;font-size:11px;color:#16a34a;font-weight:700;margin-top:8px;text-align:center;"></div>`;
-          document.body.appendChild(panel);
-        } else {
-          panel.style.display = (panel.style.display === 'none') ? 'block' : (panel.style.display ? 'none' : 'block');
-        }
-      }
-
       function getFilter() { return (document.getElementById("dm-areaFilter")?.value||"ALL").toUpperCase(); }
 
       function rebuildUI() {
@@ -3009,8 +2927,8 @@
           <td style="padding:3px;"><input type="number" min="0" step="0.25" value="${Number(data?.hours??0)}" style="width:54px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
           <td style="padding:3px;text-align:center;">
             <input type="color" value="${color}" style="width:36px;height:24px;padding:0;border:none;background:transparent;cursor:pointer;"/>
-            <div class="dm-sw" style="background:${color};width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15);vertical-align:middle;"></div>
-            <button type="button" class="dm-eye" title="Pick color from screen" style="background:none;border:1px solid #d1d5db;border-radius:4px;padding:1px 4px;cursor:pointer;font-size:11px;line-height:1;vertical-align:middle;margin-left:2px;">🔬</button>
+            <div class="dm-sw" style="background:${color};width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15);vertical-align:middle;margin:0 2px;"></div>
+            <input type="text" class="dm-hex" value="${color.toUpperCase()}" maxlength="7" placeholder="#rrggbb" style="width:62px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-family:monospace;text-transform:uppercase;vertical-align:middle;"/>
           </td>
           <td style="padding:3px;"><input class="dm-area-cell" type="text" list="dm-areasDatalist" value="${area}" style="width:66px;text-transform:uppercase;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;" placeholder="Area"/></td>
           <td style="padding:3px;"><input type="number" min="0" step="1" value="${Number(data?.assignedSt??0)}" style="width:52px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
@@ -3022,16 +2940,12 @@
         tr.cells[6].querySelector("select").value=(data?.startDay||"Any").toString();
         tr.cells[7].querySelector("select").value=(data?.startTime||"Any").toString();
         tr.cells[9].querySelector("select").value=(data?.defaultDays??"Any").toString();
-        const ci=tr.cells[3].querySelector('input[type="color"]'), sw=tr.cells[3].querySelector(".dm-sw");
-        const eye=tr.cells[3].querySelector(".dm-eye");
-        ci.addEventListener("input",()=>sw.style.background=ci.value);
-        if(eye){
-          if(!window.EyeDropper){eye.style.opacity="0.4";eye.style.cursor="not-allowed";eye.title="EyeDropper not supported (use Chrome/Edge)";}
-          else{eye.addEventListener("click",async()=>{
-            if(_stagedColor){ci.value=_stagedColor;sw.style.background=_stagedColor;clearStaged();return;}
-            try{const{sRGBHex}=await new EyeDropper().open();ci.value=sRGBHex;sw.style.background=sRGBHex;}catch{}
-          });}
-        }
+        const ci=tr.cells[3].querySelector('input[type="color"]'), sw=tr.cells[3].querySelector(".dm-sw"), hx=tr.cells[3].querySelector(".dm-hex");
+        const syncFromPicker=()=>{ sw.style.background=ci.value; hx.value=ci.value.toUpperCase(); };
+        const syncFromHex=()=>{ const v=hx.value.trim(); if(/^#[0-9a-fA-F]{6}$/.test(v)){ci.value=v;sw.style.background=v;} };
+        ci.addEventListener("input", syncFromPicker);
+        hx.addEventListener("input", syncFromHex);
+        hx.addEventListener("blur", ()=>{ hx.value=ci.value.toUpperCase(); });
         tr.cells[4].querySelector(".dm-area-cell").addEventListener("change",function(){
           const v=this.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
           this.value=v; if(v){saveAreaToList(v);rebuildUI();} applyAreaFilter();
@@ -3146,7 +3060,7 @@
       }
       function close() { document.getElementById("dutiesModal").style.display="none"; }
 
-      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openAdobeColorPanel,extractAdobeColors,stageColor,clearStaged};
+      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════
