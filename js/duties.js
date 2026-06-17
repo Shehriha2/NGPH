@@ -147,6 +147,8 @@
           <input type="color" value="${chosenColor}"
             style="width:46px;height:28px;padding:0;border:none;background:transparent"/>
           <div class="swatch" style="background:${chosenColor}"></div>
+          <button type="button" class="eyedropper-btn" title="Pick color from screen"
+            style="background:none;border:1px solid #d1d5db;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:13px;line-height:1;vertical-align:middle;">🔬</button>
         </td>
         <td><input class="area-cell" type="text" list="areasDatalist" value="${chosenArea}"
           style="width:80px;text-transform:uppercase" placeholder="Area"/></td>
@@ -177,10 +179,24 @@
       tr.cells[7].querySelector("select").value  = (data?.startTime   || "Any").toString();
       tr.cells[9].querySelector("select").value  = (data?.defaultDays ?? "Any").toString();
 
-      // color swatch sync
-      const colorInput = tr.cells[3].querySelector('input[type="color"]');
-      const swatch     = tr.cells[3].querySelector(".swatch");
+      // color swatch sync + eyedropper
+      const colorInput  = tr.cells[3].querySelector('input[type="color"]');
+      const swatch      = tr.cells[3].querySelector(".swatch");
+      const eyeBtn      = tr.cells[3].querySelector(".eyedropper-btn");
       colorInput.addEventListener("input", () => swatch.style.background = colorInput.value);
+      if (window.EyeDropper) {
+        eyeBtn.addEventListener("click", async () => {
+          try {
+            const { sRGBHex } = await new EyeDropper().open();
+            colorInput.value = sRGBHex;
+            swatch.style.background = sRGBHex;
+          } catch { /* user cancelled */ }
+        });
+      } else {
+        eyeBtn.title = "EyeDropper not supported in this browser (use Chrome/Edge)";
+        eyeBtn.style.opacity = "0.4";
+        eyeBtn.style.cursor = "not-allowed";
+      }
 
       // area cell: save new area to list when user leaves the field
       tr.cells[4].querySelector(".area-cell").addEventListener("change", function() {
