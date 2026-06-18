@@ -1818,6 +1818,7 @@
         monthlyTarget:getMonthlyTarget(),
         mixedStdHours: Number(document.getElementById('mixedStdHours').value)||0,
         holidays: holidays.map(h=>({...h})),
+        leaveCodes: Object.entries(DUTIES).filter(([,d])=>Number(d.hours)===0&&!d.noLeaveCount).map(([c])=>c),
         records:[] };
       staffList=loadStaffList();
       for (const row of rows) {
@@ -1830,9 +1831,10 @@
         const schedType=row.querySelector('.sched-cell select')?.value||'';
         const otCell=row.querySelector('.ot-cell');
         const otOverride=otCell?.dataset?.override==='true' ? (otCell.querySelector('.ot-val')?.textContent||null) : null;
+        const otCalcRaw=parseFloat((otCell?.querySelector('.ot-val')?.textContent||'0').replace('+',''));
         const extension=Number(row.querySelector('.ext-cell input')?.value)||0;
         const compType=row.dataset.compType||'OT';
-        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, extension, compType});
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, extension, compType});
       }
       return payload;
     }

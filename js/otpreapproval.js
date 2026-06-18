@@ -34,13 +34,13 @@
     return n;
   }
   function isInHolRange(hols,day){ return enabledHols(hols).some(h=>day>=h.fromDay&&day<=h.toDay); }
-  function leaveDays(daysData,hols,m,y){
+  function leaveDays(daysData,hols,m,y,leaveSet){
     let all=0,st=0;
     Object.entries(daysData||{}).forEach(([k,v])=>{
       const code=(v||'').toUpperCase().replace(/_O$/,'');
       const day=parseInt(k.replace('day',''),10);
-      if(isInHolRange(hols,day)) return; // holiday range already handles this day
-      if(code==='L'){                     // 'L' always counts as off-day
+      if(isInHolRange(hols,day)) return;
+      if(code==='L'||leaveSet.has(code)){
         all++;
         const dw=new Date(y,m-1,day).getDay(); if(dw>=0&&dw<=4)st++;
       }
@@ -49,21 +49,25 @@
   }
   function calcOT(rec,payload){
     if(rec.otOverride!=null){ const v=parseFloat(String(rec.otOverride).replace('+','')); return Number.isFinite(v)?Math.max(0,v):0; }
+    // Use OT value saved by the rota (eliminates formula drift)
+    if(rec.otCalc!=null){ const v=Number(rec.otCalc); return Number.isFinite(v)?Math.max(0,v):0; }
+    // Legacy fallback for releases saved before otCalc was added
     const m=payload.month, y=payload.year||new Date().getFullYear();
     const hols=payload.holidays||[], mxd=Number(payload.mixedStdHours)||0;
     const tot=Number(rec.hours)||0, sched=rec.schedType||'';
-    const lv=leaveDays(rec.daysData,hols,m,y);
+    const leaveSet=new Set(Array.isArray(payload.leaveCodes)?payload.leaveCodes:['AL']);
+    const lv=leaveDays(rec.daysData,hols,m,y,leaveSet);
     let std=0;
     if(sched==='Regular'){
       std=Math.max(0,sunThuInRange(m,y,1,getDIM(m,y))-holSunThu(hols,m,y)-lv.st)*9;
     } else if(sched==='12 Hours'){
       const td=getDIM(m,y), rem=Math.max(0,td-holAllDays(hols,m,y)-lv.all);
-      std=(rem*15/28)*12;
+      std=Math.round((rem*15/28)*12*10)/10;
     } else if(sched==='Mixed'){
       const td=getDIM(m,y), den=Math.max(1,td-holAllDays(hols,m,y));
       std=mxd*(Math.max(0,den-lv.all)/den);
     }
-    return Math.max(0,Math.round((tot-std)*10)/10);
+    return Math.max(0, sched==='12 Hours' ? Math.ceil(tot-std) : Math.round((tot-std)*10)/10);
   }
 
   // ── Firestore refs ────────────────────────────────────────────────────────
