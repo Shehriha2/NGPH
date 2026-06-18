@@ -1409,21 +1409,32 @@
       if (!cleaned) return [];
       const parts=[]; let i=0;
       while (i<cleaned.length) {
+        // Count: optional leading digits, default 1
         let num=''; while (i<cleaned.length&&/\d/.test(cleaned[i])) num+=cleaned[i++];
-        let code=''; while (i<cleaned.length&&/[A-Z]/.test(cleaned[i])) code+=cleaned[i++];
-        // Support _O suffix: consume _O if followed by digit or end of string
-        if (i<cleaned.length && cleaned[i]==='_' && i+1<cleaned.length && cleaned[i+1]==='O') {
+        const count=num?parseInt(num,10):1;
+        if (!Number.isFinite(count)||count<1) return null;
+        // Code: must start with a letter
+        if (i>=cleaned.length||!/[A-Z]/.test(cleaned[i])) return null;
+        let code=cleaned[i++];
+        // Letters consumed freely; digits consumed only if NOT followed by a letter (lookahead)
+        while (i<cleaned.length) {
+          const ch=cleaned[i], next=cleaned[i+1];
+          if (/[A-Z]/.test(ch)) { code+=ch; i++; }
+          else if (/\d/.test(ch)) {
+            if (next!==undefined&&/[A-Z]/.test(next)) break;
+            code+=ch; i++;
+          } else break;
+        }
+        // Support _O suffix: consume if followed by digit or end of string
+        if (i<cleaned.length&&cleaned[i]==='_'&&i+1<cleaned.length&&cleaned[i+1]==='O') {
           const after=i+2;
           if (after>=cleaned.length||/\d/.test(cleaned[after])) { code+='_O'; i+=2; }
         }
-        if (!num||!code) return null;
         const baseCode=code.endsWith('_O')?code.slice(0,-2):code;
         if (!DUTIES[baseCode]) return null;
-        const count=parseInt(num,10);
-        if (!Number.isFinite(count)||count<1) return null;
         parts.push({count,code});
       }
-      return parts;
+      return parts.length ? parts : null;
     }
 
     function applyPatternMode(startCell, patternText, reps=0) {
@@ -1452,18 +1463,31 @@
       // Support CODE_O suffix: strip _O, validate base, reattach for display
       const isOT=raw.endsWith('_O');
       const baseRaw=isOT?raw.slice(0,-2):raw;
-      const m=baseRaw.match(/^([A-Z]{1,8})(\d+)?$|^(\d+)([A-Z]{1,8})$/);
-      if (m) {
-        const code=(m[1]||m[4]||'').toUpperCase();
-        const numStr=m[2]||m[3];
-        if (!DUTIES[code]) { updateHours(row); return; }
-        const displayCode=isOT?code+'_O':code;
-        let count=parseInt(numStr||'1',10);
+      // 1. Full input is itself a duty code (handles T9, NC12, etc.)
+      if (DUTIES[baseRaw]) {
+        applyDutyToCell(cell, isOT?baseRaw+'_O':baseRaw);
+        updateHours(row); return;
+      }
+      // 2. Leading digits + code: count before code (e.g. 3T9 → T9 × 3)
+      const m2=baseRaw.match(/^(\d+)([A-Z][A-Z0-9_]*)$/);
+      if (m2&&DUTIES[m2[2]]) {
+        const code=m2[2], displayCode=isOT?code+'_O':code;
+        let count=parseInt(m2[1],10);
         if (!Number.isFinite(count)||count<1) count=1; if (count>31) count=31;
-        const hCellRef=row.querySelector('.hours-cell');
+        const hCellRef2=row.querySelector('.hours-cell');
         let cur=cell;
-        // Stop strictly at the hours cell — never touch hours, schedule or OT columns
-        for (let i=0;i<count&&cur&&cur!==hCellRef;i++) { applyDutyToCell(cur,displayCode); cur=cur.nextElementSibling; }
+        for (let i=0;i<count&&cur&&cur!==hCellRef2;i++) { applyDutyToCell(cur,displayCode); cur=cur.nextElementSibling; }
+        updateHours(row); return;
+      }
+      // 3. Letters-only code + trailing digits: fallback count (e.g. T9 → T × 9 when T9 not defined)
+      const m3=baseRaw.match(/^([A-Z]+)(\d+)$/);
+      if (m3&&DUTIES[m3[1]]) {
+        const code=m3[1], displayCode=isOT?code+'_O':code;
+        let count=parseInt(m3[2],10);
+        if (!Number.isFinite(count)||count<1) count=1; if (count>31) count=31;
+        const hCellRef3=row.querySelector('.hours-cell');
+        let cur=cell;
+        for (let i=0;i<count&&cur&&cur!==hCellRef3;i++) { applyDutyToCell(cur,displayCode); cur=cur.nextElementSibling; }
         updateHours(row); return;
       }
       updateHours(row);
@@ -2922,7 +2946,7 @@
         const f=getFilter(), defArea=f==="ALL"?"":f;
         const area=(data?.area||defArea||"").toString().toUpperCase();
         tr.innerHTML=`
-          <td style="padding:3px;"><input placeholder="CODE" value="${code}" style="width:64px;text-transform:uppercase;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
+          <td style="padding:3px;"><input placeholder="CODE" value="${code}" style="width:64px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
           <td style="padding:3px;"><input placeholder="Label" value="${(data?.label||"").toString()}" style="width:130px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
           <td style="padding:3px;"><input type="number" min="0" step="0.25" value="${Number(data?.hours??0)}" style="width:54px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
           <td style="padding:3px;text-align:center;">
@@ -2966,7 +2990,7 @@
         for(const tr of Array.from(document.querySelectorAll("#dm-dutiesBody tr"))){
           const code=(tr.cells[0].querySelector("input").value||"").toString().trim().toUpperCase();
           if(!code)continue;
-          if(!/^[A-Z0-9_]{1,6}$/.test(code))throw new Error(`Invalid code: "${code}"`);
+          if(!/^[A-Z][A-Z0-9_]{0,5}$/.test(code))throw new Error(`Invalid code: "${code}"`);
           out[code]={label:(tr.cells[1].querySelector("input").value||code).toString().trim(),hours:Number(tr.cells[2].querySelector("input").value||0)||0,color:(tr.cells[3].querySelector('input[type="color"]').value||"#111827").toString(),area:(tr.cells[4].querySelector(".dm-area-cell").value||"").toString().toUpperCase(),assignedSt:Number(tr.cells[5].querySelector("input").value||0)||0,startDay:(tr.cells[6].querySelector("select").value||"Any").toString(),startTime:(tr.cells[7].querySelector("select").value||"Any").toString(),defaultDays:(tr.cells[9].querySelector("select").value||"Any").toString()};
         }
         return out;

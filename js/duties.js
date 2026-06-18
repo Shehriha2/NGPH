@@ -140,7 +140,7 @@
 
       tr.innerHTML = `
         <td><input class="nowrap" placeholder="e.g. OP" value="${code}"
-          style="width:68px;text-transform:uppercase"/></td>
+          style="width:68px"/></td>
         <td><input placeholder="Label" value="${(data?.label||"").toString()}" style="width:160px"/></td>
         <td><input type="number" min="0" step="0.25" value="${Number(data?.hours??0)}" style="width:64px"/></td>
         <td>
@@ -224,7 +224,7 @@
       for (const tr of Array.from(document.querySelectorAll("#dutiesBody tr"))) {
         const code = (tr.cells[0].querySelector("input").value || "").toString().trim().toUpperCase();
         if (!code) continue;
-        if (!/^[A-Z]{1,5}$/.test(code)) throw new Error(`Invalid code: "${code}" (1–5 letters)`);
+        if (!/^[A-Z][A-Z0-9_]{0,5}$/.test(code)) throw new Error(`Invalid code: "${code}" (must start with a letter, up to 6 chars)`);
         out[code] = {
           label:       (tr.cells[1].querySelector("input").value || code).toString().trim(),
           hours:       Number(tr.cells[2].querySelector("input").value || 0) || 0,
