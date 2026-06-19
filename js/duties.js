@@ -3,6 +3,17 @@
 
     const DAYS = ["Any","Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+    function contrastColor(hex) {
+      const c = (hex || '#1a4f8b').replace('#', '');
+      if (c.length !== 6) return '#fff';
+      const r = parseInt(c.substring(0,2),16)/255;
+      const g = parseInt(c.substring(2,4),16)/255;
+      const b = parseInt(c.substring(4,6),16)/255;
+      const lin = x => x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4);
+      const L = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+      return L > 0.179 ? '#000' : '#fff';
+    }
+
     const COLOR_PALETTE = [
       "#1a4f8b","#2e8b57","#dc3545","#d97706","#6f42c1",
       "#0f766e","#7c2d12","#c93c5d","#2563eb","#b8860b",
@@ -403,9 +414,10 @@
       available.forEach(([code, meta]) => {
         const bg = meta.color || "#1a4f8b";
         const item = document.createElement("label");
-        item.style.cssText = `display:inline-flex;align-items:center;gap:5px;background:${bg};color:#fff;font-weight:700;
+        const fg = contrastColor(bg);
+        item.style.cssText = `display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};font-weight:700;
           border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;user-select:none;`;
-        item.innerHTML = `<input type="checkbox" data-code="${code}" style="accent-color:#fff;width:13px;height:13px;" checked>
+        item.innerHTML = `<input type="checkbox" data-code="${code}" style="accent-color:${fg};width:13px;height:13px;" checked>
           ${code}${meta.label?` — ${meta.label}`:''}`;
         list.appendChild(item);
       });

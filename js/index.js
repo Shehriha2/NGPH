@@ -1087,6 +1087,17 @@
       return 'D_' + String(code).replace(/[^a-zA-Z0-9_-]/g, '_');
     }
 
+    function contrastColor(hex) {
+      const c = (hex || '#1a4f8b').replace('#', '');
+      if (c.length !== 6) return '#fff';
+      const r = parseInt(c.substring(0,2),16)/255;
+      const g = parseInt(c.substring(2,4),16)/255;
+      const b = parseInt(c.substring(4,6),16)/255;
+      const lin = x => x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4);
+      const L = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+      return L > 0.179 ? '#000' : '#fff';
+    }
+
     function injectDutyStyles() {
       const old = document.getElementById("dutiesStyleTag");
       if (old) old.remove();
@@ -1096,7 +1107,7 @@
       Object.entries(DUTIES).forEach(([code, meta]) => {
         const color = (meta?.color && meta.color !== 'undefined') ? meta.color : "#1a4f8b";
         const cls   = dutyCls(code);
-        css += `.${cls}{background:${color}!important;color:#fff!important;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact;}` +
+        css += `.${cls}{background:${color}!important;color:${contrastColor(color)}!important;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact;}` +
                `.weekend.${cls}{filter:brightness(0.92);}`;
       });
       style.textContent = css;
@@ -1732,7 +1743,7 @@
               const bg=duty.color||'#1a4f8b';
               const label=raw; // show full code including _O suffix
               const desc=duty.label?` (${duty.label})`:'';
-              rowHtml+=`<td style="background:${bg};color:#fff;font-weight:bold;border:1pt solid #aaa;padding:2pt 3pt;text-align:center;font-size:8pt;" title="${desc}">${label}</td>`;
+              rowHtml+=`<td style="background:${bg};color:${contrastColor(bg)};font-weight:bold;border:1pt solid #aaa;padding:2pt 3pt;text-align:center;font-size:8pt;" title="${desc}">${label}</td>`;
             } else {
               const isWE=cell.classList.contains('weekend');
               rowHtml+=`<td style="background:${isWE?'#f0f0f0':'#fff'};border:1pt solid #ddd;padding:2pt 3pt;text-align:center;font-size:8pt;"></td>`;
@@ -1746,7 +1757,7 @@
         Object.entries(DUTIES).forEach(([code,meta])=>{
           const bg=meta.color||'#1a4f8b';
           legendHtml+=`<tr>
-            <td style="background:${bg};color:#fff;font-weight:bold;border:1pt solid #aaa;padding:2pt 6pt;text-align:center;">${code}</td>
+            <td style="background:${bg};color:${contrastColor(bg)};font-weight:bold;border:1pt solid #aaa;padding:2pt 6pt;text-align:center;">${code}</td>
             <td style="border:1pt solid #ddd;padding:2pt 6pt;">${meta.label||''}</td>
             <td style="border:1pt solid #ddd;padding:2pt 6pt;text-align:center;">${meta.hours||''} hrs</td>
             <td style="border:1pt solid #ddd;padding:2pt 6pt;">${meta.area||'All'}</td>
@@ -3070,7 +3081,7 @@
         if(!avail.length){document.getElementById("dm-importPreview").style.display="none";if(hint)hint.textContent="No new duties found in that area.";return;}
         if(hint)hint.textContent=`${avail.length} duties available from ${src}.`;
         const list=document.getElementById("dm-importList"); list.innerHTML="";
-        avail.forEach(([code,meta])=>{const bg=meta.color||"#1a4f8b";const item=document.createElement("label");item.style.cssText=`display:inline-flex;align-items:center;gap:5px;background:${bg};color:#fff;font-weight:700;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;`;item.innerHTML=`<input type="checkbox" data-code="${code}" style="accent-color:#fff;width:13px;height:13px;" checked>${code}${meta.label?` — ${meta.label}`:''}`;list.appendChild(item);});
+        avail.forEach(([code,meta])=>{const bg=meta.color||"#1a4f8b";const fg=contrastColor(bg);const item=document.createElement("label");item.style.cssText=`display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};font-weight:700;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;`;item.innerHTML=`<input type="checkbox" data-code="${code}" style="accent-color:${fg};width:13px;height:13px;" checked>${code}${meta.label?` — ${meta.label}`:''}`;list.appendChild(item);});
         document.getElementById("dm-importPreview").style.display="block";
       }
       function selectAllImport(){document.querySelectorAll("#dm-importList input[type=checkbox]").forEach(cb=>cb.checked=true);}
