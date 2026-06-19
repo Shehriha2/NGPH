@@ -425,7 +425,7 @@
     try {
       const ctrl = new AbortController();
       const tid  = setTimeout(() => ctrl.abort(), 5000);
-      const resp = await fetch('https://api64.ipify.org?format=json', { signal: ctrl.signal });
+      const resp = await fetch('https://api4.ipify.org?format=json', { signal: ctrl.signal });
       clearTimeout(tid);
       const data = await resp.json();
       return data.ip || null;
