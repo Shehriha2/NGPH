@@ -1291,6 +1291,21 @@
       return nameCell;
     }
 
+    function sortStaffAlpha() {
+      const tbody = document.querySelector('#rotaTable tbody');
+      const rows  = Array.from(tbody.querySelectorAll('tr'));
+      const getName = r => (r.cells[0]?.querySelector('input')?.value || '').replace(/\s*\(\d+\)\s*$/, '').trim().toLowerCase();
+      rows.sort((a, b) => {
+        const na = getName(a), nb = getName(b);
+        if (!na && !nb) return 0;
+        if (!na) return 1;   // empty rows go to bottom
+        if (!nb) return -1;
+        return na.localeCompare(nb);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+      showStatusMessage('Staff sorted A → Z', 'info');
+    }
+
     function addNewRow() {
       const tbody = document.querySelector('#rotaTable tbody');
       const tr    = document.createElement('tr');
