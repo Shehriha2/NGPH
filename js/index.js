@@ -1317,6 +1317,169 @@
       if (!silent) showStatusMessage('Staff sorted A → Z', 'info');
     }
 
+    // ── Import Rota from Excel ────────────────────────────────────────────────
+    function importRotaFromExcel(input) {
+      const file = input.files[0]; if (!file) return; input.value = '';
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb   = XLSX.read(e.target.result, { type: 'array' });
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (rows.length < 1) { showStatusMessage('Excel file is empty.', 'error'); return; }
+
+          // Skip header row if first cell is non-numeric text (e.g. "Name", "Staff Name")
+          const firstCell = String(rows[0][0] || '').trim();
+          const dataRows  = (firstCell && !/^\d+$/.test(firstCell) && rows.length > 1)
+                            ? rows.slice(1) : rows;
+
+          // Parse: col 0 = staff name, cols 1-31 = day duties
+          const parsed = [];
+          dataRows.forEach(row => {
+            const name = String(row[0] || '').trim(); if (!name) return;
+            const days = {};
+            for (let d = 1; d <= 31; d++) {
+              const v = String(row[d] || '').trim().toUpperCase();
+              if (v) days['day' + d] = v;
+            }
+            parsed.push({ name, days });
+          });
+          if (!parsed.length) { showStatusMessage('No staff rows found in Excel.', 'error'); return; }
+
+          // Collect unique unknown base codes
+          const unknown = new Set();
+          parsed.forEach(p => Object.values(p.days).forEach(v => {
+            const base = v.endsWith('_O') ? v.slice(0, -2) : v;
+            if (base && !DUTIES[base]) unknown.add(base);
+          }));
+
+          if (unknown.size === 0) {
+            _applyExcelImport(parsed, {});
+          } else {
+            _showDutyMappingDialog(Array.from(unknown).sort(), parsed);
+          }
+        } catch(err) {
+          console.error(err);
+          showStatusMessage('Failed to read Excel: ' + (err?.message || err), 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function _showDutyMappingDialog(unknownCodes, parsedRows) {
+      const existing = Object.entries(DUTIES).sort(([a],[b]) => a.localeCompare(b));
+      const opts = `<option value="">— Skip (leave empty) —</option>` +
+        existing.map(([c, m]) => {
+          const bg  = m.color || '#1a4f8b';
+          const fg  = contrastColor(bg);
+          return `<option value="${c}" style="background:${bg};color:${fg};">${c}${m.label ? ' — ' + m.label : ''}</option>`;
+        }).join('');
+
+      const tableRows = unknownCodes.map(code => `
+        <tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:7px 10px;font-weight:700;font-family:monospace;font-size:13px;
+                     background:#fef3c7;color:#92400e;border-radius:4px;">${code}</td>
+          <td style="padding:7px 10px;">
+            <select data-code="${code}"
+              style="font-size:12px;padding:5px 8px;border:1px solid #d1d5db;
+                     border-radius:6px;min-width:220px;width:100%;">
+              ${opts}
+            </select>
+          </td>
+        </tr>`).join('');
+
+      const modal = document.createElement('div');
+      modal.id = 'rotaXlsxMapModal';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      modal.innerHTML = `
+        <div style="background:#fff;border-radius:14px;padding:28px 28px 20px;max-width:560px;
+                    width:94%;max-height:85vh;display:flex;flex-direction:column;gap:14px;
+                    box-shadow:0 24px 64px rgba(0,0,0,.28);">
+          <div style="font-size:16px;font-weight:800;color:#1f2937;">🔗 Map Unknown Duty Codes</div>
+          <div style="font-size:12px;color:#6b7280;line-height:1.5;">
+            The Excel file contains <b>${unknownCodes.length}</b> duty code(s) not in your duties list.<br>
+            Map each one to an existing duty, or leave it as <i>Skip</i> to leave those cells empty.
+          </div>
+          <div style="overflow-y:auto;flex:1;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f3f6fb;font-size:12px;">
+                  <th style="padding:7px 10px;text-align:left;white-space:nowrap;">Excel Code</th>
+                  <th style="padding:7px 10px;text-align:left;">Map to Duty</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;border-top:1px solid #e5e7eb;">
+            <button id="_xlsxMapCancel" style="background:#6b7280;color:#fff;border:none;
+              border-radius:8px;padding:8px 20px;font-size:12px;cursor:pointer;">Cancel</button>
+            <button id="_xlsxMapApply" style="background:#15803d;color:#fff;border:none;
+              border-radius:8px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer;">
+              ✅ Apply Import
+            </button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+
+      document.getElementById('_xlsxMapCancel').onclick = () => modal.remove();
+      document.getElementById('_xlsxMapApply').onclick = () => {
+        const mapping = {};
+        modal.querySelectorAll('select[data-code]').forEach(sel => {
+          if (sel.value) mapping[sel.dataset.code] = sel.value;
+        });
+        modal.remove();
+        _applyExcelImport(parsedRows, mapping);
+      };
+    }
+
+    function _applyExcelImport(parsedRows, mapping) {
+      const tbody = document.querySelector('#rotaTable tbody');
+      const month = parseInt(document.getElementById('monthSelect').value, 10);
+      const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
+      const numDays = getDaysInMonth(month);
+
+      // Build name→row map (case-insensitive)
+      const existingMap = {};
+      Array.from(tbody.querySelectorAll('tr')).forEach(row => {
+        const n = (row.cells[0]?.querySelector('input')?.value || '').trim().toLowerCase();
+        if (n) existingMap[n] = row;
+      });
+
+      let added = 0, updated = 0;
+      parsedRows.forEach(({ name, days }) => {
+        let row = existingMap[name.toLowerCase()];
+        if (!row) {
+          addNewRow();
+          row = tbody.lastElementChild;
+          row.cells[0].querySelector('input').value = name;
+          added++;
+        } else {
+          updated++;
+        }
+        const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+        for (let d = 1; d <= numDays; d++) {
+          const cell = row.cells[d];
+          if (!cell || d >= hIdx) break;
+          let raw  = (days['day' + d] || '').toUpperCase();
+          const isOT = raw.endsWith('_O');
+          const base = isOT ? raw.slice(0, -2) : raw;
+          const resolved = DUTIES[base] ? base : (mapping[base] || null);
+          if (resolved) {
+            applyDutyToCell(cell, isOT ? resolved + '_O' : resolved);
+          } else {
+            cell.textContent = '';
+            Object.keys(DUTIES).forEach(c => cell.classList.remove(dutyCls(c)));
+          }
+        }
+        updateHours(row);
+      });
+
+      sortStaffAlpha(true);
+      updateDashboard();
+      showStatusMessage(`Excel import done — ${added} added, ${updated} updated.`, 'success');
+    }
+
     function addNewRow() {
       const tbody = document.querySelector('#rotaTable tbody');
       const tr    = document.createElement('tr');

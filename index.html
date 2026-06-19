@@ -816,6 +816,16 @@
       🔤 A→Z
     </button>
 
+    <!-- Import rota from Excel -->
+    <button type="button" onclick="document.getElementById('rotaXlsxInput').click()"
+      title="Import rota from Excel (.xlsx)"
+      style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:6px 13px;
+             font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+      📥 Import Excel
+    </button>
+    <input type="file" id="rotaXlsxInput" accept=".xlsx,.xls" style="display:none;"
+      onchange="importRotaFromExcel(this)"/>
+
     <!-- Staff search filter -->
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <div style="display:flex;align-items:center;background:#f3f6fb;border:1px solid #d1d5db;border-radius:8px;padding:0 8px;gap:4px;">
