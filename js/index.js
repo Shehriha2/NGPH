@@ -1326,17 +1326,14 @@
           const wb   = XLSX.read(e.target.result, { type: 'array' });
           const ws   = wb.Sheets[wb.SheetNames[0]];
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-          if (rows.length < 1) { showStatusMessage('Excel file is empty.', 'error'); return; }
+          if (!rows.length) { showStatusMessage('Excel file is empty.', 'error'); return; }
 
-          // Skip header row if first cell is non-numeric text (e.g. "Name", "Staff Name")
-          const firstCell = String(rows[0][0] || '').trim();
-          const dataRows  = (firstCell && !/^\d+$/.test(firstCell) && rows.length > 1)
-                            ? rows.slice(1) : rows;
-
-          // Parse: col 0 = staff name, cols 1-31 = day duties
+          // Col 0 = staff name (exact), cols 1..31 = day 1..31.
+          // Rows with an empty first cell are skipped automatically.
           const parsed = [];
-          dataRows.forEach(row => {
-            const name = String(row[0] || '').trim(); if (!name) return;
+          rows.forEach(row => {
+            const name = String(row[0] || '').trim();
+            if (!name) return;
             const days = {};
             for (let d = 1; d <= 31; d++) {
               const v = String(row[d] || '').trim().toUpperCase();
@@ -1344,7 +1341,7 @@
             }
             parsed.push({ name, days });
           });
-          if (!parsed.length) { showStatusMessage('No staff rows found in Excel.', 'error'); return; }
+          if (!parsed.length) { showStatusMessage('No data rows found in Excel.', 'error'); return; }
 
           // Collect unique unknown base codes
           const unknown = new Set();
@@ -1446,10 +1443,13 @@
         if (n) existingMap[n] = row;
       });
 
-      let added = 0, updated = 0;
+      let added = 0, updated = 0, skipped = 0;
       parsedRows.forEach(({ name, days }) => {
         let row = existingMap[name.toLowerCase()];
         if (!row) {
+          // Only add a new row if the name has at least 2 chars and contains a letter
+          // (filters out header rows like "Name", "1", etc. that slipped through)
+          if (name.length < 2 || !/[a-zA-Z]/.test(name)) { skipped++; return; }
           addNewRow();
           row = tbody.lastElementChild;
           row.cells[0].querySelector('input').value = name;
@@ -1477,7 +1477,8 @@
 
       sortStaffAlpha(true);
       updateDashboard();
-      showStatusMessage(`Excel import done — ${added} added, ${updated} updated.`, 'success');
+      const msg = `Excel import done — ${updated} updated, ${added} added` + (skipped ? `, ${skipped} skipped.` : '.');
+      showStatusMessage(msg, 'success');
     }
 
     function addNewRow() {
