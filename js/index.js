@@ -1302,7 +1302,7 @@
       return nameCell;
     }
 
-    function sortStaffAlpha() {
+    function sortStaffAlpha(silent = false) {
       const tbody = document.querySelector('#rotaTable tbody');
       const rows  = Array.from(tbody.querySelectorAll('tr'));
       const getName = r => (r.cells[0]?.querySelector('input')?.value || '').replace(/\s*\(\d+\)\s*$/, '').trim().toLowerCase();
@@ -1314,7 +1314,7 @@
         return na.localeCompare(nb);
       });
       rows.forEach(r => tbody.appendChild(r));
-      showStatusMessage('Staff sorted A → Z', 'info');
+      if (!silent) showStatusMessage('Staff sorted A → Z', 'info');
     }
 
     function addNewRow() {
@@ -1399,6 +1399,7 @@
           }
         });
         updateDashboard();
+        sortStaffAlpha(true);
         if (addedCount === 0) {
           showStatusMessage(`All staff for "${areaTag}" are already loaded ✅`, 'info');
         } else {
@@ -1911,6 +1912,7 @@
       }
       if (!records.length) addNewRow();
       persistMonthlyTarget(); updateDashboard();
+      sortStaffAlpha(true);
     }
 
     // ── Cloud Save / Load (primary workflow) ─────────────────────────────────
