@@ -3572,10 +3572,10 @@
             header.forEach((h,i)=>{if(/badge/i.test(h))bC=i;else if(/name/i.test(h))nC=i;else if(/hrr|rate|hourly/i.test(h))hC=i;});
             if(bC<0&&hC<0){bC=0;nC=1;hC=2;}
             if(hC<0){showStatusMessage("Could not find HRR column.","error");return;}
-            let upd=0,notF=[];
-            rows.slice(1).forEach(row=>{const rb=String(row[bC]??"").trim(),rn=String(row[nC]??"").trim().toUpperCase(),rh=parseFloat(row[hC]);if(!Number.isFinite(rh)||rh<=0)return;let idx=rb?records.findIndex(s=>String(s.badge).trim()===rb):-1;if(idx<0&&rn)idx=records.findIndex(s=>s.name.replace(/\s*\(\d+\)\s*$/,"").trim().toUpperCase()===rn);if(idx<0){notF.push(rn||rb);return;}records[idx].hrr=rh;upd++;});
+            let upd=0,kept=0,notF=[];
+            rows.slice(1).forEach(row=>{const rb=String(row[bC]??"").trim(),rn=String(row[nC]??"").trim().toUpperCase(),rh=parseFloat(row[hC]);if(!Number.isFinite(rh)||rh<=0)return;let idx=rb?records.findIndex(s=>String(s.badge).trim()===rb):-1;if(idx<0&&rn)idx=records.findIndex(s=>s.name.replace(/\s*\(\d+\)\s*$/,"").trim().toUpperCase()===rn);if(idx<0){notF.push(rn||rb);return;}if(rh>(records[idx].hrr||0)){records[idx].hrr=rh;upd++;}else{kept++;}});
             if(upd){writeLocal();renderTable();}
-            let msg=`HRR updated: ${upd} staff`;if(notF.length)msg+=` · ${notF.length} not found`;showStatusMessage(msg+(upd?"":" — nothing updated"),"error");}
+            let msg=`HRR updated: ${upd} staff`;if(kept)msg+=` · ${kept} kept (existing rate higher)`;if(notF.length)msg+=` · ${notF.length} not found`;showStatusMessage(msg+(upd||kept?"":" — nothing updated"),"error");}
           catch(err){console.error(err);showStatusMessage("HRR import failed: "+(err?.message||err),"error");}
         };
         reader.readAsArrayBuffer(file);
