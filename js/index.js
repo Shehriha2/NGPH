@@ -2132,6 +2132,7 @@
         rels.sort((a,b)=>a.releaseNum-b.releaseNum);
         await window.FB.setDoc(idxRef,{releases:rels},{merge:true});
         showStatusMessage(`${getRotaDisplayName()} saved ✅`);
+        await saveAreaConsumption();
       } catch(err){ console.error(err); showStatusMessage('Save failed: '+(err?.message||err),'error'); }
     }
 
