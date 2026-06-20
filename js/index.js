@@ -1714,8 +1714,8 @@
         if (!DUTIES[v]) continue;
         const dh  = Number(DUTIES[v].hours) || 0;
         const dow = new Date(year, month - 1, i).getDay(); // 5=Fri, 6=Sat
-        // Weekend rule: Fri or Sat, duty between 1–10.99h → count as 8h
-        hours += (dh > 0 && dh < 11 && (dow === 5 || dow === 6)) ? 8 : dh;
+        // Weekend rule: Fri or Sat, duty 8–10.99h → count as 8h
+        hours += (dh >= 8 && dh < 11 && (dow === 5 || dow === 6)) ? 8 : dh;
       }
       hCell.textContent=hours;
       row.classList.remove('row-over','row-under','row-target');
