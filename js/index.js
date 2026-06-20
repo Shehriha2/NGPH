@@ -1704,9 +1704,19 @@
     function updateHours(row) {
       const hCell = row.querySelector('.hours-cell');
       if (!hCell) return;
-      const hIdx = Array.from(row.cells).indexOf(hCell);
-      let hours=0;
-      for (let i=1;i<hIdx;i++) { let v=row.cells[i].textContent.trim().toUpperCase(); if(v.endsWith('_O'))v=v.slice(0,-2); if(DUTIES[v]) hours+=Number(DUTIES[v].hours)||0; }
+      const hIdx  = Array.from(row.cells).indexOf(hCell);
+      const month = parseInt(document.getElementById('monthSelect').value, 10);
+      const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
+      let hours = 0;
+      for (let i = 1; i < hIdx; i++) {
+        let v = row.cells[i].textContent.trim().toUpperCase();
+        if (v.endsWith('_O')) v = v.slice(0, -2);
+        if (!DUTIES[v]) continue;
+        const dh  = Number(DUTIES[v].hours) || 0;
+        const dow = new Date(year, month - 1, i).getDay(); // 5=Fri, 6=Sat
+        // Weekend rule: Fri or Sat, duty between 1–10.99h → count as 8h
+        hours += (dh > 0 && dh < 11 && (dow === 5 || dow === 6)) ? 8 : dh;
+      }
       hCell.textContent=hours;
       row.classList.remove('row-over','row-under','row-target');
       hCell.classList.remove('hours-ok','hours-warn','hours-over');
