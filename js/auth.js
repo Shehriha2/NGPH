@@ -377,6 +377,43 @@
     });
   }
 
+  function _collectAccessMessage(ip) {
+    return new Promise(resolve => {
+      const ov = _dialogBase(`
+        <h3 style="margin:0 0 8px;font-size:16px;color:#1a4f8b;">🔒 Access Request</h3>
+        <p style="margin:0 0 4px;font-size:13px;color:#374151;line-height:1.6;">
+          Your device is not yet approved. Your request will be sent to the administrator.
+        </p>
+        <p style="margin:0 0 10px;font-size:12px;color:#6b7280;">
+          IP: <strong style="font-family:monospace;">${ip}</strong>
+        </p>
+        <label style="display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;letter-spacing:.05em;">
+          MESSAGE TO ADMINISTRATOR
+          <span style="font-weight:400;color:#9ca3af;">(optional, max 200 characters)</span>
+        </label>
+        <textarea id="_cam_msg" maxlength="200"
+          placeholder="e.g. Dr. Ahmed – Pharmacy department, office laptop"
+          style="width:100%;padding:9px 10px;border:1px solid #d1d5db;border-radius:8px;
+                 font-size:13px;box-sizing:border-box;resize:vertical;min-height:72px;
+                 font-family:Arial,sans-serif;margin-bottom:4px;"></textarea>
+        <div style="text-align:right;margin-bottom:14px;">
+          <span id="_cam_count" style="font-size:11px;color:#9ca3af;">0 / 200</span>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="_cam_skip" style="padding:9px 22px;background:#f3f4f6;color:#374151;
+            border:1px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer;">Skip</button>
+          <button id="_cam_send" style="padding:9px 22px;background:#1a4f8b;color:#fff;border:none;
+            border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Send Request</button>
+        </div>`);
+      const ta    = ov.querySelector('#_cam_msg');
+      const count = ov.querySelector('#_cam_count');
+      ta.addEventListener('input', () => { count.textContent = ta.value.length + ' / 200'; });
+      ov.querySelector('#_cam_send').onclick = () => { const v = ta.value.trim().slice(0,200); ov.remove(); resolve(v); };
+      ov.querySelector('#_cam_skip').onclick  = () => { ov.remove(); resolve(''); };
+      setTimeout(() => ta.focus(), 50);
+    });
+  }
+
   function doLogout() {
     _bcotConfirm('You will need to log in again to access the app.', 'Log Out?',
       { confirmLabel: 'Log Out', danger: true })
@@ -469,14 +506,16 @@
       return 'pending';
     }
 
-    // New device — add to pending queue
+    // New device — collect optional message then add to pending queue
+    const accessMsg = await _collectAccessMessage(_myIP);
     _pendingIPs.push({
       ip:        _myIP,
       label:     '',
       firstSeen: now,
       lastSeen:  now,
       visits:    1,
-      ua:        (navigator.userAgent || '').slice(0, 120)
+      ua:        (navigator.userAgent || '').slice(0, 120),
+      message:   accessMsg
     });
     try { await saveIPs(); } catch {}
     return 'pending';
@@ -894,6 +933,7 @@
         &nbsp;·&nbsp; Visits: ${e.visits || 1}
       </div>
       ${e.ua ? `<div style="font-size:10px;color:#d1d5db;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.ua}</div>` : ''}
+      ${e.message ? `<div style="font-size:11px;color:#374151;margin-top:5px;background:#fffbeb;padding:5px 9px;border-radius:6px;border-left:3px solid #f59e0b;">💬 ${e.message}</div>` : ''}
     </div>
     <div style="display:flex;gap:6px;flex-shrink:0;">
       <button onclick="BCOT_AUTH.ipApprove(${i});"
