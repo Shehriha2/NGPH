@@ -2016,11 +2016,23 @@
       const td=document.createElement('td'); td.contentEditable=true;
       td.addEventListener('focus',function(){ patternStartCell=this; });
       td.addEventListener('click',function(){ patternStartCell=this; if(patternModeArmed) startSimplePatternFill(this); });
-      td.addEventListener('dblclick',function(){
+      td.addEventListener('dblclick',function(e){
         let v=(this.textContent||'').trim().toUpperCase();
         if(!v)return;
         const base=v.endsWith('_O')?v.slice(0,-2):v;
         if(!DUTIES[base])return;
+        if(e.ctrlKey){
+          e.preventDefault();
+          const pwd=(window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
+          if(!pwd){DM.openEditByCode(base);return;}
+          BCOT_AUTH.prompt('Enter the administrator password to edit duty properties.',{title:'🔑 Duty Properties',placeholder:'Admin password',type:'password',confirmLabel:'Unlock'})
+            .then(entered=>{
+              if(entered===null)return;
+              if(entered.trim()!==pwd){BCOT_AUTH.alert('Incorrect password.','Access Denied');return;}
+              DM.openEditByCode(base);
+            });
+          return;
+        }
         applyDutyFilter(base);
       });
       td.addEventListener('input',function(e){ scheduleCellProcess(e.target); });
@@ -3578,6 +3590,111 @@
 
       async function saveAndClose() { await saveToCloud(); await reloadDutiesFromStorage(); close(); }
 
+      function openEditByCode(code) {
+        const duty = DUTIES[code];
+        if (!duty) { showStatusMessage(`Duty "${code}" not found.`, 'info'); return; }
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        const hdrColor = duty.color || '#1a4f8b';
+        const hdrText  = contrastColor(hdrColor);
+        overlay.innerHTML = `
+          <div style="background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(460px,96%);font-family:Arial,sans-serif;overflow:hidden;">
+            <div style="background:${hdrColor};padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:15px;font-weight:700;color:${hdrText};">✏️ Duty Properties — ${code}</span>
+              <button id="_dep_x" style="background:transparent;border:none;color:${hdrText};font-size:20px;line-height:1;cursor:pointer;padding:0 4px;">✕</button>
+            </div>
+            <div style="padding:16px 20px;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <tr><td style="padding:5px 6px;color:#6b7280;width:130px;">Code</td>
+                    <td style="padding:5px 6px;"><b style="font-family:monospace;font-size:14px;">${code}</b> <span style="color:#9ca3af;font-size:11px;">(read-only)</span></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Label</td>
+                    <td style="padding:5px 6px;"><input id="_dep_lbl" type="text" maxlength="60" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Hours</td>
+                    <td style="padding:5px 6px;"><input id="_dep_hrs" type="number" min="0" step="0.25" style="width:80px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Color</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <input id="_dep_cp" type="color" style="width:38px;height:28px;padding:0;border:none;cursor:pointer;"/>
+                      <div id="_dep_sw" style="width:22px;height:22px;border-radius:4px;border:1px solid rgba(0,0,0,.15);flex-shrink:0;"></div>
+                      <input id="_dep_hx" type="text" maxlength="7" placeholder="#rrggbb" style="width:78px;font-family:monospace;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;text-transform:uppercase;"/>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Area</td>
+                    <td style="padding:5px 6px;"><input id="_dep_ar" type="text" maxlength="20" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;text-transform:uppercase;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Assigned Staff</td>
+                    <td style="padding:5px 6px;"><input id="_dep_st" type="number" min="0" step="1" style="width:78px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Start Day</td>
+                    <td style="padding:5px 6px;"><select id="_dep_sd" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;">${DAYS.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Start Time</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <select id="_dep_st2" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildTOpts()}</select>
+                      <span id="_dep_et" style="color:#6b7280;font-size:12px;"></span>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Default Days</td>
+                    <td style="padding:5px 6px;"><select id="_dep_dd" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildDOpts()}</select></td></tr>
+              </table>
+            </div>
+            <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
+              <button id="_dep_cn" style="background:#f3f4f6;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:Arial,sans-serif;">Cancel</button>
+              <button id="_dep_sv" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-weight:700;font-family:Arial,sans-serif;">Save Changes</button>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+
+        const $ = id => overlay.querySelector(id);
+        const cp=$('#_dep_cp'), sw=$('#_dep_sw'), hx=$('#_dep_hx'), st2=$('#_dep_st2'), hrs=$('#_dep_hrs'), et=$('#_dep_et');
+
+        // Set initial values
+        $('#_dep_lbl').value = duty.label || '';
+        hrs.value = Number(duty.hours) || 0;
+        cp.value  = duty.color || '#1a4f8b';
+        sw.style.background = cp.value;
+        hx.value  = cp.value.toUpperCase();
+        $('#_dep_ar').value  = (duty.area || '').toUpperCase();
+        $('#_dep_st').value  = Number(duty.assignedSt) || 0;
+        $('#_dep_sd').value  = duty.startDay || 'Any';
+        st2.value  = duty.startTime || 'Any';
+        $('#_dep_dd').value  = (duty.defaultDays ?? 'Any').toString();
+
+        const updEnd = () => { const e=calcEnd(st2.value,hrs.value); et.textContent=e!=='Any'?`→ ${e}`:''; };
+        const syncPicker = () => { sw.style.background=cp.value; hx.value=cp.value.toUpperCase(); };
+        const syncHex    = () => { const v=hx.value.trim(); if(/^#[0-9a-fA-F]{6}$/.test(v)){cp.value=v;sw.style.background=v;} };
+        cp.addEventListener('input', syncPicker);
+        hx.addEventListener('input', syncHex);
+        hx.addEventListener('blur',  ()=>{ hx.value=cp.value.toUpperCase(); });
+        st2.addEventListener('change', updEnd);
+        hrs.addEventListener('input',  updEnd);
+        updEnd();
+
+        const dismiss = () => overlay.remove();
+        $('#_dep_x').addEventListener('click', dismiss);
+        $('#_dep_cn').addEventListener('click', dismiss);
+        overlay.addEventListener('click', e => { if (e.target===overlay) dismiss(); });
+
+        $('#_dep_sv').addEventListener('click', async () => {
+          const updated = {
+            label:       ($('#_dep_lbl').value||code).trim(),
+            hours:       Number(hrs.value)||0,
+            color:       cp.value||'#1a4f8b',
+            area:        ($('#_dep_ar').value||'').trim().toUpperCase(),
+            assignedSt:  Number($('#_dep_st').value)||0,
+            startDay:    $('#_dep_sd').value||'Any',
+            startTime:   st2.value||'Any',
+            defaultDays: $('#_dep_dd').value||'Any',
+          };
+          DUTIES[code] = updated;
+          let allDuties={};
+          try{allDuties=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+          allDuties[code]=updated;
+          localStorage.setItem(DUTIES_ALL_KEY, JSON.stringify(allDuties));
+          injectDutyStyles();
+          try {
+            const appKey=(window.BCOT_APP_KEY||'').trim();
+            if(appKey) await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',appKey,'duties_named','DUTIES_POOL'),{savedAt:new Date().toISOString(),duties:allDuties},{merge:true});
+          } catch(e){console.error(e);showStatusMessage('Duty cloud save failed: '+(e?.message||e),'error');}
+          showStatusMessage(`Duty "${code}" updated ✅`);
+          dismiss();
+        });
+      }
+
       function open() {
         document.getElementById("dutiesModal").style.display="block";
         loadLocal(); rebuildUI();
@@ -3587,7 +3704,7 @@
       }
       function close() { document.getElementById("dutiesModal").style.display="none"; }
 
-      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose};
+      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════
