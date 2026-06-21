@@ -1186,6 +1186,112 @@
       const tbody = document.getElementById('statisticsTableBody');
       if (!tbody) return;
       tbody.innerHTML = '';
+      const statsTable = tbody.closest('table');
+      const thead = statsTable?.querySelector('thead tr');
+      const modalTitle = document.querySelector('#statisticsModal .modal-header h2');
+
+      if (_dutyFilterCode && _dutyFilterLevel >= 2) {
+        // ── Duty statistics: grid matching rota column widths ────────────────
+        const duty      = DUTIES[_dutyFilterCode];
+        const dutyColor = duty?.color || '#1a4f8b';
+        const dutyLabel = _dutyFilterCode + (duty?.label ? ' — ' + duty.label : '');
+        if (modalTitle) modalTitle.textContent = `Duty Statistics: ${dutyLabel}`;
+
+        const nw = Number(document.getElementById('nameWidth')?.value || 220);
+        const dw = Math.max(10, Number(document.getElementById('dayWidth')?.value || 34));
+
+        const rotaHdrs = Array.from(document.querySelectorAll('#rotaTable thead tr th'));
+        const hIdx     = rotaHdrs.findIndex(th => th.textContent.trim() === 'Hours');
+        const numDays  = hIdx > 0 ? hIdx - 1
+                       : getDaysInMonth(parseInt(document.getElementById('monthSelect').value, 10));
+
+        // Rebuild thead
+        if (thead) {
+          thead.innerHTML = '';
+          const nTh = document.createElement('th');
+          nTh.textContent = 'Staff';
+          nTh.style.cssText = `min-width:${nw}px;width:${nw}px;text-align:left;`;
+          thead.appendChild(nTh);
+          for (let d = 1; d <= numDays; d++) {
+            const th = document.createElement('th');
+            th.textContent = d;
+            th.style.cssText = `min-width:${dw}px;width:${dw}px;text-align:center;padding:4px 2px;`;
+            if (rotaHdrs[d]?.classList.contains('weekend')) th.classList.add('weekend');
+            thead.appendChild(th);
+          }
+          const tTh = document.createElement('th');
+          tTh.textContent = 'Total';
+          tTh.style.cssText = 'min-width:44px;text-align:center;';
+          thead.appendChild(tTh);
+        }
+
+        // Data rows for visible staff only
+        const visRows = Array.from(document.querySelectorAll('#rotaTable tbody tr'))
+          .filter(r => r.style.display !== 'none' &&
+                       (r.cells[0]?.querySelector('input')?.value || '').trim());
+        const dayCounts = new Array(numDays + 1).fill(0);
+
+        visRows.forEach(row => {
+          const name = row.cells[0]?.querySelector('input')?.value?.trim();
+          if (!name) return;
+          const tr = document.createElement('tr');
+          const nTd = document.createElement('td');
+          nTd.textContent = name;
+          nTd.style.cssText = `min-width:${nw}px;text-align:left;font-weight:600;`;
+          tr.appendChild(nTd);
+          let rowTotal = 0;
+          for (let ci = 1; ci <= numDays; ci++) {
+            let v = (row.cells[ci]?.textContent || '').trim().toUpperCase();
+            if (v.endsWith('_O')) v = v.slice(0, -2);
+            const hit = v === _dutyFilterCode;
+            const td  = document.createElement('td');
+            td.style.cssText = `min-width:${dw}px;width:${dw}px;text-align:center;padding:3px 1px;`;
+            if (hit) {
+              td.textContent = '✓';
+              td.style.background  = dutyColor;
+              td.style.color       = contrastColor(dutyColor);
+              td.style.fontWeight  = '700';
+              rowTotal++;
+              dayCounts[ci]++;
+            }
+            if (rotaHdrs[ci]?.classList.contains('weekend')) td.classList.add('weekend');
+            tr.appendChild(td);
+          }
+          const tTd = document.createElement('td');
+          tTd.textContent = rowTotal;
+          tTd.style.cssText = 'font-weight:700;text-align:center;color:#1a4f8b;';
+          tr.appendChild(tTd);
+          tbody.appendChild(tr);
+        });
+
+        // Daily count footer
+        const foot = document.createElement('tr');
+        foot.style.cssText = 'background:#edf4fb;border-top:2px solid #1a4f8b;font-weight:700;';
+        const fLabel = document.createElement('td');
+        fLabel.textContent = 'Daily Count';
+        fLabel.style.cssText = `min-width:${nw}px;color:#12324d;font-weight:700;`;
+        foot.appendChild(fLabel);
+        let grand = 0;
+        for (let ci = 1; ci <= numDays; ci++) {
+          const cnt = dayCounts[ci];
+          const td  = document.createElement('td');
+          td.textContent = cnt || '';
+          td.style.cssText = `min-width:${dw}px;text-align:center;${cnt?'color:#1a4f8b;font-weight:700;':''}`;
+          if (rotaHdrs[ci]?.classList.contains('weekend')) td.classList.add('weekend');
+          foot.appendChild(td);
+          grand += cnt;
+        }
+        const gTd = document.createElement('td');
+        gTd.textContent = grand;
+        gTd.style.cssText = 'font-weight:700;text-align:center;color:#1a4f8b;';
+        foot.appendChild(gTd);
+        tbody.appendChild(foot);
+        return;
+      }
+
+      // ── General statistics ───────────────────────────────────────────────────
+      if (modalTitle) modalTitle.textContent = 'Monthly Statistics';
+      if (thead) thead.innerHTML = '<th>Staff</th><th>Hours</th><th>Difference vs Target</th><th>Status</th>';
       Array.from(document.querySelectorAll('#rotaTable tbody tr')).forEach(row => {
         const name = row.cells[0]?.querySelector('input')?.value?.trim();
         if (!name) return;
@@ -2864,10 +2970,11 @@
     function applyDutyFilter(code) {
       if (_dutyFilterCode === code) {
         if (_dutyFilterLevel === 1) {
-          // 2nd double-click: escalate to cell-hiding
+          // 2nd double-click: escalate to cell-hiding + auto-open duty statistics
           _dutyFilterLevel = 2;
           _applyDimFilter();
           _updateDutyBadge();
+          openStatisticsPage();
           return;
         }
         // 3rd double-click: clear everything
