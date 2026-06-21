@@ -1330,7 +1330,8 @@
       const hTh  = document.createElement('th'); hTh.textContent  = 'Hours';       headerRow.appendChild(hTh);
       const sTh  = document.createElement('th'); sTh.className='sched-th'; sTh.textContent  = 'Sched. Type'; headerRow.appendChild(sTh);
       const otTh = document.createElement('th'); otTh.className='ot-th';   otTh.textContent = 'OT';          headerRow.appendChild(otTh);
-      const exTh = document.createElement('th'); exTh.className='ext-th';  exTh.textContent = 'Ext.';        headerRow.appendChild(exTh);
+      const exTh   = document.createElement('th'); exTh.className='ext-th';   exTh.textContent = 'Ext.';  headerRow.appendChild(exTh);
+      const noteTh = document.createElement('th'); noteTh.className='note-th'; noteTh.textContent = 'Note'; headerRow.appendChild(noteTh);
 
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name          = row.cells[0]?.querySelector('input')?.value || '';
@@ -1338,6 +1339,7 @@
         const otIsOverride  = row.querySelector('.ot-cell')?.dataset?.override === 'true';
         const otOverrideVal = otIsOverride ? (row.querySelector('.ot-val')?.textContent || null) : null;
         const extVal        = Number(row.querySelector('.ext-cell input')?.value) || 0;
+        const noteVal       = row.querySelector('.note-input')?.value || '';
         const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
         const codes = [];
         for (let i=1; i<hIdx; i++) codes.push(row.cells[i].textContent.trim());
@@ -1354,10 +1356,67 @@
         row.appendChild(buildSchedCell(schedVal));
         row.appendChild(buildOTCell(otOverrideVal, otIsOverride));
         row.appendChild(buildExtCell(extVal));
+        row.appendChild(buildNoteCell(noteVal));
         updateHours(row);
       });
       applyColumnWidths();
       updateDashboard();
+      updateNotesBtn();
+    }
+
+    function buildNoteCell(note='') {
+      const td  = document.createElement('td');
+      td.className = 'note-cell';
+      td.style.cssText = 'padding:2px 6px;vertical-align:middle;white-space:nowrap;';
+      const inp = document.createElement('input');
+      inp.type        = 'text';
+      inp.className   = 'note-input' + (note ? ' has-note' : '');
+      inp.maxLength   = 50;
+      inp.placeholder = 'Note…';
+      inp.value       = note;
+      inp.title       = note;
+      inp.addEventListener('input', function() {
+        this.title = this.value;
+        this.classList.toggle('has-note', this.value.length > 0);
+        updateNotesBtn();
+      });
+      td.appendChild(inp);
+      return td;
+    }
+
+    function updateNotesBtn() {
+      const hasAny = Array.from(document.querySelectorAll('#rotaTable .note-input'))
+                          .some(i => i.value.trim());
+      const btn = document.getElementById('notesOverviewBtn');
+      if (btn) btn.style.display = hasAny ? '' : 'none';
+    }
+
+    function openNotesOverview() {
+      const body = document.getElementById('notesModalBody');
+      if (!body) return;
+      const rows = Array.from(document.querySelectorAll('#rotaTable tbody tr'));
+      const notes = rows.map(r => ({
+        name: (r.cells[0]?.querySelector('input')?.value || '').trim(),
+        note: (r.querySelector('.note-input')?.value || '').trim()
+      })).filter(n => n.name && n.note);
+
+      if (!notes.length) {
+        body.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">No notes added yet.</p>';
+      } else {
+        body.innerHTML = notes.map(n => `
+          <div style="display:flex;gap:12px;align-items:baseline;padding:9px 0;
+                      border-bottom:1px solid #f3f4f6;">
+            <span style="font-size:12px;font-weight:700;color:#1f2937;min-width:160px;
+                         flex-shrink:0;">${n.name}</span>
+            <span style="font-size:12px;color:#92400e;background:#fffbeb;padding:3px 9px;
+                         border-radius:5px;border:1px solid #fde68a;">${n.note}</span>
+          </div>`).join('');
+      }
+      document.getElementById('notesModal').classList.add('show');
+    }
+
+    function closeNotesOverview() {
+      document.getElementById('notesModal').classList.remove('show');
     }
 
     function buildNameCell(rowRef, existingValue='') {
@@ -1603,6 +1662,7 @@
       tr.appendChild(buildSchedCell());
       tr.appendChild(buildOTCell());
       tr.appendChild(buildExtCell());
+      tr.appendChild(buildNoteCell());
       // Inherit comp type from area default
       const areaDefault = getAreaCompType(getCurrentArea());
       tr.dataset.compType = areaDefault;
@@ -2149,7 +2209,8 @@
         const otCalcRaw=parseFloat((otCell?.querySelector('.ot-val')?.textContent||'0').replace('+',''));
         const extension=Number(row.querySelector('.ext-cell input')?.value)||0;
         const compType=row.dataset.compType||'OT';
-        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, extension, compType});
+        const note=(row.querySelector('.note-input')?.value||'').trim().slice(0,50);
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, extension, compType, note});
       }
       return payload;
     }
@@ -2177,6 +2238,7 @@
         for (let i=1;i<hIdx;i++) { const v=(days[`day${i}`]||'').toUpperCase(); const bv=v.endsWith('_O')?v.slice(0,-2):v; if(DUTIES[bv]) applyDutyToCell(row.cells[i],v); }
         const sel=row.querySelector('.sched-cell select'); if(sel&&rec.schedType) sel.value=rec.schedType;
         if (rec.extension!=null) { const ei=row.querySelector('.ext-cell input'); if(ei) ei.value=String(Number(rec.extension)||0); }
+        if (rec.note) { const ni=row.querySelector('.note-input'); if(ni){ ni.value=rec.note; ni.title=rec.note; ni.classList.toggle('has-note', rec.note.length>0); } }
         updateHours(row);
         if (rec.otOverride!=null) {
           const otCell=row.querySelector('.ot-cell');
@@ -2201,6 +2263,7 @@
       if (!records.length) addNewRow();
       persistMonthlyTarget(); updateDashboard();
       sortStaffAlpha(true);
+      updateNotesBtn();
     }
 
     // ── Cloud Save / Load (primary workflow) ─────────────────────────────────
@@ -3277,6 +3340,7 @@
     document.getElementById('newAreaInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addNewArea(); });
     document.getElementById('abbreviationsModal').addEventListener('click',function(e){ if(e.target===this) closeAbbreviationsPage(); });
     document.getElementById('statisticsModal').addEventListener('click',function(e){ if(e.target===this) closeStatisticsPage(); });
+    document.getElementById('notesModal').addEventListener('click',function(e){ if(e.target===this) closeNotesOverview(); });
     document.getElementById('settingsModal').addEventListener('click',function(e){ if(e.target===this) closeSettingsModal(); });
     document.getElementById('mixedStdHours').addEventListener('input',()=>{ mixedStdHours=Number(document.getElementById('mixedStdHours').value)||0; recalculateAllOT(); });
 

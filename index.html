@@ -169,6 +169,17 @@
       background: #f1f5f9 !important;
     }
 
+    /* ── Row notes ───────────────────────────────────────────────────────────── */
+    .note-input {
+      border: none; border-bottom: 1px solid #e5e7eb; background: transparent;
+      font-size: 11px; padding: 2px 4px; width: 118px; color: #374151;
+      font-family: Arial, sans-serif; outline: none; box-sizing: border-box;
+    }
+    .note-input:focus  { border-bottom-color: #d97706; background: #fffbeb; }
+    .note-input.has-note { color: #92400e; border-bottom-color: #f59e0b; }
+    .note-input::placeholder { color: #d1d5db; }
+    @media print { .note-th, .note-cell { display: none !important; } }
+
     /* ── Active row highlight — name cell only ───────────────────────────────── */
     #rotaTable tbody tr.active-editing-row > td:first-child {
       background:#fef3c7 !important;
@@ -695,6 +706,17 @@
     </div>
   </div>
 
+  <!-- Notes overview modal -->
+  <div class="modal" id="notesModal">
+    <div class="modal-card" style="width:min(520px,96%);">
+      <div class="modal-header" style="background:linear-gradient(135deg,#d97706,#b45309);">
+        <h2>📝 Row Notes</h2>
+        <button type="button" class="btn-orange" onclick="closeNotesOverview()">✕</button>
+      </div>
+      <div class="modal-body" id="notesModalBody" style="padding:16px;"></div>
+    </div>
+  </div>
+
   <div class="modal" id="statisticsModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -848,6 +870,14 @@
       </div>
       <span id="rotaFilterCount" style="font-size:11px;font-weight:700;color:#1f4e79;white-space:nowrap;"></span>
     </div>
+
+    <!-- Notes overview button -->
+    <button type="button" id="notesOverviewBtn" onclick="openNotesOverview()"
+      style="background:#d97706;color:#fff;border:none;border-radius:8px;padding:6px 13px;
+             font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;display:none;"
+      title="View all row notes">
+      📝 Notes
+    </button>
 
     <!-- Leave types help button — shown only when leave codes are used in the rota -->
     <button type="button" id="leaveHelpBtn" onclick="openLeaveHelpModal()" style="display:none;
