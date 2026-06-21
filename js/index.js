@@ -1441,6 +1441,14 @@
       staffList.forEach(s => { const o = document.createElement('option'); o.value = s; datalist.appendChild(o); });
 
       input.value = existingValue;
+      input.addEventListener('dblclick', function(e) {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const name = this.value.trim();
+        if (!name) return;
+        SM.openEditByName(name);
+      });
+
       input.addEventListener('change', function() {
         staffList = loadStaffList();
         const v = this.value.trim();
@@ -3884,7 +3892,20 @@
       }
       function close() { document.getElementById("staffModal").style.display="none"; }
 
-      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal};
+      function openEditByName(name) {
+        const strip = s => s.replace(/\s*\(\d+\)\s*$/, '').trim().toLowerCase();
+        const doOpen = () => {
+          const n = name.trim().toLowerCase();
+          let idx = records.findIndex(r => r.name.trim().toLowerCase() === n);
+          if (idx < 0) idx = records.findIndex(r => strip(r.name) === strip(n));
+          if (idx < 0) { showStatusMessage('Staff record not found in Staff Management.', 'info'); return; }
+          openEditModal(idx);
+        };
+        if (!records.length) loadFromCloud().then(doOpen).catch(doOpen);
+        else doOpen();
+      }
+
+      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName};
     })();
 
     // ── Init ──────────────────────────────────────────────────────────────────
