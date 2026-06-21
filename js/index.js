@@ -1446,7 +1446,17 @@
         e.preventDefault();
         const name = this.value.trim();
         if (!name) return;
-        SM.openEditByName(name);
+        const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
+        if (!pwd) { SM.openEditByName(name); return; }
+        BCOT_AUTH.prompt(
+          'Enter the administrator password to edit staff properties.',
+          { title: '🔑 Staff Properties', placeholder: 'Admin password',
+            type: 'password', confirmLabel: 'Unlock' }
+        ).then(entered => {
+          if (entered === null) return;
+          if (entered.trim() !== pwd) { BCOT_AUTH.alert('Incorrect password.', 'Access Denied'); return; }
+          SM.openEditByName(name);
+        });
       });
 
       input.addEventListener('change', function() {
