@@ -205,6 +205,75 @@
     </div>`;
   }
 
+  // ── Summary page (last page — grand totals across all regular pages) ─────
+  function summaryPageHtml(groups, meta, mode) {
+    const showCost = mode !== 'noSR';
+    const pages = groups.map((g, gi) => ({
+      pageNum: gi + 1,
+      count:   g.length,
+      hours:   g.reduce((s,r) => s + r.otHours, 0),
+      cost:    g.reduce((s,r) => s + r.totalCost, 0),
+    }));
+    const grandCount = pages.reduce((s,p) => s + p.count, 0);
+    const grandHours = pages.reduce((s,p) => s + p.hours, 0);
+    const grandCost  = pages.reduce((s,p) => s + p.cost,  0);
+
+    let pageRows = '';
+    pages.forEach(p => {
+      pageRows += `<tr>
+        <td class="num" style="font-weight:600;">Page ${p.pageNum}</td>
+        <td class="num">${p.count}</td>
+        <td class="num">${p.hours}</td>
+        ${showCost ? `<td class="num">${fmt(p.cost)}</td>` : ''}
+      </tr>`;
+    });
+
+    return `<div class="print-page">
+      <div class="form-title">
+        <div class="main-title" style="color:#1a4f8b;">Monthly Overtime Pre-Approval — Grand Summary</div>
+        <div class="sub-title">
+          King Abdulaziz Medical City<br>National Guard Health Affairs<br>Western Region
+        </div>
+      </div>
+      <div class="meta-section">
+        <div class="meta-row">
+          <div class="meta-cell"><b>Department Name:</b>
+            <input type="text" class="meta-val" value="${esc(meta.dept)}" readonly/>
+          </div>
+          <div class="meta-cell"><span>Period covered:</span>
+            <input type="text" class="meta-val" value="${esc(meta.period)}" style="max-width:160px;" readonly/>
+          </div>
+        </div>
+        <div class="meta-row">
+          <div class="meta-cell"><b>Cost Center No:</b>
+            <input type="text" class="meta-val" value="${esc(meta.cost)}" style="max-width:180px;" readonly/>
+          </div>
+          <div class="meta-cell"><span>Total pages:</span>
+            <span class="meta-val" style="border:none;font-weight:700;">${groups.length}</span>
+          </div>
+        </div>
+      </div>
+      <table class="ot-table" style="margin-top:10px;">
+        <thead><tr>
+          <th style="width:20%;">Page</th>
+          <th style="width:20%;">Staff Count</th>
+          <th style="width:${showCost?'25':'60'}%;">Total Hours</th>
+          ${showCost ? '<th style="width:35%;">Total Cost (SR)</th>' : ''}
+        </tr></thead>
+        <tbody>
+          ${pageRows}
+          <tr class="total-row" style="background:#fef9c3;">
+            <td style="text-align:center;font-weight:900;">Grand Total</td>
+            <td class="num" style="font-weight:900;">${grandCount}</td>
+            <td class="num" style="font-weight:900;">${grandHours}</td>
+            ${showCost ? `<td class="num" style="font-weight:900;">${fmt(grandCost)} SR</td>` : ''}
+          </tr>
+        </tbody>
+      </table>
+      ${sigHtml(meta)}
+    </div>`;
+  }
+
   // ── Main form builder with pagination ────────────────────────────────────
   // mode: 'full'      → individual cost column + cost in total row (default)
   //       'noSR'      → no cost column, total hours only in total row
@@ -233,10 +302,9 @@
 
     groups.forEach((group, gi) => {
       const isFirst = gi === 0;
-      const isLast  = gi === totalPages - 1;
       const pageNum = gi + 1;
 
-      html += `<div class="print-page${isLast ? '' : ' page-break-after'}">`;
+      html += `<div class="print-page page-break-after">`;
 
       const pgBadge = totalPages > 1
         ? `<div style="position:absolute;top:0;right:0;font-size:9px;color:#888;font-style:italic;">
@@ -345,6 +413,7 @@
       html += `</div>`;  // end .print-page
     });
 
+    html += summaryPageHtml(groups, meta, mode);
     html += formFooterHtml();
     wrapper.innerHTML = html;
   }
