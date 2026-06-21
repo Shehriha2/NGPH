@@ -1357,6 +1357,10 @@
         row.appendChild(buildOTCell(otOverrideVal, otIsOverride));
         row.appendChild(buildExtCell(extVal));
         row.appendChild(buildNoteCell(noteVal));
+        if (noteVal) {
+          const dot = row.querySelector('.note-dot');
+          if (dot) { dot.classList.add('visible'); dot.title = noteVal; }
+        }
         updateHours(row);
       });
       applyColumnWidths();
@@ -1378,6 +1382,8 @@
       inp.addEventListener('input', function() {
         this.title = this.value;
         this.classList.toggle('has-note', this.value.length > 0);
+        const dot = this.closest('tr')?.querySelector('.note-dot');
+        if (dot) { dot.classList.toggle('visible', this.value.length > 0); dot.title = this.value || ''; }
         updateNotesBtn();
       });
       td.appendChild(inp);
@@ -1463,7 +1469,10 @@
         if (ok) { rowRef.remove(); updateDashboard(); }
       };
 
-      nameCell.appendChild(input); nameCell.appendChild(datalist); nameCell.appendChild(del);
+      const noteDot = document.createElement('span');
+      noteDot.className = 'note-dot';
+      noteDot.title = '';
+      nameCell.appendChild(input); nameCell.appendChild(datalist); nameCell.appendChild(noteDot); nameCell.appendChild(del);
       return nameCell;
     }
 
@@ -2238,7 +2247,12 @@
         for (let i=1;i<hIdx;i++) { const v=(days[`day${i}`]||'').toUpperCase(); const bv=v.endsWith('_O')?v.slice(0,-2):v; if(DUTIES[bv]) applyDutyToCell(row.cells[i],v); }
         const sel=row.querySelector('.sched-cell select'); if(sel&&rec.schedType) sel.value=rec.schedType;
         if (rec.extension!=null) { const ei=row.querySelector('.ext-cell input'); if(ei) ei.value=String(Number(rec.extension)||0); }
-        if (rec.note) { const ni=row.querySelector('.note-input'); if(ni){ ni.value=rec.note; ni.title=rec.note; ni.classList.toggle('has-note', rec.note.length>0); } }
+        if (rec.note) {
+          const ni=row.querySelector('.note-input');
+          if (ni) { ni.value=rec.note; ni.title=rec.note; ni.classList.toggle('has-note', rec.note.length>0); }
+          const dot=row.querySelector('.note-dot');
+          if (dot) { dot.classList.add('visible'); dot.title=rec.note; }
+        }
         updateHours(row);
         if (rec.otOverride!=null) {
           const otCell=row.querySelector('.ot-cell');

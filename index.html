@@ -178,6 +178,12 @@
     .note-input:focus  { border-bottom-color: #d97706; background: #fffbeb; }
     .note-input.has-note { color: #92400e; border-bottom-color: #f59e0b; }
     .note-input::placeholder { color: #d1d5db; }
+    .note-dot {
+      display: none; width: 8px; height: 8px; border-radius: 50%;
+      background: #d97706; flex-shrink: 0; cursor: default;
+      box-shadow: 0 0 0 2px #fff, 0 0 0 3px #d97706;
+    }
+    .note-dot.visible { display: inline-block; }
     @media print { .note-th, .note-cell { display: none !important; } }
 
     /* ── Active row highlight — name cell only ───────────────────────────────── */
