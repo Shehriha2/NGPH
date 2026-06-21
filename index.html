@@ -850,6 +850,17 @@
       📋 Leave Types
     </button>
 
+    <!-- Duty filter indicator — shown when a duty is double-clicked -->
+    <span id="dutyFilterBar" style="display:none;align-items:center;gap:6px;">
+      <span style="font-size:11px;color:#374151;font-weight:600;">Duty filter:</span>
+      <span id="dutyFilterSwatch" style="display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.2);vertical-align:middle;flex-shrink:0;"></span>
+      <span id="dutyFilterLabel" style="font-size:12px;font-weight:700;color:#1a4f8b;"></span>
+      <span id="dutyFilterCount" style="font-size:11px;color:#6b7280;"></span>
+      <button type="button" onclick="clearDutyFilter()" title="Clear duty filter (Esc)"
+        style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:3px 10px;
+               font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✕ Clear</button>
+    </span>
+
     <!-- OT unlock indicator — hidden until password entered -->
     <span id="otUnlockBar" style="display:none;align-items:center;gap:8px;">
       <span style="background:#7c3aed;color:#fff;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px;">🔓 OT Override: ON</span>

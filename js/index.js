@@ -1810,6 +1810,7 @@
 
     document.addEventListener('keydown',(e)=>{
       if (e.key==='Escape'&&patternModeArmed) { patternModeArmed=false; setPatternIndicator(false); showStatusMessage('Pattern mode cancelled','info'); return; }
+      if (e.key==='Escape'&&_dutyFilterCode)  { clearDutyFilter(); return; }
       if (!pendingDelete) return;
       if (Date.now()>pendingDelete.expiresAt) { pendingDelete=null; return; }
       const k=e.key;
@@ -1822,6 +1823,13 @@
       const td=document.createElement('td'); td.contentEditable=true;
       td.addEventListener('focus',function(){ patternStartCell=this; });
       td.addEventListener('click',function(){ patternStartCell=this; if(patternModeArmed) startSimplePatternFill(this); });
+      td.addEventListener('dblclick',function(){
+        let v=(this.textContent||'').trim().toUpperCase();
+        if(!v)return;
+        const base=v.endsWith('_O')?v.slice(0,-2):v;
+        if(!DUTIES[base])return;
+        applyDutyFilter(base);
+      });
       td.addEventListener('input',function(e){ scheduleCellProcess(e.target); });
       td.addEventListener('keydown',function(e){
         // Tab on last day cell → jump to next row's first day cell (skip hours/sched/OT)
@@ -2796,7 +2804,7 @@
         const hasName = rawName.length > 0;
         if (hasName) total++;
 
-        if (!query) {
+        if (!query && !_dutyFilterCode) {
           row.style.display = '';
           if (hasName) visible++;
           return;
@@ -2811,10 +2819,25 @@
         const badgeInName = (nameLower.match(/\((\d+)\)/) || [])[1] || '';
         const badge = badgeLookup || badgeInName;
 
-        const match = nameStripped.includes(query) ||
-                      nameLower.includes(query)    ||
-                      (badge && badge.includes(query));
+        const nameMatch = !query ||
+                          nameStripped.includes(query) ||
+                          nameLower.includes(query)    ||
+                          (badge && badge.includes(query));
 
+        // Duty filter: row must contain _dutyFilterCode at least once
+        let dutyMatch = true;
+        if (_dutyFilterCode) {
+          const hCell = row.querySelector('.hours-cell');
+          const hIdx  = hCell ? Array.from(row.cells).indexOf(hCell) : row.cells.length;
+          dutyMatch = false;
+          for (let ci = 1; ci < hIdx; ci++) {
+            let v = (row.cells[ci]?.textContent || '').trim().toUpperCase();
+            if (v.endsWith('_O')) v = v.slice(0, -2);
+            if (v === _dutyFilterCode) { dutyMatch = true; break; }
+          }
+        }
+
+        const match = nameMatch && dutyMatch;
         row.style.display = match ? '' : 'none';
         if (match) visible++;
       });
@@ -2832,6 +2855,38 @@
       if (inp) inp.value = '';
       filterRota();
       inp?.focus();
+    }
+
+    // ── Duty double-click filter ──────────────────────────────────────────────
+    let _dutyFilterCode = null;
+
+    function applyDutyFilter(code) {
+      if (_dutyFilterCode === code) { clearDutyFilter(); return; }
+      _dutyFilterCode = code;
+      filterRota();
+
+      // Update badge
+      const bar    = document.getElementById('dutyFilterBar');
+      const swatch = document.getElementById('dutyFilterSwatch');
+      const label  = document.getElementById('dutyFilterLabel');
+      const countEl = document.getElementById('dutyFilterCount');
+      const duty   = DUTIES[code];
+      if (bar)    { bar.style.display = 'flex'; }
+      if (label)  { label.textContent = code + (duty?.label ? ' — ' + duty.label : ''); }
+      if (swatch) { swatch.style.background = duty?.color || '#1a4f8b'; }
+
+      const rows    = Array.from(document.querySelectorAll('#rotaTable tbody tr'));
+      const total   = rows.filter(r => (r.cells[0]?.querySelector('input')?.value || '').trim()).length;
+      const visible = rows.filter(r => r.style.display !== 'none' &&
+                                       (r.cells[0]?.querySelector('input')?.value || '').trim()).length;
+      if (countEl) countEl.textContent = `${visible} / ${total} staff`;
+    }
+
+    function clearDutyFilter() {
+      _dutyFilterCode = null;
+      const bar = document.getElementById('dutyFilterBar');
+      if (bar) bar.style.display = 'none';
+      filterRota();
     }
 
     // ── Active row highlight + staff name banner ──────────────────────────────
