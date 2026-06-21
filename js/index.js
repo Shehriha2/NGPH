@@ -2858,32 +2858,72 @@
     }
 
     // ── Duty double-click filter ──────────────────────────────────────────────
-    let _dutyFilterCode = null;
+    let _dutyFilterCode  = null;
+    let _dutyFilterLevel = 0;   // 0=off  1=rows only  2=rows + hide other cells
 
     function applyDutyFilter(code) {
-      if (_dutyFilterCode === code) { clearDutyFilter(); return; }
-      _dutyFilterCode = code;
+      if (_dutyFilterCode === code) {
+        if (_dutyFilterLevel === 1) {
+          // 2nd double-click: escalate to cell-hiding
+          _dutyFilterLevel = 2;
+          _applyDimFilter();
+          _updateDutyBadge();
+          return;
+        }
+        // 3rd double-click: clear everything
+        clearDutyFilter();
+        return;
+      }
+      // First double-click on a new duty: row filter only
+      _removeDimFilter();
+      _dutyFilterCode  = code;
+      _dutyFilterLevel = 1;
       filterRota();
+      _updateDutyBadge();
+    }
 
-      // Update badge
-      const bar    = document.getElementById('dutyFilterBar');
-      const swatch = document.getElementById('dutyFilterSwatch');
-      const label  = document.getElementById('dutyFilterLabel');
+    function _updateDutyBadge() {
+      const bar     = document.getElementById('dutyFilterBar');
+      const swatch  = document.getElementById('dutyFilterSwatch');
+      const label   = document.getElementById('dutyFilterLabel');
       const countEl = document.getElementById('dutyFilterCount');
-      const duty   = DUTIES[code];
-      if (bar)    { bar.style.display = 'flex'; }
-      if (label)  { label.textContent = code + (duty?.label ? ' — ' + duty.label : ''); }
-      if (swatch) { swatch.style.background = duty?.color || '#1a4f8b'; }
-
+      const duty    = DUTIES[_dutyFilterCode];
+      if (bar)   bar.style.display = 'flex';
+      if (swatch) swatch.style.background = duty?.color || '#1a4f8b';
+      if (label) {
+        const base = _dutyFilterCode + (duty?.label ? ' — ' + duty.label : '');
+        label.textContent = _dutyFilterLevel === 2 ? base + ' · cells hidden' : base;
+      }
       const rows    = Array.from(document.querySelectorAll('#rotaTable tbody tr'));
-      const total   = rows.filter(r => (r.cells[0]?.querySelector('input')?.value || '').trim()).length;
+      const total   = rows.filter(r => (r.cells[0]?.querySelector('input')?.value||'').trim()).length;
       const visible = rows.filter(r => r.style.display !== 'none' &&
-                                       (r.cells[0]?.querySelector('input')?.value || '').trim()).length;
+                                       (r.cells[0]?.querySelector('input')?.value||'').trim()).length;
       if (countEl) countEl.textContent = `${visible} / ${total} staff`;
     }
 
+    function _applyDimFilter() {
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        if (row.style.display === 'none') return;
+        const hCell = row.querySelector('.hours-cell');
+        const hIdx  = hCell ? Array.from(row.cells).indexOf(hCell) : row.cells.length;
+        for (let ci = 1; ci < hIdx; ci++) {
+          const cell = row.cells[ci]; if (!cell) continue;
+          let v = (cell.textContent || '').trim().toUpperCase();
+          if (v.endsWith('_O')) v = v.slice(0, -2);
+          if (v !== _dutyFilterCode) cell.classList.add('duty-cell-dimmed');
+        }
+      });
+    }
+
+    function _removeDimFilter() {
+      document.querySelectorAll('#rotaTable td.duty-cell-dimmed')
+        .forEach(td => td.classList.remove('duty-cell-dimmed'));
+    }
+
     function clearDutyFilter() {
-      _dutyFilterCode = null;
+      _dutyFilterCode  = null;
+      _dutyFilterLevel = 0;
+      _removeDimFilter();
       const bar = document.getElementById('dutyFilterBar');
       if (bar) bar.style.display = 'none';
       filterRota();
