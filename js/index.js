@@ -1313,6 +1313,17 @@
     function closeStatisticsPage()    { document.getElementById('statisticsModal').classList.remove('show'); }
     function openSettingsModal()      { document.getElementById('settingsModal').classList.add('show'); try{ updateDashboard(); }catch(e){ console.warn('dashboard update:',e); } }
     function closeSettingsModal()     { document.getElementById('settingsModal').classList.remove('show'); }
+    function openSettingsWithAuth() {
+      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
+      if (!pwd) { openSettingsModal(); return; }
+      BCOT_AUTH.prompt('Enter the administrator password to access Settings & Tools.',
+        { title: '🔑 Settings & Tools', placeholder: 'Admin password', type: 'password', confirmLabel: 'Unlock' })
+        .then(entered => {
+          if (entered === null) return;
+          if (entered.trim() !== pwd) { BCOT_AUTH.alert('Incorrect password.', 'Access Denied'); return; }
+          openSettingsModal();
+        });
+    }
 
     // ── Calendar ──────────────────────────────────────────────────────────────
     function getDaysInMonth(month) { return new Date(new Date().getFullYear(), month, 0).getDate(); }
