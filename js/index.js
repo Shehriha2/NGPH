@@ -989,6 +989,10 @@
       await reloadDutiesFromStorage();
       await populateStaff();
       updateDashboard();
+      // Update lock for the new area
+      const _y = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
+      const _m = String(document.getElementById('monthSelect')?.value||'1').padStart(2,'0');
+      LockManager.onRotaChange(area, `${_y}-${_m}`);
     }
 
     function getAreaOrWarn() {
@@ -2013,7 +2017,7 @@
     });
 
     function createDayCell() {
-      const td=document.createElement('td'); td.contentEditable=true;
+      const td=document.createElement('td'); td.contentEditable=_rotaLocked?'false':'true';
       td.addEventListener('focus',function(){ patternStartCell=this; });
       td.addEventListener('click',function(){ patternStartCell=this; if(patternModeArmed) startSimplePatternFill(this); });
       td.addEventListener('dblclick',function(e){
@@ -2035,7 +2039,7 @@
         }
         applyDutyFilter(base);
       });
-      td.addEventListener('input',function(e){ scheduleCellProcess(e.target); });
+      td.addEventListener('input',function(e){ LockManager.nudge(); scheduleCellProcess(e.target); });
       td.addEventListener('keydown',function(e){
         // Tab on last day cell → jump to next row's first day cell (skip hours/sched/OT)
         if (e.key==='Tab' && !e.shiftKey) {
@@ -3070,6 +3074,9 @@
       inp?.focus();
     }
 
+    // ── Collaborative lock state (set by LockManager) ────────────────────────
+    let _rotaLocked = false;
+
     // ── Duty double-click filter ──────────────────────────────────────────────
     let _dutyFilterCode  = null;
     let _dutyFilterLevel = 0;   // 0=off  1=rows only  2=rows + hide other cells
@@ -3375,10 +3382,216 @@
       });
     })();
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // ROTA LOCK MANAGER  (LockManager namespace)
+    // One user holds an editing lock on area+month at a time. Others see readonly.
+    // Lock stored in Firestore: bcot_overtime_secure/[KEY]/rota_locks/[area_YYYY-MM]
+    // ══════════════════════════════════════════════════════════════════════════
+    const LockManager = (() => {
+      const COLL    = 'rota_locks';
+      const SID     = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const DUR_KEY = 'BCOT_LOCK_DUR_V1';
+
+      let _sub  = null;   // Firestore unsubscribe
+      let _tick = null;   // countdown setInterval
+      let _ext  = null;   // auto-extend setInterval
+      let _area = null;
+      let _ym   = null;   // "YYYY-MM"
+      let _lock = null;   // Firestore doc data or null
+      let _act  = Date.now();
+
+      // ── Tiny helpers ─────────────────────────────────────────────────────
+      const _key  = () => (window.BCOT_APP_KEY||'').trim();
+      const _dur  = () => Math.max(60, Math.min(3600, Number(localStorage.getItem(DUR_KEY))||600));
+      const _lid  = () => `${_area}_${_ym}`;
+      const _ref  = () => { const k=_key(); return k?window.FB.doc(window.FB.db,'bcot_overtime_secure',k,COLL,_lid()):null; };
+      const _exp  = l => !l||!l.expiresAt||new Date(l.expiresAt)<=new Date();
+      const _mine = l => !!(l&&l.sessionId===SID);
+      const _secs = l => Math.max(0,l&&l.expiresAt?Math.round((new Date(l.expiresAt)-Date.now())/1000):0);
+      const _fmt  = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+
+      function _who() {
+        try { const s=JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{}; return [s.nameTitle,s.name].filter(Boolean).join(' ')||s.name||'Unknown'; } catch { return 'Unknown'; }
+      }
+      function _uid() {
+        try { return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')?.id||SID; } catch { return SID; }
+      }
+
+      // ── Write / extend ────────────────────────────────────────────────────
+      async function _write() {
+        const ref=_ref(); if(!ref) return null;
+        const dur=_dur();
+        const d={ sessionId:SID, userId:_uid(), displayName:_who(),
+                  lockedAt:new Date().toISOString(),
+                  expiresAt:new Date(Date.now()+dur*1000).toISOString(), duration:dur };
+        await window.FB.setDoc(ref,d);
+        return d;
+      }
+      async function _doExt() {
+        const ref=_ref(); if(!ref||!_mine(_lock)) return;
+        const ex=new Date(Date.now()+_dur()*1000).toISOString();
+        await window.FB.setDoc(ref,{expiresAt:ex},{merge:true});
+        if(_lock) _lock.expiresAt=ex;
+      }
+
+      // ── Timers ────────────────────────────────────────────────────────────
+      function _stopT() {
+        if(_tick){clearInterval(_tick);_tick=null;}
+        if(_ext) {clearInterval(_ext); _ext=null; }
+      }
+      function _startT() {
+        _stopT();
+        const half=Math.max(30,Math.floor(_dur()*0.5))*1000;
+        _ext=setInterval(async()=>{
+          if(!_mine(_lock)){_stopT();return;}
+          if(Date.now()-_act<_dur()*1000) await _doExt();
+        },half);
+        _tick=setInterval(()=>{
+          const el=document.getElementById('_lkCd');
+          if(el&&_lock){ const s=_secs(_lock); el.textContent=` — ${_fmt(s)} left`; }
+          if(_lock&&_exp(_lock)&&!_mine(_lock)){
+            _lock=null; _setReadonly(false); _renderBar();
+          }
+        },1000);
+      }
+
+      // ── Apply readonly ────────────────────────────────────────────────────
+      function _setReadonly(on) {
+        _rotaLocked=on;
+        const tbl=document.getElementById('rotaTable');
+        const ov=document.getElementById('_lkOv');
+        if(tbl){
+          tbl.classList.toggle('rota-readonly',on);
+          tbl.querySelectorAll('td[contenteditable]').forEach(td=>{ td.contentEditable=on?'false':'true'; });
+        }
+        if(ov) ov.style.display=on?'block':'none';
+      }
+
+      // ── Render status bar ─────────────────────────────────────────────────
+      function _renderBar() {
+        const bar=document.getElementById('lockStatusBar');
+        if(!bar) return;
+        bar.style.display='flex';
+        const durMin=Math.round(_dur()/60);
+        const durWidget=`<span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11px;color:#9ca3af;">
+          Lock: <input type="number" id="_lkDurIn" min="1" max="60" value="${durMin}"
+            style="width:40px;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;text-align:center;"
+            onchange="LockManager.setDur(this.value)" title="Lock duration in minutes"/>min
+          </span>`;
+        const active=_lock&&!_exp(_lock);
+        if(!active){
+          bar.innerHTML=`<span style="color:#16a34a;font-size:12px;font-weight:600;">🔓 Rota is free to edit</span>${durWidget}`;
+          return;
+        }
+        if(_mine(_lock)){
+          bar.innerHTML=`
+            <span style="color:#2563eb;font-size:12px;font-weight:600;">🔒 Locked by you</span>
+            <span id="_lkCd" style="font-size:11px;color:#6b7280;"> — ${_fmt(_secs(_lock))} left</span>
+            <button onclick="LockManager.extend()" title="Reset timer to ${durMin} min"
+              style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">⏰ +${durMin}min</button>
+            <button onclick="LockManager.release()"
+              style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">🔓 Release</button>
+            ${durWidget}`;
+        } else {
+          const who=_lock.displayName||'another user';
+          bar.innerHTML=`
+            <span style="color:#dc2626;font-size:12px;font-weight:700;">🔒 Locked by <b>${who}</b></span>
+            <span id="_lkCd" style="font-size:11px;color:#6b7280;"> — ${_fmt(_secs(_lock))} left</span>
+            <span style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;white-space:nowrap;">👁 View only</span>
+            <button onclick="LockManager.recheck()" title="Check if lock has been released"
+              style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">🔄 Refresh</button>
+            ${durWidget}`;
+        }
+      }
+
+      // ── Firestore snapshot callback ────────────────────────────────────────
+      function _onSnap(snap) {
+        const data=snap.exists()?snap.data():null;
+        const valid=data&&!_exp(data);
+        if(!valid){
+          if(_mine(_lock)){ _stopT(); }
+          _lock=null; _setReadonly(false);
+        } else {
+          if(_mine(data)){
+            _lock=data;
+            if(!_ext) _startT();
+            _setReadonly(false);
+          } else {
+            if(_mine(_lock)) _stopT();
+            _lock=data;
+            _setReadonly(true);
+          }
+        }
+        _renderBar();
+      }
+
+      // ── Public API ────────────────────────────────────────────────────────
+      async function onRotaChange(area,ym) {
+        if(_mine(_lock)) await release();
+        else if(_sub){_sub();_sub=null;}
+        _area=area; _ym=ym; _lock=null; _stopT();
+        _setReadonly(false); _renderBar();
+        const ref=_ref(); if(!ref) return;
+        _sub=window.FB.onSnapshot(ref,_onSnap,e=>console.warn('LockManager:',e));
+        await _acquire();
+      }
+
+      async function _acquire() {
+        const ref=_ref(); if(!ref) return;
+        try {
+          const snap=await window.FB.getDoc(ref);
+          const ex=snap.exists()?snap.data():null;
+          if(ex&&!_exp(ex)&&!_mine(ex)){
+            _lock=ex; _setReadonly(true); _renderBar(); return;
+          }
+          const d=await _write();
+          _lock=d; _startT(); _setReadonly(false); _renderBar();
+        } catch(e){ console.warn('LockManager acquire:',e); }
+      }
+
+      async function release() {
+        _stopT();
+        const ref=_ref();
+        if(ref&&_mine(_lock)){
+          try { await window.FB.setDoc(ref,{expiresAt:new Date(0).toISOString()},{merge:true}); } catch{}
+        }
+        _lock=null; _setReadonly(false); _renderBar();
+      }
+
+      async function extend() {
+        await _doExt(); _renderBar();
+        showStatusMessage(`Lock extended by ${Math.round(_dur()/60)} min ✅`);
+      }
+
+      function setDur(mins) {
+        const s=Math.max(60,Math.min(3600,Math.round(Number(mins)||10)*60));
+        localStorage.setItem(DUR_KEY,String(s));
+      }
+
+      function nudge() { _act=Date.now(); }
+
+      async function recheck() {
+        const ref=_ref(); if(!ref) return;
+        try { const snap=await window.FB.getDoc(ref); _onSnap(snap); } catch{}
+      }
+
+      function blockMsg() {
+        const who=_lock?.displayName||'another user';
+        showStatusMessage(`Rota is locked for editing by ${who} — view only mode.`,'error');
+      }
+
+      return { onRotaChange, release, extend, setDur, nudge, recheck, blockMsg };
+    })();
+
     // ── Event listeners ───────────────────────────────────────────────────────
     document.getElementById('nameWidth').addEventListener('input',applyColumnWidths);
     document.getElementById('dayWidth').addEventListener('input',applyColumnWidths);
-    document.getElementById('monthSelect').addEventListener('change',()=>{ updateTable(); updateRotaLabel(); });
+    document.getElementById('monthSelect').addEventListener('change',()=>{
+      updateTable(); updateRotaLabel();
+      const _y=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
+      const _m=String(document.getElementById('monthSelect').value).padStart(2,'0');
+      LockManager.onRotaChange(getCurrentArea(),`${_y}-${_m}`);
+    });
     document.getElementById('monthlyTarget').addEventListener('input',persistMonthlyTarget);
     document.getElementById('rotaTitleInput').addEventListener('input',updateDashboard);
     document.getElementById('newAreaInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addNewArea(); });
@@ -4091,6 +4304,11 @@
       injectDutyStyles();
       buildLegend();
       updateTable();
+      // Initialize lock for current area + month
+      { const _ly=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
+        const _lm=String(document.getElementById('monthSelect')?.value||'1').padStart(2,'0');
+        LockManager.onRotaChange(getCurrentArea(),`${_ly}-${_lm}`); }
+      window.addEventListener('beforeunload',()=>LockManager.release());
 
       // Restore any unsaved rota work from the draft (e.g. after navigating to Duties.html and back)
       const restored = restoreDraft();
