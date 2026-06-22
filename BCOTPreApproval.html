@@ -68,11 +68,11 @@
       border:1px solid #333; padding:4px 5px; font-size:11px; vertical-align:middle;
     }
     .ot-table td.num{ text-align:center; }
-    .ot-table td.loc select{
+    .ot-table td.just input,
+    .ot-table td.loc input{
       width:100%; border:none; background:transparent; font-size:11px;
       font-family:Arial,sans-serif; outline:none; padding:0; cursor:pointer;
     }
-    .ot-table td.loc select:focus{ background:#fffde7; }
     .ot-table td.just{ font-size:10.5px; color:#374151; }
     .total-row td{ font-weight:700; font-size:11px; }
 
@@ -178,8 +178,7 @@
       }
       .sig-row1{ margin-bottom:16mm; }
 
-      /* Location dropdown: print selected text only */
-      .ot-table td.loc select{ -webkit-appearance:none; appearance:none; }
+      .picker-trigger::placeholder{ color:transparent !important; }
 
       .form-footer{
         position:fixed; bottom:10px; left:0; right:0;
@@ -316,6 +315,7 @@
   window.FB = { db, doc, getDoc, collection, getDocs };
 </script>
 
+<script src="js/preapproval_picker.js"></script>
 <script src="js/bcotpreapproval.js"></script>
 </body>
 </html>

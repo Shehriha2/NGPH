@@ -350,8 +350,8 @@
             <td>${esc(stripBadge(r.name))}</td>
             <td class="num">${r.otHours}</td>
             <td class="num">${fmt(r.totalCost)}</td>
-            <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
-            <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
+            ${_locCell(r)}
+            ${_justCell(r)}
           </tr>`;
         } else if (mode === 'noSR') {
           html += `<tr>
@@ -359,8 +359,8 @@
             <td class="num">${esc(r.badge)}</td>
             <td>${esc(stripBadge(r.name))}</td>
             <td class="num">${r.otHours}</td>
-            <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
-            <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
+            ${_locCell(r)}
+            ${_justCell(r)}
           </tr>`;
         } else {
           /* totalOnly — 7-column layout, SR cell blank per row */
@@ -370,8 +370,8 @@
             <td>${esc(stripBadge(r.name))}</td>
             <td class="num">${r.otHours}</td>
             <td class="num"></td>
-            <td class="loc"><input type="text" value="KASCH" placeholder="Location"/></td>
-            <td class="just"><input type="text" value="WEEKEND DUTY" placeholder="Justification"/></td>
+            ${_locCell(r)}
+            ${_justCell(r)}
           </tr>`;
         }
       });
@@ -418,6 +418,25 @@
     wrapper.innerHTML = html;
   }
 
+  // ── Picker-trigger cell helpers ───────────────────────────────────────────
+  const _PT = 'cursor:pointer;caret-color:transparent;width:100%;border:none;background:transparent;font-size:11px;font-family:Arial,sans-serif;outline:none;padding:0;';
+  function _locCell(r) {
+    return `<td class="loc"><input type="text" class="picker-trigger" value="${esc(r.loc||'')}" placeholder="📍 Click to select…" readonly style="${_PT}"/></td>`;
+  }
+  function _justCell(r) {
+    return `<td class="just"><input type="text" class="picker-trigger" value="${esc(r.just||'')}" placeholder="📋 Click to select…" readonly style="${_PT}"/></td>`;
+  }
+  function _snapRowSelections() {
+    if (!_cachedRows) return;
+    document.querySelectorAll('#formWrapper .ot-table tbody tr').forEach(tr => {
+      if (tr.classList.contains('total-row')) return;
+      const idx = parseInt(tr.cells[0]?.textContent || '0') - 1;
+      if (idx < 0 || idx >= _cachedRows.length) return;
+      _cachedRows[idx].loc  = tr.querySelector('td.loc  .picker-trigger')?.value || '';
+      _cachedRows[idx].just = tr.querySelector('td.just .picker-trigger')?.value || '';
+    });
+  }
+
   // ── Shared helper: snapshot current meta field values ─────────────────────
   function _snapMeta() {
     return {
@@ -437,6 +456,7 @@
   // ── Print without SR column (hours only) ─────────────────────────────────
   function printNoSR() {
     if (!_cachedRows) { showStatus('Build the form first before printing.', false); return; }
+    _snapRowSelections();
     const meta = _snapMeta();
     buildForm(_cachedRows, _cachedArea, meta, 'noSR');
     window.print();
@@ -446,6 +466,7 @@
   // ── Print hours per person + total SR amount only (no individual amounts) ─
   function printTotalSR() {
     if (!_cachedRows) { showStatus('Build the form first before printing.', false); return; }
+    _snapRowSelections();
     const meta = _snapMeta();
     buildForm(_cachedRows, _cachedArea, meta, 'totalOnly');
     window.print();
@@ -536,7 +557,7 @@
       const totalCost=Math.round(otHours*hrr*1.5);   // integer SAR — ensures page total = sum of displayed rows
       const staffRec=staffRecs.find(s=>s.name.trim()===name);
       const badge=staffRec?.badge||'—';
-      rows.push({ name, badge, otHours, totalCost, hrr });
+      rows.push({ name, badge, otHours, totalCost, hrr, loc: '', just: '' });
     });
 
     buildForm(rows, area, meta);
@@ -548,4 +569,25 @@
     buildAreaSelect();
     document.getElementById("monthSel").value=String(new Date().getMonth()+1);
     document.getElementById("yearSel").value=String(new Date().getFullYear());
+
+    document.getElementById('formWrapper').addEventListener('click', function(e) {
+      const inp = e.target.closest('.picker-trigger');
+      if (!inp || typeof PreApprovalPicker === 'undefined') return;
+      const row = inp.closest('tr'); if (!row) return;
+      const locInp  = row.querySelector('td.loc  .picker-trigger');
+      const justInp = row.querySelector('td.just .picker-trigger');
+      PreApprovalPicker.open({
+        currentLoc:  locInp?.value  || '',
+        currentJust: justInp?.value || '',
+        onConfirm: (loc, just, applyAll) => {
+          if (applyAll) {
+            document.querySelectorAll('#formWrapper td.loc  .picker-trigger').forEach(i => { i.value = loc;  });
+            document.querySelectorAll('#formWrapper td.just .picker-trigger').forEach(i => { i.value = just; });
+          } else {
+            if (locInp)  locInp.value  = loc;
+            if (justInp) justInp.value = just;
+          }
+        }
+      });
+    });
   })();

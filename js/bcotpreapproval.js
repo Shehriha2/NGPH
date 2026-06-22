@@ -276,14 +276,15 @@
 
       html += tableHeaderHtml();
 
+      const _PT = 'cursor:pointer;caret-color:transparent;width:100%;border:none;background:transparent;font-size:11px;font-family:Arial,sans-serif;outline:none;padding:0;';
       group.forEach(r => {
         html += `<tr>
           <td class="num">${seq++}</td>
           <td class="num">${esc(r.badge)}</td>
           <td>${esc(stripBadge(r.name))}</td>
           <td class="num">${r.hours}</td>
-          <td class="loc">${locationInputHtml(r.location)}</td>
-          <td class="just">${esc(BC_JUSTIFICATION)}</td>
+          <td class="loc"><input type="text" class="picker-trigger" value="${esc(r.loc||'')}" placeholder="📍 Click to select…" readonly style="${_PT}"/></td>
+          <td class="just"><input type="text" class="picker-trigger" value="${esc(r.just||'')}" placeholder="📋 Click to select…" readonly style="${_PT}"/></td>
         </tr>`;
       });
 
@@ -390,7 +391,7 @@
       const firebaseExt = extMap[name] || 0;
       const ext         = firebaseExt > 0 ? firebaseExt : (Number(rec.extension)||0);
       const combined    = ext > 0 ? Math.ceil(hours + ext) : hours;
-      rows.push({ name, badge, hours: combined, location });
+      rows.push({ name, badge, hours: combined, loc: location, just: BC_JUSTIFICATION });
     });
 
     if (!rows.length) {
@@ -406,4 +407,25 @@
   (function init(){
     document.getElementById("monthSel").value = String(new Date().getMonth()+1);
     document.getElementById("yearSel").value  = String(new Date().getFullYear());
+
+    document.getElementById('formWrapper').addEventListener('click', function(e) {
+      const inp = e.target.closest('.picker-trigger');
+      if (!inp || typeof PreApprovalPicker === 'undefined') return;
+      const row = inp.closest('tr'); if (!row) return;
+      const locInp  = row.querySelector('td.loc  .picker-trigger');
+      const justInp = row.querySelector('td.just .picker-trigger');
+      PreApprovalPicker.open({
+        currentLoc:  locInp?.value  || '',
+        currentJust: justInp?.value || '',
+        onConfirm: (loc, just, applyAll) => {
+          if (applyAll) {
+            document.querySelectorAll('#formWrapper td.loc  .picker-trigger').forEach(i => { i.value = loc;  });
+            document.querySelectorAll('#formWrapper td.just .picker-trigger').forEach(i => { i.value = just; });
+          } else {
+            if (locInp)  locInp.value  = loc;
+            if (justInp) justInp.value = just;
+          }
+        }
+      });
+    });
   })();
