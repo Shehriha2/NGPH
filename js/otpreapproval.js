@@ -258,7 +258,7 @@
           <th style="width:20%;">Page</th>
           <th style="width:20%;">Staff Count</th>
           <th style="width:${showCost?'25':'60'}%;">Total Hours</th>
-          ${showCost ? '<th style="width:35%;">Total Cost (SR)</th>' : ''}
+          ${showCost ? '<th style="width:35%;">Total Cost (﷼)</th>' : ''}
         </tr></thead>
         <tbody>
           ${pageRows}
@@ -266,7 +266,7 @@
             <td style="text-align:center;font-weight:900;">Grand Total</td>
             <td class="num" style="font-weight:900;">${grandCount}</td>
             <td class="num" style="font-weight:900;">${grandHours}</td>
-            ${showCost ? `<td class="num" style="font-weight:900;">${fmt(grandCost)} SR</td>` : ''}
+            ${showCost ? `<td class="num" style="font-weight:900;">${fmt(grandCost)} ﷼</td>` : ''}
           </tr>
         </tbody>
       </table>
@@ -397,7 +397,7 @@
         html += `<tr class="total-row">
           <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/Cost</td>
           <td class="num" style="font-weight:900;">${pageHours}</td>
-          <td class="num" style="font-weight:900;">${fmt(pageTotal)} SR</td>
+          <td class="num" style="font-weight:900;">${fmt(pageTotal)} ﷼</td>
           <td colspan="2" class="total-note">
             The overtime amount is _______ the ceiling that is defined through the formula to practice,
             fig#1, which was mentioned in the approved minutes of the meeting, JED-16-029120-99492.
@@ -606,7 +606,7 @@
           <th style="text-align:left;padding:8px;width:40%;">Area</th>
           <th style="text-align:center;padding:8px;width:20%;">Staff Count</th>
           <th style="text-align:center;padding:8px;width:20%;">Total Hours</th>
-          <th style="text-align:center;padding:8px;width:20%;">Total Cost (SR)</th>
+          <th style="text-align:center;padding:8px;width:20%;">Total Cost (﷼)</th>
         </tr></thead>
         <tbody>
           ${rowsHtml}
