@@ -73,7 +73,20 @@
     <input id="newAreaInput" type="text" placeholder="New area (e.g. ACC)"
       style="width:120px;text-transform:uppercase"/>
     <button type="button" onclick="addNewArea()">Add Area</button>
-    <span class="hint">New duties get the selected area tag. "All Areas" shows everything.</span>
+
+    <div style="display:flex;align-items:center;background:#fff;border:1px solid #c7d2fe;border-radius:7px;padding:0 8px;gap:5px;margin-left:10px;">
+      <span style="color:#6b7280;font-size:13px;">🔍</span>
+      <input id="dutySearch" type="text" placeholder="Search code or label…"
+        style="border:none;outline:none;font-size:12px;padding:5px 2px;width:180px;background:transparent;"
+        oninput="applyAreaFilter()"/>
+      <button type="button" id="dutySearchClear"
+        onclick="document.getElementById('dutySearch').value='';applyAreaFilter();"
+        style="display:none;background:none;border:none;color:#6b7280;font-size:14px;cursor:pointer;padding:0 2px;"
+        title="Clear">✕</button>
+    </div>
+    <span id="dutySearchCount" style="font-size:11px;font-weight:700;color:#3730a3;white-space:nowrap;"></span>
+
+    <span class="hint" style="margin-left:auto;">New duties get the selected area tag.</span>
   </div>
 
   <div class="card no-print">

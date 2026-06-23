@@ -65,15 +65,35 @@
     }
 
     function applyAreaFilter() {
-      const filter = getCurrentFilter();
+      const filter  = getCurrentFilter();
+      const q       = (document.getElementById("dutySearch")?.value || "").trim().toLowerCase();
+      const clearBtn = document.getElementById("dutySearchClear");
+      if (clearBtn) clearBtn.style.display = q ? "inline" : "none";
+
+      let visible = 0, total = 0;
       Array.from(document.querySelectorAll("#dutiesBody tr")).forEach(tr => {
-        if (filter === "ALL") { tr.classList.remove("hidden-row"); return; }
+        total++;
         const rowArea = (tr.querySelector(".area-cell")?.value || "").trim().toUpperCase();
-        // support comma-separated multi-area values
-        const areas = rowArea.split(",").map(x => x.trim()).filter(Boolean);
-        const visible = !rowArea || areas.includes(filter);
-        tr.classList.toggle("hidden-row", !visible);
+        const areas   = rowArea.split(",").map(x => x.trim()).filter(Boolean);
+        const areaOk  = filter === "ALL" || !rowArea || areas.includes(filter);
+
+        let textOk = true;
+        if (q) {
+          const code  = (tr.cells[0]?.querySelector("input")?.value || "").toLowerCase();
+          const label = (tr.cells[1]?.querySelector("input")?.value || "").toLowerCase();
+          textOk = code.includes(q) || label.includes(q);
+        }
+
+        const show = areaOk && textOk;
+        tr.classList.toggle("hidden-row", !show);
+        if (show) visible++;
       });
+
+      const countEl = document.getElementById("dutySearchCount");
+      if (countEl) {
+        countEl.textContent = q ? `${visible} / ${total} duties` : "";
+        countEl.style.color = visible === 0 ? "#dc2626" : "#3730a3";
+      }
       rebuildImportSourceSelect();
     }
 
