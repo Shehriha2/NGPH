@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Training Management</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --danger:#dc2626; --warn:#d97706; --accent:#7c3aed; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:#f1f5f9; font-size:13px; color:#1e293b; }
+
+    .controls-bar{
+      background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.12);
+      padding:10px 16px; margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    .page-badge{
+      background:linear-gradient(135deg,#1a4f8b,#7c3aed); color:#fff; font-weight:800;
+      font-size:13px; padding:6px 16px; border-radius:20px; letter-spacing:.3px; white-space:nowrap;
+    }
+    button{
+      padding:7px 14px; border:none; border-radius:7px; font-size:13px; font-weight:700;
+      cursor:pointer; background:var(--primary); color:#fff; transition:background .15s;
+    }
+    button:hover{ background:#163e70; }
+    .btn-green{ background:var(--secondary); }  .btn-green:hover{ background:#257a4a; }
+    .btn-red{ background:var(--danger); }       .btn-red:hover{ background:#b91c1c; }
+    .btn-ghost{ background:#e2e8f0; color:#334155; } .btn-ghost:hover{ background:#cbd5e1; }
+    .btn-sm{ padding:4px 10px; font-size:11px; border-radius:5px; }
+    input,select,textarea{
+      padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;
+      outline:none; font-family:Arial,sans-serif; width:100%;
+    }
+    input:focus,select:focus,textarea:focus{ border-color:var(--primary); box-shadow:0 0 0 2px rgba(26,79,139,.15); }
+    textarea{ resize:vertical; }
+
+    /* Tabs */
+    .tab-nav{
+      display:flex; gap:4px; background:#fff; border-radius:10px;
+      padding:6px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:14px; width:fit-content;
+    }
+    .tab-btn{
+      padding:8px 20px; border-radius:7px; border:none; font-size:13px; font-weight:700;
+      cursor:pointer; background:transparent; color:#64748b; transition:all .15s;
+    }
+    .tab-btn.active{ background:var(--primary); color:#fff; }
+    .tab-btn:hover:not(.active){ background:#f1f5f9; color:#1e293b; }
+    .tab-pane{ display:none; }
+    .tab-pane.active{ display:block; }
+
+    /* Card */
+    .card{ background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.09); border:1px solid #e2e8f0; padding:18px 20px; }
+    .card-title{ font-size:14px; font-weight:700; color:var(--primary); border-bottom:2px solid #e7edf3; padding-bottom:8px; margin:0 0 14px; }
+
+    /* Two-panel */
+    .two-panel{ display:flex; gap:14px; align-items:flex-start; }
+    .list-panel{ flex:0 0 300px; min-width:0; }
+    .detail-panel{ flex:1; min-width:0; }
+    @media(max-width:860px){ .two-panel{ flex-direction:column; } .list-panel{ width:100%; flex:none; } }
+
+    /* Trainee list */
+    .list-toolbar{ display:flex; gap:7px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+    .list-toolbar input{ flex:1; min-width:100px; }
+    .type-filters{ display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; }
+    .type-pill{
+      padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer;
+      border:2px solid transparent; background:#f1f5f9; color:#64748b; transition:all .15s; user-select:none;
+    }
+    .type-pill.sel{ background:#1a4f8b; color:#fff; border-color:#1a4f8b; }
+    .trainee-cards{ display:flex; flex-direction:column; gap:6px; max-height:calc(100vh - 260px); overflow-y:auto; }
+    .trainee-card{
+      padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;
+      cursor:pointer; transition:all .15s; background:#fff;
+    }
+    .trainee-card:hover{ border-color:#93c5fd; background:#eff6ff; }
+    .trainee-card.sel{ border-color:var(--primary); background:#eff6ff; box-shadow:0 0 0 2px rgba(26,79,139,.12); }
+    .tc-name{ font-weight:700; font-size:13px; color:#0f172a; }
+    .tc-sub{ font-size:11px; color:#64748b; margin-top:2px; }
+    .tc-chips{ display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+
+    /* Chips */
+    .chip{ display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .ch-master{ background:#ede9fe; color:#6d28d9; }
+    .ch-intern{ background:#dbeafe; color:#1e40af; }
+    .ch-r1{ background:#d1fae5; color:#065f46; }
+    .ch-r2{ background:#fef3c7; color:#92400e; }
+    .ch-r3{ background:#fee2e2; color:#991b1b; }
+    .ch-other{ background:#f1f5f9; color:#475569; }
+    .ch-active{ background:#dcfce7; color:#15803d; }
+    .ch-upcoming{ background:#dbeafe; color:#1e40af; }
+    .ch-completed{ background:#f1f5f9; color:#64748b; }
+
+    /* Detail */
+    .det-header{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:10px; }
+    .det-name{ font-size:17px; font-weight:800; color:#0f172a; }
+    .det-meta{ font-size:12px; color:#64748b; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .info-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; font-size:12px; margin-bottom:14px; }
+    .info-lbl{ font-weight:700; color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
+    .info-val{ color:#1e293b; margin-top:1px; }
+
+    /* Rotations */
+    .rot-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .rot-header h4{ margin:0; font-size:13px; font-weight:700; color:var(--primary); }
+    .rot-card{ border:1px solid #e2e8f0; border-radius:8px; padding:11px 13px; margin-bottom:8px; background:#fafafa; }
+    .rot-card-top{ display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
+    .rot-name{ font-weight:700; font-size:13px; color:#0f172a; }
+    .rot-meta{ font-size:11px; color:#64748b; display:flex; gap:10px; flex-wrap:wrap; margin-top:3px; }
+    .rot-prec{ font-size:12px; color:#374151; margin-top:4px; }
+    .rot-rem{ font-size:11px; color:#64748b; font-style:italic; margin-top:3px; }
+
+    /* Preceptors table */
+    table.pt{ width:100%; border-collapse:collapse; font-size:12px; }
+    .pt th{ background:var(--primary); color:#fff; padding:8px 10px; text-align:left; font-size:11px; white-space:nowrap; }
+    .pt td{ padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .pt tbody tr:hover{ background:#f8fafc; }
+
+    /* Reports */
+    .stats-row{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .stat-card{ flex:1; min-width:110px; background:#fff; border-radius:10px; border:1px solid #e2e8f0; padding:14px 16px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+    .stat-num{ font-size:28px; font-weight:900; line-height:1; }
+    .stat-lbl{ font-size:11px; color:#64748b; font-weight:700; margin-top:4px; text-transform:uppercase; letter-spacing:.4px; }
+    table.rt{ width:100%; border-collapse:collapse; font-size:12px; }
+    .rt th{ background:#f8fafc; color:#475569; padding:7px 10px; text-align:left; font-size:11px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    .rt td{ padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    .rt tbody tr:hover{ background:#f8fafc; }
+
+    /* Staff search results */
+    .sr-list{ border:1px solid #e2e8f0; border-radius:8px; max-height:200px; overflow-y:auto; margin-top:8px; }
+    .sr-item{ padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f4f6; font-size:12px; }
+    .sr-item:hover{ background:#eff6ff; }
+    .sr-item:last-child{ border-bottom:none; }
+
+    /* Modals */
+    .mbd{ position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9000; display:none; align-items:center; justify-content:center; }
+    .mbd.show{ display:flex; }
+    .mbox{ background:#fff; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:min(520px,96%); max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; }
+    .mhd{ padding:13px 18px; border-radius:14px 14px 0 0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .mhd span{ font-size:14px; font-weight:700; color:#fff; }
+    .mhd button{ background:transparent; border:none; color:#fff; font-size:20px; cursor:pointer; line-height:1; }
+    .mbody{ padding:20px; }
+    .mft{ padding:12px 20px 16px; border-top:1px solid #f3f4f6; display:flex; gap:8px; justify-content:flex-end; flex-shrink:0; }
+    .fg{ margin-bottom:13px; }
+    .fl{ display:block; font-size:11px; font-weight:700; color:#374151; margin-bottom:4px; text-transform:uppercase; letter-spacing:.4px; }
+    .fr{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+    .empty{ padding:36px; text-align:center; color:#94a3b8; font-size:13px; }
+
+    /* Status */
+    .smsg{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); padding:10px 22px; border-radius:10px; font-weight:700; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,.18); display:none; z-index:8000; max-width:90vw; text-align:center; }
+    .sok{ background:#166534; color:#fff; display:block !important; }
+    .serr{ background:var(--danger); color:#fff; display:block !important; }
+
+    #authOverlay{ position:fixed; inset:0; background:#f1f5f9; z-index:9999; display:flex; align-items:center; justify-content:center; }
+    @media print{ .no-print,.controls-bar,.tab-nav{ display:none !important; } }
+  </style>
+</head>
+<body>
+
+<div id="authOverlay">
+  <div style="text-align:center;color:#64748b;font-size:14px;">
+    <div style="font-size:40px;margin-bottom:12px;">🎓</div>
+    Loading Training Management…
+  </div>
+</div>
+
+<div class="controls-bar no-print">
+  <span class="page-badge">🎓 Training Management</span>
+  <a href="index.html" style="text-decoration:none;margin-left:auto;">
+    <button type="button" class="btn-ghost">← Back to Rota</button>
+  </a>
+</div>
+
+<div class="tab-nav no-print">
+  <button class="tab-btn active"  onclick="switchTab('trainees',this)">👥 Trainees</button>
+  <button class="tab-btn"         onclick="switchTab('preceptors',this)">🧑‍🏫 Preceptors</button>
+  <button class="tab-btn"         onclick="switchTab('reports',this)">📊 Reports</button>
+</div>
+
+<!-- ── TRAINEES ─────────────────────────────────────────────────────────── -->
+<div id="tab-trainees" class="tab-pane active">
+  <div class="two-panel">
+    <div class="list-panel">
+      <div class="card" style="padding:14px 16px;">
+        <div class="list-toolbar">
+          <input type="text" id="traineeSearch" placeholder="Search name or ID…" oninput="renderList()"/>
+          <button class="btn-green btn-sm" onclick="openTraineeModal(null)" style="white-space:nowrap;">+ Add</button>
+        </div>
+        <div class="type-filters" id="typeFilters"></div>
+        <div class="trainee-cards" id="traineeCards"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+    <div class="detail-panel">
+      <div class="card">
+        <div id="detEmpty" style="padding:60px 20px;text-align:center;color:#94a3b8;">
+          <div style="font-size:48px;margin-bottom:10px;">🎓</div>
+          <div style="font-size:14px;font-weight:700;">Select a trainee to view details</div>
+        </div>
+        <div id="detContent" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PRECEPTORS ───────────────────────────────────────────────────────── -->
+<div id="tab-preceptors" class="tab-pane">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h3 class="card-title" style="margin:0;border:none;padding:0;">🧑‍🏫 Preceptors</h3>
+      <button class="btn-green btn-sm no-print" onclick="openPreceptorModal()">+ Add Preceptor</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="pt">
+        <thead><tr>
+          <th>Name</th><th>Badge</th><th>Role</th><th>Area</th>
+          <th>Active Trainees</th><th>Status</th><th class="no-print">Actions</th>
+        </tr></thead>
+        <tbody id="precBody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── REPORTS ──────────────────────────────────────────────────────────── -->
+<div id="tab-reports" class="tab-pane">
+  <div class="stats-row" id="statsRow"></div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+    <div class="card" style="flex:1;min-width:280px;">
+      <h3 class="card-title">🟢 Active Rotations</h3>
+      <div style="overflow-x:auto;"><table class="rt">
+        <thead><tr><th>Trainee</th><th>Type</th><th>Rotation</th><th>Preceptor</th><th>Ends</th><th>Days Left</th></tr></thead>
+        <tbody id="repActive"></tbody>
+      </table></div>
+    </div>
+    <div class="card" style="flex:1;min-width:280px;">
+      <h3 class="card-title">📋 Preceptor Workload</h3>
+      <div style="overflow-x:auto;"><table class="rt">
+        <thead><tr><th>Preceptor</th><th>Active</th><th>Upcoming</th><th>Completed</th></tr></thead>
+        <tbody id="repWorkload"></tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px;">
+    <h3 class="card-title">🔵 Upcoming Rotations — Next 30 Days</h3>
+    <div style="overflow-x:auto;"><table class="rt">
+      <thead><tr><th>Trainee</th><th>Type</th><th>Rotation</th><th>Preceptor</th><th>Starts</th><th>Ends</th></tr></thead>
+      <tbody id="repUpcoming"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ── MODAL: Trainee ──────────────────────────────────────────────────── -->
+<div id="mTrainee" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,#1a4f8b,#7c3aed);">
+      <span id="mTraineeTitle">Add Trainee</span><button onclick="closeModal('mTrainee')">✕</button>
+    </div>
+    <div class="mbody">
+      <input type="hidden" id="tmId"/>
+      <div class="fr">
+        <div class="fg"><label class="fl">Full Name *</label><input type="text" id="tmName" placeholder="Ahmed Al-Qahtani"/></div>
+        <div class="fg"><label class="fl">Trainee No. / ID *</label><input type="text" id="tmNo" placeholder="T2026001"/></div>
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <label class="fl">Type *</label>
+          <select id="tmType">
+            <option value="">— Select —</option>
+            <option>Master</option><option>Intern</option><option>R1</option>
+            <option>R2</option><option>R3</option><option>Other</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">University / Institution</label><input type="text" id="tmUni" placeholder="King Abdulaziz University"/></div>
+      </div>
+      <div class="fg"><label class="fl">Contact (Phone / Email)</label><input type="text" id="tmContact" placeholder="0501234567 or email@example.com"/></div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mTrainee')">Cancel</button>
+      <button class="btn-green" onclick="saveTrainee()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Rotation ─────────────────────────────────────────────────── -->
+<div id="mRotation" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,#2e8b57,#0f766e);">
+      <span id="mRotTitle">Add Rotation</span><button onclick="closeModal('mRotation')">✕</button>
+    </div>
+    <div class="mbody">
+      <input type="hidden" id="rmTid"/>
+      <input type="hidden" id="rmIdx"/>
+      <div class="fg"><label class="fl">Rotation Name *</label><input type="text" id="rmName" placeholder="e.g. Clinical Pharmacy – Inpatient"/></div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Start Date *</label><input type="date" id="rmStart"/></div>
+        <div class="fg"><label class="fl">End Date *</label><input type="date" id="rmEnd"/></div>
+      </div>
+      <div class="fg"><label class="fl">Preceptor</label><select id="rmPrec"><option value="">— No Preceptor —</option></select></div>
+      <div class="fg"><label class="fl">Remarks</label><textarea id="rmRem" style="min-height:65px;" placeholder="Any notes about this rotation…"></textarea></div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mRotation')">Cancel</button>
+      <button class="btn-green" onclick="saveRotation()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Add Preceptor ────────────────────────────────────────────── -->
+<div id="mPreceptor" class="mbd">
+  <div class="mbox" style="width:min(460px,96%);">
+    <div class="mhd" style="background:linear-gradient(135deg,#1a4f8b,#0f766e);">
+      <span>Add Preceptor</span><button onclick="closeModal('mPreceptor')">✕</button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:12px;color:#64748b;margin:0 0 10px;">Search staff records to quickly populate fields.</p>
+      <div style="display:flex;gap:7px;margin-bottom:4px;">
+        <input type="text" id="psQuery" placeholder="Badge or name…" style="flex:1;" onkeydown="if(event.key==='Enter')searchPrec()"/>
+        <button onclick="searchPrec()">Search</button>
+      </div>
+      <div id="psResults"></div>
+      <hr style="margin:14px 0;border:none;border-top:1px solid #e2e8f0;"/>
+      <div class="fr">
+        <div class="fg"><label class="fl">Name *</label><input type="text" id="pmName" placeholder="Full name"/></div>
+        <div class="fg"><label class="fl">Badge / ID</label><input type="text" id="pmBadge" placeholder="Staff badge"/></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label class="fl">Title / Role</label><input type="text" id="pmRole" placeholder="e.g. Clinical Pharmacist"/></div>
+        <div class="fg"><label class="fl">Area</label><input type="text" id="pmArea" placeholder="e.g. IP, OP"/></div>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mPreceptor')">Cancel</button>
+      <button class="btn-green" onclick="savePrecManual()">➕ Add</button>
+    </div>
+  </div>
+</div>
+
+<div class="smsg" id="sb"></div>
+<script src="config.js"></script>
+<script src="js/auth.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc }
+    from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw", authDomain:"bcotrota.firebaseapp.com",
+    projectId:"bcotrota", storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894", appId:"1:659421824894:web:f0546879df8808491ad52f"
+  });
+  const db = getFirestore(app);
+
+  const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
+  const TYPES     = ['Master','Intern','R1','R2','R3','Other'];
+  const TYPE_CLS  = { Master:'ch-master', Intern:'ch-intern', R1:'ch-r1', R2:'ch-r2', R3:'ch-r3', Other:'ch-other' };
+
+  let _trainees   = [];
+  let _preceptors = [];
+  let _selId      = null;
+  let _typeFilter = 'All';
+  let _psResults  = [];
+
+  const _key  = () => (window.BCOT_APP_KEY||'').trim();
+  const tColl = () => collection(db,'bcot_overtime_secure',_key(),'trainees');
+  const tDoc  = id => doc(db,'bcot_overtime_secure',_key(),'trainees',id);
+  const pColl = () => collection(db,'bcot_overtime_secure',_key(),'preceptors');
+  const pDoc  = id => doc(db,'bcot_overtime_secure',_key(),'preceptors',id);
+
+  function ss(msg,ok=true){
+    const el=document.getElementById('sb');
+    el.textContent=msg; el.className='smsg '+(ok?'sok':'serr');
+    clearTimeout(el._t); el._t=setTimeout(()=>{el.className='smsg';},ok?3500:5000);
+  }
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function fd(d){ if(!d)return'—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+  function dl(end){ if(!end)return null; return Math.ceil((new Date(end)-new Date())/86400000); }
+  function rstt(r){
+    const t=new Date().toISOString().slice(0,10);
+    if(!r.startDate||r.startDate>t) return 'upcoming';
+    if(r.endDate&&r.endDate<t) return 'completed';
+    return 'active';
+  }
+  function getSubmitter(){
+    try{ const s=JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'{}'); return [s.nameTitle,s.name].filter(Boolean).join(' ')||'Staff'; }
+    catch{ return 'Staff'; }
+  }
+  function staffRecs(){ try{ return JSON.parse(localStorage.getItem(STAFF_KEY)||'[]')||[]; }catch{ return []; } }
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  window.switchTab = function(tab,el){
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('tab-'+tab).classList.add('active');
+    el.classList.add('active');
+    if(tab==='reports') renderReports();
+  };
+
+  // ── Load ──────────────────────────────────────────────────────────────────
+  async function loadAll(){
+    const [ts,ps] = await Promise.all([getDocs(tColl()), getDocs(pColl())]);
+    _trainees=[]; _preceptors=[];
+    ts.forEach(d=>_trainees.push({_id:d.id,...d.data()}));
+    ps.forEach(d=>_preceptors.push({_id:d.id,...d.data()}));
+    _trainees.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    _preceptors.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    renderTypeFilters(); renderList(); renderPrecList();
+  }
+
+  // ── Type filters ──────────────────────────────────────────────────────────
+  function renderTypeFilters(){
+    document.getElementById('typeFilters').innerHTML = ['All',...TYPES].map(t=>
+      `<span class="type-pill ${t===_typeFilter?'sel':''}" onclick="setFilter('${t}')">${t}</span>`
+    ).join('');
+  }
+  window.setFilter = function(t){ _typeFilter=t; renderTypeFilters(); renderList(); };
+
+  // ── Trainee list ──────────────────────────────────────────────────────────
+  window.renderList = function(){
+    const q=(document.getElementById('traineeSearch')?.value||'').toLowerCase();
+    let list=_trainees;
+    if(_typeFilter!=='All') list=list.filter(t=>t.type===_typeFilter);
+    if(q) list=list.filter(t=>(t.name||'').toLowerCase().includes(q)||(t.no||'').toLowerCase().includes(q));
+    if(!list.length){ document.getElementById('traineeCards').innerHTML='<div class="empty">No trainees found.</div>'; return; }
+    document.getElementById('traineeCards').innerHTML = list.map(t=>{
+      const rots=t.rotations||[];
+      const st=rots.find(r=>rstt(r)==='active') ? 'active'
+               : rots.some(r=>rstt(r)==='upcoming') ? 'upcoming'
+               : rots.length ? 'completed' : null;
+      const stChip=st ? `<span class="chip ch-${st}">${st.charAt(0).toUpperCase()+st.slice(1)}</span>` : '';
+      return `<div class="trainee-card${t._id===_selId?' sel':''}" onclick="selTrainee('${t._id}')">
+        <div class="tc-name">${esc(t.name)}</div>
+        <div class="tc-sub">${esc(t.no||'—')} · ${esc(t.university||'—')}</div>
+        <div class="tc-chips">
+          <span class="chip ${TYPE_CLS[t.type]||'ch-other'}">${esc(t.type||'Other')}</span>
+          ${stChip}
+          <span class="chip ch-other">${rots.length} rotation${rots.length!==1?'s':''}</span>
+        </div>
+      </div>`;
+    }).join('');
+  };
+
+  // ── Trainee detail ────────────────────────────────────────────────────────
+  window.selTrainee = function(id){
+    _selId=id; renderList();
+    const t=_trainees.find(x=>x._id===id); if(!t) return;
+    document.getElementById('detEmpty').style.display='none';
+    document.getElementById('detContent').style.display='block';
+    renderDetail(t);
+  };
+
+  function renderDetail(t){
+    const rots=t.rotations||[];
+    const rotHtml=rots.length ? rots.map((r,i)=>{
+      const st=rstt(r), d=dl(r.endDate);
+      const dlTx=st==='active'&&d!=null ? `<span style="color:${d<=7?'#dc2626':'#374151'};font-weight:700;">${d>0?d+'d left':'ends today'}</span>` : '';
+      return `<div class="rot-card">
+        <div class="rot-card-top">
+          <span class="rot-name">${esc(r.rotationName||'—')}</span>
+          <span class="chip ch-${st}">${st.charAt(0).toUpperCase()+st.slice(1)}</span>
+          <div style="margin-left:auto;display:flex;gap:5px;" class="no-print">
+            <button class="btn-sm" style="background:#1a4f8b;" onclick="openRotModal('${t._id}',${i})">✏️</button>
+            <button class="btn-sm btn-red" onclick="delRot('${t._id}',${i})">🗑</button>
+          </div>
+        </div>
+        <div class="rot-meta"><span>📅 ${fd(r.startDate)} → ${fd(r.endDate)}</span>${dlTx}</div>
+        <div class="rot-prec">👤 <strong>Preceptor:</strong> ${esc(r.preceptorName||'—')}</div>
+        ${r.remarks?`<div class="rot-rem">💬 ${esc(r.remarks)}</div>`:''}
+      </div>`;
+    }).join('') : '<div class="empty" style="padding:20px 10px;">No rotations added yet.</div>';
+
+    document.getElementById('detContent').innerHTML=`
+      <div class="det-header">
+        <div>
+          <div class="det-name">${esc(t.name)}</div>
+          <div class="det-meta">
+            <span>🪪 ${esc(t.no||'—')}</span>
+            <span>🏫 ${esc(t.university||'—')}</span>
+            <span>📞 ${esc(t.contact||'—')}</span>
+            <span class="chip ${TYPE_CLS[t.type]||'ch-other'}">${esc(t.type||'Other')}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;" class="no-print">
+          <button class="btn-sm btn-ghost" onclick="openTraineeModal('${t._id}')">✏️ Edit</button>
+          <button class="btn-sm btn-red" onclick="delTrainee('${t._id}')">🗑 Delete</button>
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 12px;"/>
+      <div class="rot-header">
+        <h4>📋 Rotations (${rots.length})</h4>
+        <button class="btn-green btn-sm no-print" onclick="openRotModal('${t._id}',-1)">+ Add Rotation</button>
+      </div>
+      ${rotHtml}`;
+  }
+
+  // ── Trainee CRUD ──────────────────────────────────────────────────────────
+  window.openTraineeModal = function(id){
+    const t=id?_trainees.find(x=>x._id===id):null;
+    document.getElementById('mTraineeTitle').textContent = t?'Edit Trainee':'Add Trainee';
+    document.getElementById('tmId').value      = t?._id||'';
+    document.getElementById('tmName').value    = t?.name||'';
+    document.getElementById('tmNo').value      = t?.no||'';
+    document.getElementById('tmType').value    = t?.type||'';
+    document.getElementById('tmUni').value     = t?.university||'';
+    document.getElementById('tmContact').value = t?.contact||'';
+    document.getElementById('mTrainee').classList.add('show');
+    setTimeout(()=>document.getElementById('tmName').focus(),100);
+  };
+
+  window.saveTrainee = async function(){
+    const id   = document.getElementById('tmId').value;
+    const name = document.getElementById('tmName').value.trim();
+    const no   = document.getElementById('tmNo').value.trim();
+    const type = document.getElementById('tmType').value;
+    if(!name){ ss('Name is required.',false); return; }
+    if(!no)  { ss('Trainee No. is required.',false); return; }
+    if(!type){ ss('Select a type.',false); return; }
+    const data={ name,no,type, university:document.getElementById('tmUni').value.trim(), contact:document.getElementById('tmContact').value.trim() };
+    try{
+      if(id){
+        await updateDoc(tDoc(id),data);
+        const i=_trainees.findIndex(x=>x._id===id);
+        if(i>=0) _trainees[i]={..._trainees[i],...data};
+      } else {
+        data.rotations=[]; data.createdAt=new Date().toISOString(); data.createdBy=getSubmitter();
+        const ref=await addDoc(tColl(),data);
+        _trainees.push({_id:ref.id,...data});
+        _trainees.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      }
+      closeModal('mTrainee'); renderTypeFilters(); renderList();
+      const updated=_trainees.find(x=>x._id===(id||_trainees[_trainees.length-1]._id));
+      if(updated&&(_selId===id||!id)){ _selId=updated._id; document.getElementById('detEmpty').style.display='none'; document.getElementById('detContent').style.display='block'; renderDetail(updated); }
+      ss(id?'Trainee updated ✅':'Trainee added ✅');
+    } catch(e){ console.error(e); ss('Save failed: '+(e?.message||e),false); }
+  };
+
+  window.delTrainee = async function(id){
+    const t=_trainees.find(x=>x._id===id); if(!t) return;
+    const ok=await window.BCOT_AUTH.confirm(`Delete trainee "${t.name}" and all rotations? This cannot be undone.`,{title:'🗑 Delete Trainee',confirmLabel:'Delete'});
+    if(!ok) return;
+    try{
+      await deleteDoc(tDoc(id));
+      _trainees=_trainees.filter(x=>x._id!==id);
+      if(_selId===id){ _selId=null; document.getElementById('detEmpty').style.display='block'; document.getElementById('detContent').style.display='none'; }
+      renderList(); ss('Trainee deleted.');
+    } catch(e){ ss('Delete failed: '+(e?.message||e),false); }
+  };
+
+  // ── Rotation CRUD ─────────────────────────────────────────────────────────
+  window.openRotModal = function(tid,idx){
+    const t=_trainees.find(x=>x._id===tid);
+    const r=idx>=0?(t?.rotations||[])[idx]:null;
+    document.getElementById('mRotTitle').textContent = r?'Edit Rotation':'Add Rotation';
+    document.getElementById('rmTid').value   = tid;
+    document.getElementById('rmIdx').value   = idx;
+    document.getElementById('rmName').value  = r?.rotationName||'';
+    document.getElementById('rmStart').value = r?.startDate||'';
+    document.getElementById('rmEnd').value   = r?.endDate||'';
+    document.getElementById('rmRem').value   = r?.remarks||'';
+    const sel=document.getElementById('rmPrec');
+    sel.innerHTML='<option value="">— No Preceptor —</option>'+
+      _preceptors.filter(p=>p.active!==false).map(p=>
+        `<option value="${esc(p._id)}"${r?.preceptorId===p._id?' selected':''}>${esc(p.name)}${p.role?' · '+p.role:''}</option>`
+      ).join('');
+    document.getElementById('mRotation').classList.add('show');
+    setTimeout(()=>document.getElementById('rmName').focus(),100);
+  };
+
+  window.saveRotation = async function(){
+    const tid=document.getElementById('rmTid').value;
+    const idx=Number(document.getElementById('rmIdx').value);
+    const name=document.getElementById('rmName').value.trim();
+    const sd=document.getElementById('rmStart').value;
+    const ed=document.getElementById('rmEnd').value;
+    const pid=document.getElementById('rmPrec').value;
+    const rem=document.getElementById('rmRem').value.trim();
+    if(!name){ ss('Rotation name is required.',false); return; }
+    if(!sd)  { ss('Start date is required.',false); return; }
+    if(!ed)  { ss('End date is required.',false); return; }
+    if(ed<sd){ ss('End date must be after start date.',false); return; }
+    const prec=_preceptors.find(p=>p._id===pid);
+    const rot={rotationName:name,startDate:sd,endDate:ed,preceptorId:pid,preceptorName:prec?.name||'',remarks:rem};
+    const t=_trainees.find(x=>x._id===tid); if(!t) return;
+    const rots=[...(t.rotations||[])];
+    if(idx>=0) rots[idx]=rot; else rots.push(rot);
+    try{
+      await updateDoc(tDoc(tid),{rotations:rots});
+      t.rotations=rots; closeModal('mRotation'); renderDetail(t); renderList();
+      ss(idx>=0?'Rotation updated ✅':'Rotation added ✅');
+    } catch(e){ ss('Save failed: '+(e?.message||e),false); }
+  };
+
+  window.delRot = async function(tid,idx){
+    const t=_trainees.find(x=>x._id===tid);
+    const r=(t?.rotations||[])[idx]; if(!r) return;
+    const ok=await window.BCOT_AUTH.confirm(`Delete rotation "${r.rotationName}"?`,{title:'🗑 Delete Rotation',confirmLabel:'Delete'});
+    if(!ok) return;
+    try{
+      const rots=(t.rotations||[]).filter((_,i)=>i!==idx);
+      await updateDoc(tDoc(tid),{rotations:rots});
+      t.rotations=rots; renderDetail(t); renderList(); ss('Rotation deleted.');
+    } catch(e){ ss('Delete failed: '+(e?.message||e),false); }
+  };
+
+  // ── Preceptors ────────────────────────────────────────────────────────────
+  function renderPrecList(){
+    const tbody=document.getElementById('precBody');
+    if(!_preceptors.length){ tbody.innerHTML='<tr><td colspan="7" class="empty">No preceptors added yet.</td></tr>'; return; }
+    tbody.innerHTML=_preceptors.map(p=>{
+      const active=_trainees.filter(t=>(t.rotations||[]).some(r=>r.preceptorId===p._id&&rstt(r)==='active')).length;
+      return `<tr>
+        <td style="font-weight:700;">${esc(p.name)}</td>
+        <td>${esc(p.badge||'—')}</td>
+        <td style="font-size:11px;color:#475569;">${esc(p.role||'—')}</td>
+        <td>${esc(p.area||'—')}</td>
+        <td style="text-align:center;font-weight:700;color:${active>0?'#166534':'#94a3b8'};">${active}</td>
+        <td><span class="chip ${p.active!==false?'ch-active':'ch-completed'}">${p.active!==false?'Active':'Inactive'}</span></td>
+        <td class="no-print"><div style="display:flex;gap:5px;">
+          <button class="btn-sm btn-ghost" onclick="togPrec('${p._id}')">${p.active!==false?'Deactivate':'Activate'}</button>
+          <button class="btn-sm btn-red" onclick="delPrec('${p._id}')">🗑</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  window.openPreceptorModal = function(){
+    document.getElementById('psQuery').value='';
+    document.getElementById('psResults').innerHTML='';
+    ['pmName','pmBadge','pmRole','pmArea'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mPreceptor').classList.add('show');
+    setTimeout(()=>document.getElementById('psQuery').focus(),100);
+  };
+
+  window.searchPrec = function(){
+    const q=(document.getElementById('psQuery').value||'').toLowerCase().trim();
+    const recs=staffRecs();
+    _psResults=q ? recs.filter(s=>(s.name||'').toLowerCase().includes(q)||String(s.badge||'').includes(q)).slice(0,10) : [];
+    const el=document.getElementById('psResults');
+    if(!_psResults.length){ el.innerHTML=q?'<div style="padding:8px;font-size:12px;color:#94a3b8;">No matching staff found.</div>':''; return; }
+    el.innerHTML=`<div class="sr-list">${_psResults.map((s,i)=>
+      `<div class="sr-item" onclick="pickStaffPrec(${i})">
+        <strong>${esc(s.name)}</strong>
+        <span style="color:#64748b;"> · ${esc(s.badge||'')} · ${esc(s.role||'')} · ${esc(s.area||'')}</span>
+      </div>`
+    ).join('')}</div>`;
+  };
+
+  window.pickStaffPrec = function(i){
+    const s=_psResults[i]; if(!s) return;
+    document.getElementById('pmName').value  = s.name||'';
+    document.getElementById('pmBadge').value = String(s.badge||'');
+    document.getElementById('pmRole').value  = s.role||'';
+    document.getElementById('pmArea').value  = s.area||'';
+  };
+
+  window.savePrecManual = async function(){
+    const name=document.getElementById('pmName').value.trim();
+    if(!name){ ss('Name is required.',false); return; }
+    if(_preceptors.find(p=>p.name===name)){ ss(`${name} is already a preceptor.`,false); return; }
+    const entry={ name, badge:document.getElementById('pmBadge').value.trim(), role:document.getElementById('pmRole').value.trim(), area:document.getElementById('pmArea').value.trim(), active:true, addedAt:new Date().toISOString(), addedBy:getSubmitter() };
+    try{
+      const ref=await addDoc(pColl(),entry);
+      _preceptors.push({_id:ref.id,...entry});
+      _preceptors.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      closeModal('mPreceptor'); renderPrecList();
+      ss(`${name} added as preceptor ✅`);
+    } catch(e){ ss('Save failed: '+(e?.message||e),false); }
+  };
+
+  window.togPrec = async function(id){
+    const p=_preceptors.find(x=>x._id===id); if(!p) return;
+    const v=p.active===false;
+    try{ await updateDoc(pDoc(id),{active:v}); p.active=v; renderPrecList(); }
+    catch(e){ ss('Update failed: '+(e?.message||e),false); }
+  };
+
+  window.delPrec = async function(id){
+    const p=_preceptors.find(x=>x._id===id); if(!p) return;
+    if(_trainees.some(t=>(t.rotations||[]).some(r=>r.preceptorId===id))){ ss(`${p.name} is assigned to rotations — cannot delete.`,false); return; }
+    const ok=await window.BCOT_AUTH.confirm(`Delete preceptor "${p.name}"?`,{title:'🗑 Delete Preceptor',confirmLabel:'Delete'});
+    if(!ok) return;
+    try{ await deleteDoc(pDoc(id)); _preceptors=_preceptors.filter(x=>x._id!==id); renderPrecList(); ss('Preceptor deleted.'); }
+    catch(e){ ss('Delete failed: '+(e?.message||e),false); }
+  };
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+  function renderReports(){
+    const in30=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+    const all=_trainees.flatMap(t=>(t.rotations||[]).map(r=>({...r,_t:t,_s:rstt(r)})));
+    const active  =all.filter(r=>r._s==='active');
+    const upcoming=all.filter(r=>r._s==='upcoming'&&r.startDate<=in30);
+
+    document.getElementById('statsRow').innerHTML=[
+      {n:_trainees.length,l:'Total Trainees',c:'#1a4f8b'},
+      {n:active.length,l:'Active Rotations',c:'#16a34a'},
+      {n:upcoming.length,l:'Upcoming (30d)',c:'#1a4f8b'},
+      {n:_preceptors.filter(p=>p.active!==false).length,l:'Active Preceptors',c:'#7c3aed'},
+    ].map(s=>`<div class="stat-card"><div class="stat-num" style="color:${s.c};">${s.n}</div><div class="stat-lbl">${s.l}</div></div>`).join('');
+
+    document.getElementById('repActive').innerHTML=active.length
+      ? active.sort((a,b)=>a.endDate.localeCompare(b.endDate)).map(r=>{
+          const d=dl(r.endDate);
+          return `<tr>
+            <td style="font-weight:700;">${esc(r._t.name)}</td>
+            <td><span class="chip ${TYPE_CLS[r._t.type]||'ch-other'}">${esc(r._t.type||'')}</span></td>
+            <td>${esc(r.rotationName)}</td><td>${esc(r.preceptorName||'—')}</td>
+            <td>${fd(r.endDate)}</td>
+            <td style="font-weight:700;color:${d!=null&&d<=7?'#dc2626':'#374151'};">${d!=null?(d>0?d+'d':'today'):'—'}</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="6" class="empty">No active rotations.</td></tr>';
+
+    document.getElementById('repUpcoming').innerHTML=upcoming.length
+      ? upcoming.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(r=>`<tr>
+          <td style="font-weight:700;">${esc(r._t.name)}</td>
+          <td><span class="chip ${TYPE_CLS[r._t.type]||'ch-other'}">${esc(r._t.type||'')}</span></td>
+          <td>${esc(r.rotationName)}</td><td>${esc(r.preceptorName||'—')}</td>
+          <td>${fd(r.startDate)}</td><td>${fd(r.endDate)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" class="empty">No upcoming rotations in the next 30 days.</td></tr>';
+
+    document.getElementById('repWorkload').innerHTML=_preceptors.length
+      ? _preceptors.map(p=>{
+          const mine=all.filter(r=>r.preceptorId===p._id);
+          return `<tr>
+            <td style="font-weight:700;">${esc(p.name)}${p.active===false?'<span class="chip ch-completed" style="margin-left:5px;font-size:10px;">Inactive</span>':''}</td>
+            <td style="text-align:center;font-weight:700;color:${mine.filter(r=>r._s==='active').length?'#166534':'#94a3b8'};">${mine.filter(r=>r._s==='active').length}</td>
+            <td style="text-align:center;color:#1e40af;">${mine.filter(r=>r._s==='upcoming').length}</td>
+            <td style="text-align:center;color:#64748b;">${mine.filter(r=>r._s==='completed').length}</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="4" class="empty">No preceptors added.</td></tr>';
+  }
+
+  // ── Modal helpers ─────────────────────────────────────────────────────────
+  window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
+  ['mTrainee','mRotation','mPreceptor'].forEach(id=>{
+    document.getElementById(id).addEventListener('click',e=>{ if(e.target.id===id) window.closeModal(id); });
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init(){
+    const pwd=(window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
+    if(pwd){
+      const entered=await window.BCOT_AUTH.prompt('Enter the password to access Training Management.',
+        {title:'🎓 Training Management',placeholder:'Password',type:'password',confirmLabel:'Enter'});
+      if(entered===null||entered.trim()!==pwd){
+        document.getElementById('authOverlay').innerHTML=`<div style="text-align:center;color:#dc2626;font-size:14px;"><div style="font-size:36px;margin-bottom:12px;">🚫</div>Incorrect password. Returning…</div>`;
+        setTimeout(()=>{window.location.href='index.html';},1800); return;
+      }
+    }
+    document.getElementById('authOverlay').style.display='none';
+    await loadAll();
+  }
+  init();
+</script>
+</body>
+</html>
