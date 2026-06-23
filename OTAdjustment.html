@@ -31,6 +31,7 @@
     button:hover{ background:#163e70; }
     .btn-green{ background:var(--secondary); }  .btn-green:hover{ background:#257a4a; }
     .btn-orange{ background:var(--warn); }      .btn-orange:hover{ background:#b45309; }
+    .btn-red{ background:var(--danger); }       .btn-red:hover{ background:#b91c1c; }
     .btn-ghost{ background:#e2e8f0; color:#334155; } .btn-ghost:hover{ background:#cbd5e1; }
 
     /* ── Layout ── */
@@ -69,7 +70,7 @@
     .form-group{ margin-bottom:14px; }
     .form-group label{ display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px; }
     .form-group input[type="number"]{ width:100%; }
-    .form-group textarea{ width:100%; resize:vertical; min-height:90px; line-height:1.5; }
+    .form-group textarea{ width:100%; resize:vertical; min-height:80px; line-height:1.5; }
     .submit-btn{ width:100%; padding:10px; font-size:14px; letter-spacing:.3px; }
 
     /* ── Log table ── */
@@ -86,10 +87,40 @@
     .adj-table tbody tr:hover{ background:#f8fafc; }
     .adj-table tbody tr:last-child td{ border-bottom:none; }
     .hours-cell{ font-weight:800; color:#166534; white-space:nowrap; }
-    .notes-cell{ max-width:280px; color:#374151; word-break:break-word; }
+    .notes-cell{ max-width:220px; color:#374151; word-break:break-word; }
+    .remarks-cell{ max-width:180px; color:#475569; font-style:italic; word-break:break-word; }
     .ts-cell{ white-space:nowrap; color:#64748b; font-size:11px; }
     .by-cell{ white-space:nowrap; font-size:11px; color:#475569; }
     .empty-log{ padding:40px; text-align:center; color:#94a3b8; font-size:13px; }
+    .action-btns{ display:flex; gap:5px; white-space:nowrap; }
+    .action-btns button{ padding:3px 9px; font-size:11px; font-weight:700; border-radius:5px; }
+
+    /* ── Edit modal ── */
+    #editModal{
+      position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9000;
+      display:none; align-items:center; justify-content:center;
+    }
+    #editModal.show{ display:flex; }
+    .edit-modal-box{
+      background:#fff; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+      width:min(500px,96%); max-height:90vh; overflow-y:auto;
+    }
+    .edit-modal-header{
+      background:linear-gradient(135deg,#1a4f8b,#0f766e); color:#fff;
+      padding:13px 18px; border-radius:14px 14px 0 0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .edit-modal-header span{ font-size:14px; font-weight:700; }
+    .edit-modal-header button{
+      background:transparent; border:none; color:#fff; font-size:20px;
+      cursor:pointer; line-height:1; padding:0 4px;
+    }
+    .edit-modal-body{ padding:20px; }
+    .edit-modal-body .form-group:last-of-type{ margin-bottom:0; }
+    .edit-modal-footer{
+      padding:12px 20px 16px; border-top:1px solid #f3f4f6;
+      display:flex; gap:8px; justify-content:flex-end;
+    }
 
     /* ── Status ── */
     .status-message{
@@ -97,8 +128,8 @@
       padding:10px 22px; border-radius:10px; font-weight:700; font-size:13px;
       box-shadow:0 4px 16px rgba(0,0,0,.18); display:none; z-index:8000; max-width:90vw; text-align:center;
     }
-    .status-ok{ background:#166534; color:#fff; }
-    .status-err{ background:var(--danger); color:#fff; }
+    .status-ok{ background:#166534; color:#fff; display:block !important; }
+    .status-err{ background:var(--danger); color:#fff; display:block !important; }
 
     /* ── Auth overlay ── */
     #authOverlay{
@@ -115,7 +146,7 @@
 <div id="authOverlay">
   <div style="text-align:center;color:#64748b;font-size:14px;">
     <div style="font-size:36px;margin-bottom:12px;">🔑</div>
-    Verifying administrator access…
+    Verifying access…
   </div>
 </div>
 
@@ -156,16 +187,20 @@
 
     <!-- Adjustment form -->
     <div class="card" id="adjFormCard" style="display:none;">
-      <h3>✏️ Log Adjustment</h3>
+      <h3 id="adjFormTitle">✏️ Log Adjustment</h3>
       <div class="form-group">
         <label>Additional Overtime Hours Claimed</label>
         <input type="number" id="addHours" min="0.5" max="200" step="0.5" placeholder="e.g. 8"/>
       </div>
       <div class="form-group">
         <label>Justification / Notes</label>
-        <textarea id="adjNotes" placeholder="e.g. Verbal approval by Dr. X on 2026-06-15 for weekend on-call coverage. Staff email dated 2026-06-16 referenced."></textarea>
+        <textarea id="adjNotes" placeholder="e.g. Verbal approval by Dr. X on 2026-06-15 for weekend on-call coverage."></textarea>
       </div>
-      <button class="btn-green submit-btn" onclick="submitAdjustment()">✅ Submit Adjustment</button>
+      <div class="form-group">
+        <label>Remarks <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(optional)</span></label>
+        <textarea id="adjRemarks" placeholder="Any additional remarks…" style="min-height:60px;"></textarea>
+      </div>
+      <button class="btn-green submit-btn" id="submitBtn" onclick="submitAdjustment()">✅ Submit Adjustment</button>
     </div>
 
   </div>
@@ -187,17 +222,53 @@
               <th>Role</th>
               <th>+ Hours</th>
               <th>Notes</th>
+              <th>Remarks</th>
               <th>Submitted By</th>
+              <th class="no-print">Actions</th>
             </tr>
           </thead>
           <tbody id="logBody">
-            <tr><td colspan="7" class="empty-log">Load a month to view adjustments.</td></tr>
+            <tr><td colspan="9" class="empty-log">Load a month to view adjustments.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
   </div>
 
+</div>
+
+<!-- Edit modal -->
+<div id="editModal">
+  <div class="edit-modal-box">
+    <div class="edit-modal-header">
+      <span>✏️ Edit Adjustment</span>
+      <button onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="edit-modal-body">
+      <input type="hidden" id="editDocId"/>
+      <div class="form-group">
+        <label>Staff</label>
+        <input type="text" id="editStaffName" readonly
+          style="background:#f8fafc;color:#64748b;cursor:default;width:100%;"/>
+      </div>
+      <div class="form-group">
+        <label>Additional Overtime Hours Claimed</label>
+        <input type="number" id="editHours" min="0.5" max="200" step="0.5" style="width:100%;"/>
+      </div>
+      <div class="form-group">
+        <label>Justification / Notes</label>
+        <textarea id="editNotes" style="width:100%;min-height:80px;resize:vertical;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Remarks <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(optional)</span></label>
+        <textarea id="editRemarks" style="width:100%;min-height:60px;resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="edit-modal-footer">
+      <button class="btn-ghost" onclick="closeEditModal()">Cancel</button>
+      <button class="btn-green" onclick="saveEdit()">💾 Save Changes</button>
+    </div>
+  </div>
 </div>
 
 <div class="status-message" id="statusBox"></div>
@@ -208,7 +279,7 @@
 
 <script type="module">
   import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, collection, getDocs, addDoc }
+  import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc }
     from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -223,8 +294,8 @@
   const db  = getFirestore(app);
 
   // ── Constants ─────────────────────────────────────────────────────────────
-  const STAFF_KEY    = 'BCOT_STAFF_RECORDS_V2';
-  const ADJ_COLL     = 'ot_adjustments';
+  const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
+  const ADJ_COLL  = 'ot_adjustments';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let _foundStaff     = null;
@@ -233,14 +304,14 @@
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function _key() { return (window.BCOT_APP_KEY || '').trim(); }
+  function adjDocRef(id) { return doc(db, 'bcot_overtime_secure', _key(), ADJ_COLL, id); }
 
   function showStatus(msg, ok = true) {
     const el = document.getElementById('statusBox');
     el.textContent = msg;
     el.className   = 'status-message ' + (ok ? 'status-ok' : 'status-err');
-    el.style.display = 'block';
     clearTimeout(el._t);
-    el._t = setTimeout(() => { el.style.display = 'none'; }, ok ? 3500 : 5000);
+    el._t = setTimeout(() => { el.className = 'status-message'; }, ok ? 3500 : 5000);
   }
 
   function esc(s) {
@@ -261,8 +332,8 @@
   function getSubmitter() {
     try {
       const sess = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
-      return [sess.nameTitle, sess.name].filter(Boolean).join(' ') || 'Administrator';
-    } catch { return 'Administrator'; }
+      return [sess.nameTitle, sess.name].filter(Boolean).join(' ') || 'Staff';
+    } catch { return 'Staff'; }
   }
 
   function getStaffRecords() {
@@ -299,8 +370,15 @@
     _foundStaff = found;
     renderStaffCard(found);
     form.style.display = 'block';
-    document.getElementById('addHours').value = '';
-    document.getElementById('adjNotes').value = '';
+    resetForm();
+  }
+
+  function resetForm() {
+    document.getElementById('addHours').value   = '';
+    document.getElementById('adjNotes').value   = '';
+    document.getElementById('adjRemarks').value = '';
+    document.getElementById('adjFormTitle').textContent = '✏️ Log Adjustment';
+    document.getElementById('submitBtn').textContent    = '✅ Submit Adjustment';
   }
 
   function renderStaffCard(s) {
@@ -315,8 +393,8 @@
       ? areas.map(a => `<span class="area-chip">${esc(a)}</span>`).join(' ')
       : '<span style="color:#94a3b8;font-size:12px;">No area assigned</span>';
 
-    const pillClass  = existingHours > 0 ? 'ot-pill' : 'ot-pill none';
-    const pillLabel  = existingHours > 0
+    const pillClass = existingHours > 0 ? 'ot-pill' : 'ot-pill none';
+    const pillLabel = existingHours > 0
       ? `+${existingHours} hrs adjustment logged this month`
       : 'No adjustments logged this month';
 
@@ -335,8 +413,9 @@
     const k = _key();
     if (!k) { showStatus('config.js not found — BCOT_APP_KEY missing.', false); return; }
 
-    const hours = parseFloat(document.getElementById('addHours').value);
-    const notes = document.getElementById('adjNotes').value.trim();
+    const hours   = parseFloat(document.getElementById('addHours').value);
+    const notes   = document.getElementById('adjNotes').value.trim();
+    const remarks = document.getElementById('adjRemarks').value.trim();
 
     if (!hours || hours <= 0) { showStatus('Enter a valid number of hours (> 0).', false); return; }
     if (!notes)               { showStatus('Notes / justification is required.', false); return; }
@@ -349,7 +428,8 @@
       month:           currentMonth(),
       year:            currentYear(),
       additionalHours: hours,
-      notes:           notes,
+      notes,
+      remarks,
       submittedBy:     getSubmitter(),
       submittedAt:     new Date().toISOString(),
     };
@@ -361,12 +441,81 @@
       _allAdjustments.unshift(entry);
       renderLog();
       renderStaffCard(_foundStaff);
-      document.getElementById('addHours').value = '';
-      document.getElementById('adjNotes').value = '';
+      resetForm();
       showStatus(`Adjustment of +${hours} hrs logged for ${_foundStaff.name} ✅`);
     } catch (e) {
       console.error(e);
       showStatus('Save failed: ' + (e?.message || e), false);
+    }
+  }
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
+  function openEditModal(id) {
+    const a = _allAdjustments.find(x => x._id === id);
+    if (!a) return;
+    document.getElementById('editDocId').value      = id;
+    document.getElementById('editStaffName').value  = `${a.staffName || ''}  (${a.badge || ''})`;
+    document.getElementById('editHours').value      = a.additionalHours || '';
+    document.getElementById('editNotes').value      = a.notes   || '';
+    document.getElementById('editRemarks').value    = a.remarks || '';
+    document.getElementById('editModal').classList.add('show');
+  }
+
+  function closeEditModal() {
+    document.getElementById('editModal').classList.remove('show');
+  }
+
+  async function saveEdit() {
+    const id      = document.getElementById('editDocId').value;
+    const hours   = parseFloat(document.getElementById('editHours').value);
+    const notes   = document.getElementById('editNotes').value.trim();
+    const remarks = document.getElementById('editRemarks').value.trim();
+
+    if (!id)                  { showStatus('No record selected.', false); return; }
+    if (!hours || hours <= 0) { showStatus('Enter a valid number of hours (> 0).', false); return; }
+    if (!notes)               { showStatus('Notes / justification is required.', false); return; }
+
+    try {
+      await updateDoc(adjDocRef(id), {
+        additionalHours: hours,
+        notes,
+        remarks,
+        lastEditedBy: getSubmitter(),
+        lastEditedAt: new Date().toISOString(),
+      });
+      const idx = _allAdjustments.findIndex(x => x._id === id);
+      if (idx >= 0) {
+        _allAdjustments[idx] = { ..._allAdjustments[idx], additionalHours: hours, notes, remarks };
+      }
+      closeEditModal();
+      renderLog();
+      if (_foundStaff) renderStaffCard(_foundStaff);
+      showStatus('Adjustment updated ✅');
+    } catch (e) {
+      console.error(e);
+      showStatus('Update failed: ' + (e?.message || e), false);
+    }
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  async function deleteAdjustment(id) {
+    const a = _allAdjustments.find(x => x._id === id);
+    if (!a) return;
+    const confirmed = await window.BCOT_AUTH.confirm(
+      `Delete the adjustment of +${a.additionalHours} hrs for ${a.staffName}?\nThis cannot be undone.`,
+      { title: '🗑 Delete Adjustment', confirmLabel: 'Delete', confirmClass: 'btn-red' }
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(adjDocRef(id));
+      _allAdjustments = _allAdjustments.filter(x => x._id !== id);
+      renderLog();
+      if (_foundStaff) renderStaffCard(_foundStaff);
+      showStatus('Adjustment deleted.');
+    } catch (e) {
+      console.error(e);
+      showStatus('Delete failed: ' + (e?.message || e), false);
     }
   }
 
@@ -377,7 +526,7 @@
 
     document.getElementById('logTitle').textContent = 'Adjustment Log — Loading…';
     document.getElementById('logBody').innerHTML =
-      '<tr><td colspan="7" class="empty-log">Loading…</td></tr>';
+      '<tr><td colspan="9" class="empty-log">Loading…</td></tr>';
 
     try {
       const colRef = collection(db, 'bcot_overtime_secure', k, ADJ_COLL);
@@ -400,20 +549,17 @@
     const year  = currentYear();
     const rows  = _allAdjustments.filter(a => a.month === month && a.year === year);
 
-    const monthName = new Date(year, month - 1, 1)
-      .toLocaleString('default', { month: 'long' });
-    document.getElementById('logTitle').textContent =
-      `Adjustment Log — ${monthName} ${year}`;
+    const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+    document.getElementById('logTitle').textContent = `Adjustment Log — ${monthName} ${year}`;
 
-    const totalHrs   = rows.reduce((s, a) => s + (Number(a.additionalHours) || 0), 0);
-    const summaryEl  = document.getElementById('logSummary');
-    summaryEl.textContent = rows.length
+    const totalHrs = rows.reduce((s, a) => s + (Number(a.additionalHours) || 0), 0);
+    document.getElementById('logSummary').textContent = rows.length
       ? `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} · +${totalHrs} hrs total`
       : '';
 
     const tbody = document.getElementById('logBody');
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-log">
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-log">
         No adjustments recorded for ${monthName} ${year}.
       </td></tr>`;
       return;
@@ -427,16 +573,26 @@
         <td style="font-size:11px;color:#475569;">${esc(a.role)}</td>
         <td class="hours-cell">+${Number(a.additionalHours) || 0} hrs</td>
         <td class="notes-cell" title="${esc(a.notes)}">${esc(a.notes)}</td>
+        <td class="remarks-cell" title="${esc(a.remarks)}">${esc(a.remarks) || '<span style="color:#cbd5e1;">—</span>'}</td>
         <td class="by-cell">${esc(a.submittedBy)}</td>
+        <td class="no-print">
+          <div class="action-btns">
+            <button onclick="openEditModal('${esc(a._id)}')" style="background:#1a4f8b;">✏️ Edit</button>
+            <button onclick="deleteAdjustment('${esc(a._id)}')" class="btn-red">🗑</button>
+          </div>
+        </td>
       </tr>`).join('');
   }
 
   // ── Expose to HTML onclick handlers ───────────────────────────────────────
-  window.searchStaff       = searchStaff;
-  window.submitAdjustment  = submitAdjustment;
-  window.refreshLog        = refreshLog;
+  window.searchStaff      = searchStaff;
+  window.submitAdjustment = submitAdjustment;
+  window.refreshLog       = refreshLog;
+  window.openEditModal    = openEditModal;
+  window.closeEditModal   = closeEditModal;
+  window.saveEdit         = saveEdit;
+  window.deleteAdjustment = deleteAdjustment;
 
-  // Re-render log when month/year changes (client-side filter, no extra fetch)
   document.getElementById('monthSel').addEventListener('change', () => {
     if (_logLoaded) renderLog();
     if (_foundStaff) renderStaffCard(_foundStaff);
@@ -446,19 +602,24 @@
     if (_foundStaff) renderStaffCard(_foundStaff);
   });
 
-  // ── Init: admin gate then load ────────────────────────────────────────────
+  // Close edit modal on backdrop click
+  document.getElementById('editModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('editModal')) closeEditModal();
+  });
+
+  // ── Init: password gate (any user with the password) ─────────────────────
   async function init() {
     const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
     if (pwd) {
       const entered = await window.BCOT_AUTH.prompt(
-        'This page is restricted to administrative staff only.',
-        { title:'🔑 OT Adjustment & Disclosure', placeholder:'Admin password', type:'password', confirmLabel:'Enter' }
+        'Enter the password to access OT Adjustment & Disclosure.',
+        { title: '🔑 OT Adjustment', placeholder: 'Password', type: 'password', confirmLabel: 'Enter' }
       );
       if (entered === null || entered.trim() !== pwd) {
         document.getElementById('authOverlay').innerHTML = `
           <div style="text-align:center;color:#dc2626;font-size:14px;">
             <div style="font-size:36px;margin-bottom:12px;">🚫</div>
-            Access denied. Returning to rota…
+            Incorrect password. Returning…
           </div>`;
         setTimeout(() => { window.location.href = 'index.html'; }, 1800);
         return;
