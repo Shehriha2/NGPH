@@ -278,10 +278,7 @@
   // mode: 'full'      → individual cost column + cost in total row (default)
   //       'noSR'      → no cost column, total hours only in total row
   //       'totalOnly' → no cost column per row, but total row shows hours + total SR amount
-  function buildForm(rows, area, meta, mode = 'full') {
-    if (mode === 'full') { _cachedRows = rows; _cachedArea = area; _cachedMeta = meta; }
-
-    const wrapper  = document.getElementById('formWrapper');
+  function buildFormHtml(rows, area, meta, mode = 'full') {
     const rp1 = Math.max(5, parseInt(document.getElementById('rowsPage1').value,10)||18);
     const rpN = Math.max(5, parseInt(document.getElementById('rowsPageN').value,10)||24);
 
@@ -414,8 +411,12 @@
     });
 
     html += summaryPageHtml(groups, meta, mode);
-    html += formFooterHtml();
-    wrapper.innerHTML = html;
+    return html;
+  }
+
+  function buildForm(rows, area, meta, mode = 'full') {
+    if (mode === 'full') { _cachedRows = rows; _cachedArea = area; _cachedMeta = meta; }
+    document.getElementById('formWrapper').innerHTML = buildFormHtml(rows, area, meta, mode) + formFooterHtml();
   }
 
   // ── Picker-trigger cell helpers ───────────────────────────────────────────
@@ -491,6 +492,26 @@
     } catch(e) { console.warn('Extension fetch failed:',e); return {}; }
   }
 
+  // ── Row builder (shared by single-area and all-areas) ────────────────────
+  function _buildRowsFromPayload(payload, staffRecs, hrrByName, extMap) {
+    const records = Array.isArray(payload.records) ? payload.records : [];
+    const rows = [];
+    records.forEach(rec => {
+      const name = (rec.staffName||'').trim(); if(!name) return;
+      const baseOT = calcOT(rec, payload);
+      const firebaseExt = extMap[name] || 0;
+      const ext = firebaseExt > 0 ? firebaseExt : (Number(rec.extension)||0);
+      const otHours = ext > 0 ? Math.ceil(baseOT + ext) : baseOT;
+      if(otHours<=0) return;
+      const hrr = hrrByName[name] || 0;
+      const totalCost = Math.round(otHours * hrr * 1.5);
+      const staffRec = staffRecs.find(s => s.name.trim() === name);
+      const badge = staffRec?.badge || '—';
+      rows.push({ name, badge, otHours, totalCost, hrr, loc: '', just: '' });
+    });
+    return rows;
+  }
+
   // ── Load & Build ──────────────────────────────────────────────────────────
   async function loadAndBuild() {
     const key=(window.BCOT_APP_KEY||'').trim();
@@ -523,10 +544,9 @@
         payload=snap.data();
         _selectedReleaseId=null; _selectedReleaseArea=null;
       } else {
-        const docId=`${year}-${String(month).padStart(2,'0')}`;
-        const snap=await window.FB.getDoc(monthRef(key,area,docId));
-        if(!snap.exists()){ showStatus(`No monthly rota for ${area} ${year}/${String(month).padStart(2,'0')}.`,false); return; }
-        payload=snap.data();
+        showStatus('No release selected. Pick a release first.', false);
+        pickRelease();
+        return;
       }
     } catch(e){ console.error(e); showStatus("Load failed: "+(e?.message||e),false); return; }
 
@@ -541,27 +561,215 @@
 
     // Fetch approved extensions from Extension page (Firebase-approved takes priority over manual entry)
     const extMap = await fetchGrantedExtensions(month, year, area);
-
-    const records=Array.isArray(payload.records)?payload.records:[];
-    const rows=[];
-    records.forEach(rec=>{
-      const name=(rec.staffName||'').trim(); if(!name) return;
-      const baseOT = calcOT(rec,payload);
-      // Firebase-approved extensions take priority; fall back to manually entered value
-      const firebaseExt = extMap[name] || 0;
-      const ext = firebaseExt > 0 ? firebaseExt : (Number(rec.extension)||0);
-      // Combine OT + extension hours, rounded up to nearest integer when extension present
-      const otHours = ext > 0 ? Math.ceil(baseOT + ext) : baseOT;
-      if(otHours<=0) return;
-      const hrr=hrrByName[name]||0;
-      const totalCost=Math.round(otHours*hrr*1.5);   // integer SAR — ensures page total = sum of displayed rows
-      const staffRec=staffRecs.find(s=>s.name.trim()===name);
-      const badge=staffRec?.badge||'—';
-      rows.push({ name, badge, otHours, totalCost, hrr, loc: '', just: '' });
-    });
+    const rows = _buildRowsFromPayload(payload, staffRecs, hrrByName, extMap);
 
     buildForm(rows, area, meta);
     showStatus(`Form built — ${rows.length} staff with OT | ${Math.ceil(rows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
+  }
+
+  // ── Fetch latest named release for one area ───────────────────────────────
+  async function _fetchLatestRelease(key, area, month, year) {
+    try {
+      const docId = `${year}-${String(month).padStart(2,'0')}`;
+      const snap  = await window.FB.getDoc(releaseIndexRef(key, area, docId));
+      if (!snap.exists()) return null;
+      const releases = snap.data().releases || [];
+      if (!releases.length) return null;
+      const latest = releases[releases.length - 1];
+      const rdoc   = await window.FB.getDoc(releaseDocRef(key, area, latest.id));
+      return rdoc.exists() ? { payload: rdoc.data(), relMeta: latest } : null;
+    } catch { return null; }
+  }
+
+  // ── Master summary page (across all areas) ────────────────────────────────
+  function masterSummaryHtml(items, month, year) {
+    const monthName  = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
+    const grandStaff = items.reduce((s,i) => s + i.staffCount, 0);
+    const grandHours = items.reduce((s,i) => s + i.totalHours, 0);
+    const grandCost  = items.reduce((s,i) => s + i.totalCost,  0);
+    const rowsHtml   = items.map(it => `<tr>
+      <td style="padding:6px 8px;border:1px solid #333;">${esc(it.area)}</td>
+      <td class="num" style="padding:6px 8px;border:1px solid #333;">${it.staffCount}</td>
+      <td class="num" style="padding:6px 8px;border:1px solid #333;">${it.totalHours}</td>
+      <td class="num" style="padding:6px 8px;border:1px solid #333;">${fmt(it.totalCost)}</td>
+    </tr>`).join('');
+    return `<div class="print-page page-break-after">
+      <div class="form-title">
+        <div class="main-title">Monthly Overtime Pre-Approval — Grand Summary</div>
+        <div class="sub-title">King Abdulaziz Medical City<br>National Guard Health Affairs<br>Western Region</div>
+      </div>
+      <div style="margin:10px 0 14px;font-size:11px;color:#374151;">
+        Period: <strong>${monthName} ${year}</strong> &nbsp;·&nbsp; All Selected Areas
+      </div>
+      <table class="ot-table">
+        <thead><tr>
+          <th style="text-align:left;padding:8px;width:40%;">Area</th>
+          <th style="text-align:center;padding:8px;width:20%;">Staff Count</th>
+          <th style="text-align:center;padding:8px;width:20%;">Total Hours</th>
+          <th style="text-align:center;padding:8px;width:20%;">Total Cost (SR)</th>
+        </tr></thead>
+        <tbody>
+          ${rowsHtml}
+          <tr class="total-row" style="background:#fef9c3;">
+            <td style="padding:7px 8px;font-weight:900;border:1px solid #333;text-align:center;">Grand Total</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandStaff}</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandHours}</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${fmt(grandCost)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  // ── All-Areas print orchestrator ──────────────────────────────────────────
+  async function buildAndPrintAllAreas(selectedAreas, month, year, zeroAction) {
+    const key = (window.BCOT_APP_KEY||'').trim();
+    if (!key) { showStatus('config.js not found.', false); return; }
+
+    const staffRecs = (() => { try{ return JSON.parse(localStorage.getItem(STAFF_KEY)||'[]')||[]; }catch{ return []; } })();
+    const hrrByName = {};
+    staffRecs.forEach(s => { if(s.name&&s.hrr) hrrByName[s.name.trim()]=Number(s.hrr)||0; });
+
+    const baseMeta = {
+      dept:     document.getElementById('deptName')?.value     || 'PHARMACEUTICAL CARE DEPARTMENT KASC 6755',
+      period:   new Date(year,month-1,1).toLocaleString('default',{month:'long'}) + '-' + String(year).slice(-2),
+      cost:     document.getElementById('costCenter')?.value   || '028498-7330',
+      tel:      document.getElementById('inchargeTel')?.value  || '67845 / 67843',
+      reqName:  document.getElementById('reqName')?.value      || 'Dr. Mohammed Aseeri',
+      reqTitle: document.getElementById('reqTitle')?.value     || 'Director Pharmaceutical Care Services-WR',
+      reqID:    document.getElementById('reqID')?.value        || '9146184',
+      appName:  document.getElementById('appName')?.value      || 'RPh. Jabr AL Subaie',
+      appTitle: document.getElementById('appTitle')?.value     || 'Executive Director, Operations, WR',
+      appID:    document.getElementById('appID')?.value        || '3712312',
+    };
+
+    let fullHtml = '', summaryItems = [], noRelease = [], noOT = [];
+
+    for (const area of selectedAreas) {
+      showStatus(`Fetching ${area}…`);
+      const result = await _fetchLatestRelease(key, area, month, year);
+      if (!result) { noRelease.push(area); continue; }
+
+      const extMap = await fetchGrantedExtensions(month, year, area);
+      const rows   = _buildRowsFromPayload(result.payload, staffRecs, hrrByName, extMap);
+
+      if (!rows.length) {
+        if (zeroAction === 'zeros') {
+          summaryItems.push({ area, staffCount:0, totalHours:0, totalCost:0 });
+        } else {
+          noOT.push(area);
+        }
+        continue;
+      }
+
+      const meta = { ...baseMeta };
+      fullHtml += buildFormHtml(rows, area, meta, 'full');
+      summaryItems.push({
+        area,
+        staffCount: rows.length,
+        totalHours: rows.reduce((s,r) => s+r.otHours, 0),
+        totalCost:  rows.reduce((s,r) => s+r.totalCost, 0),
+      });
+    }
+
+    if (!summaryItems.length) {
+      const why = noRelease.length ? ` No releases found for: ${noRelease.join(', ')}.` : '';
+      showStatus('No data to print.' + why, false);
+      return;
+    }
+
+    const wrapper = document.getElementById('formWrapper');
+    const prevHtml = wrapper.innerHTML;
+    wrapper.innerHTML = fullHtml + masterSummaryHtml(summaryItems, month, year) + formFooterHtml();
+    window.print();
+    wrapper.innerHTML = prevHtml;
+
+    const parts = [
+      `Printed ${summaryItems.filter(i=>i.staffCount>0).length} area(s) with OT`,
+      zeroAction==='zeros' && summaryItems.some(i=>i.staffCount===0)
+        ? `${summaryItems.filter(i=>i.staffCount===0).length} included as zeros`
+        : null,
+      noRelease.length  ? `No release: ${noRelease.join(', ')}`  : null,
+      noOT.length       ? `Skipped (no OT): ${noOT.join(', ')}` : null,
+    ].filter(Boolean);
+    showStatus(parts.join(' · ') + ' ✅');
+  }
+
+  // ── All-Areas modal ───────────────────────────────────────────────────────
+  function openAllAreasModal() {
+    document.getElementById('_aaBd')?.remove();
+    const areas = (() => { try{ return JSON.parse(localStorage.getItem(AREAS_LIST_KEY)||'[]')||[]; }catch{ return []; } })();
+    if (!areas.length) { showStatus('No areas found. Add areas in the rota first.', false); return; }
+
+    const month = Number(document.getElementById('monthSel').value);
+    const year  = Number(document.getElementById('yearSel').value) || new Date().getFullYear();
+    const monthName = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
+
+    const chkHtml = areas.map(a => {
+      const isBC = /bcot|^bc$/i.test(a.trim());
+      return `<label style="display:flex;align-items:center;gap:9px;padding:5px 2px;cursor:pointer;user-select:none;">
+        <input type="checkbox" class="_aChk" value="${esc(a)}" ${isBC?'':'checked'} style="width:15px;height:15px;cursor:pointer;accent-color:#1a4f8b;"/>
+        <span style="font-size:13px;color:#1e293b;">${esc(a)}</span>
+      </label>`;
+    }).join('');
+
+    const bd = document.createElement('div');
+    bd.id = '_aaBd';
+    bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:9800;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
+    bd.innerHTML = `
+      <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(460px,96%);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="background:linear-gradient(135deg,#1a4f8b,#2e8b57);padding:13px 18px;display:flex;align-items:center;justify-content:space-between;">
+          <span style="color:#fff;font-size:13px;font-weight:700;">🖨 Print All Areas — ${monthName} ${year}</span>
+          <button id="_aaX" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+        </div>
+        <div style="padding:16px 20px;overflow-y:auto;flex:1;">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;">Areas</span>
+            <div style="display:flex;gap:6px;">
+              <button id="_aaAll"  style="background:#e2e8f0;color:#374151;border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;">All</button>
+              <button id="_aaNone" style="background:#e2e8f0;color:#374151;border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;">None</button>
+            </div>
+          </div>
+          <div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;max-height:180px;overflow-y:auto;margin-bottom:14px;">
+            ${chkHtml}
+          </div>
+
+          <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;border:1px solid #e2e8f0;">
+            <span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:9px;">Areas with no overtime this month</span>
+            <label style="display:flex;align-items:center;gap:9px;margin-bottom:7px;cursor:pointer;">
+              <input type="radio" name="_zeroAct" value="skip" checked style="cursor:pointer;accent-color:#1a4f8b;"/>
+              <span style="font-size:13px;">Skip</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:9px;cursor:pointer;">
+              <input type="radio" name="_zeroAct" value="zeros" style="cursor:pointer;accent-color:#1a4f8b;"/>
+              <span style="font-size:13px;">Include with zeros</span>
+            </label>
+          </div>
+
+        </div>
+        <div style="padding:11px 20px 15px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;">
+          <button id="_aaCn" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;">Cancel</button>
+          <button id="_aaBuild" style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;">🖨 Build &amp; Print</button>
+        </div>
+      </div>`;
+    document.body.appendChild(bd);
+
+    const $ = id => bd.querySelector(id);
+    const dismiss = () => bd.remove();
+    bd.addEventListener('click', e => { if(e.target===bd) dismiss(); });
+    $('#_aaX').addEventListener('click', dismiss);
+    $('#_aaCn').addEventListener('click', dismiss);
+    $('#_aaAll').addEventListener('click',  () => bd.querySelectorAll('._aChk').forEach(c => c.checked=true));
+    $('#_aaNone').addEventListener('click', () => bd.querySelectorAll('._aChk').forEach(c => c.checked=false));
+
+    $('#_aaBuild').addEventListener('click', async () => {
+      const selected = [...bd.querySelectorAll('._aChk:checked')].map(c => c.value);
+      if (!selected.length) { showStatus('Select at least one area.', false); return; }
+      const zeroAction = bd.querySelector('input[name="_zeroAct"]:checked')?.value || 'skip';
+      dismiss();
+      await buildAndPrintAllAreas(selected, month, year, zeroAction);
+    });
   }
 
   // Init
