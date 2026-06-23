@@ -278,7 +278,7 @@
   // mode: 'full'      → individual cost column + cost in total row (default)
   //       'noSR'      → no cost column, total hours only in total row
   //       'totalOnly' → no cost column per row, but total row shows hours + total SR amount
-  function buildFormHtml(rows, area, meta, mode = 'full') {
+  function buildFormHtml(rows, area, meta, mode = 'full', includeSummary = true) {
     const rp1 = Math.max(5, parseInt(document.getElementById('rowsPage1').value,10)||18);
     const rpN = Math.max(5, parseInt(document.getElementById('rowsPageN').value,10)||24);
 
@@ -410,7 +410,7 @@
       html += `</div>`;  // end .print-page
     });
 
-    html += summaryPageHtml(groups, meta, mode);
+    if (includeSummary) html += summaryPageHtml(groups, meta, mode);
     return html;
   }
 
@@ -663,7 +663,7 @@
       }
 
       const meta = { ...baseMeta };
-      fullHtml += buildFormHtml(rows, area, meta, 'full');
+      fullHtml += buildFormHtml(rows, area, meta, 'full', false);
       summaryItems.push({
         area,
         staffCount: rows.length,
