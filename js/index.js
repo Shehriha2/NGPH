@@ -2334,7 +2334,9 @@
       const key=getKeyOrWarn(); if (!key) return;
       const area=getCurrentArea();
       if (!area||area==='ALL'){ showStatusMessage('Select a specific area first.','error'); return; }
-      const payload=tableToPayload();
+      let payload;
+      try { payload=tableToPayload(); }
+      catch(err){ showStatusMessage('Cannot save: '+(err?.message||err),'error'); return; }
       if (!payload.records.length){ showStatusMessage('Nothing to save (no valid rows).','error'); return; }
       document.getElementById('saveModalLabel').textContent=getRotaDisplayName();
       document.getElementById('saveReleaseNote').value='';
