@@ -151,6 +151,27 @@
 
     #authOverlay{ position:fixed; inset:0; background:#f1f5f9; z-index:9999; display:flex; align-items:center; justify-content:center; }
     @media print{ .no-print,.controls-bar,.tab-nav{ display:none !important; } }
+
+    /* ── Availability calendar ── */
+    .cal-wrap{ user-select:none; }
+    .cal-nav{ display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:10px; }
+    .cal-nav span{ font-size:14px; font-weight:700; min-width:150px; text-align:center; }
+    .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+    .cal-hd{ text-align:center; font-size:10px; font-weight:700; color:#64748b; padding:4px 0; text-transform:uppercase; }
+    .cd{ min-height:36px; display:flex; align-items:center; justify-content:center; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; transition:background .1s; }
+    .cd.blank{ cursor:default; }
+    .cd.avail{ background:#f0fdf4; color:#166534; }
+    .cd.avail:hover{ background:#bbf7d0; }
+    .cd.unavail{ background:#fee2e2; color:#991b1b; }
+    .cd.unavail:hover{ background:#fca5a5; }
+    .cd.today{ box-shadow:inset 0 0 0 2px #1a4f8b; font-weight:900; }
+    .uperiod{
+      display:flex; align-items:center; gap:8px; padding:7px 10px;
+      border-radius:7px; border:1px solid #fecaca; background:#fff5f5; margin-bottom:5px;
+    }
+    .uperiod-info{ flex:1; font-size:12px; }
+    .uf-box{ background:#fff5f5; border:1px solid #fecaca; border-radius:8px; padding:13px; margin-top:8px; }
+    .avail-warn{ background:#fef9c3; border:1px solid #fde68a; border-radius:6px; padding:7px 10px; font-size:12px; color:#92400e; margin-top:6px; display:none; }
   </style>
 </head>
 <body>
@@ -294,6 +315,7 @@
         <div class="fg"><label class="fl">End Date *</label><input type="date" id="rmEnd"/></div>
       </div>
       <div class="fg"><label class="fl">Preceptor</label><select id="rmPrec"><option value="">— No Preceptor —</option></select></div>
+      <div class="avail-warn" id="precAvailWarn"></div>
       <div class="fg"><label class="fl">Remarks</label><textarea id="rmRem" style="min-height:65px;" placeholder="Any notes about this rotation…"></textarea></div>
     </div>
     <div class="mft">
@@ -333,6 +355,71 @@
   </div>
 </div>
 
+<!-- ── MODAL: Preceptor Availability Calendar ──────────────────────────── -->
+<div id="mAvail" class="mbd">
+  <div class="mbox" style="width:min(560px,96%);">
+    <div class="mhd" style="background:linear-gradient(135deg,#0f766e,#1a4f8b);">
+      <span id="mAvailTitle">Preceptor Availability</span>
+      <button onclick="closeModal('mAvail')">✕</button>
+    </div>
+    <div class="mbody">
+      <input type="hidden" id="avPrecId"/>
+      <div class="cal-wrap">
+        <div class="cal-nav">
+          <button class="btn-ghost btn-sm" onclick="navCal(-1)">‹ Prev</button>
+          <span id="calLabel"></span>
+          <button class="btn-ghost btn-sm" onclick="navCal(1)">Next ›</button>
+        </div>
+        <div class="cal-grid" style="margin-bottom:3px;">
+          <div class="cal-hd">Mon</div><div class="cal-hd">Tue</div><div class="cal-hd">Wed</div>
+          <div class="cal-hd">Thu</div><div class="cal-hd">Fri</div>
+          <div class="cal-hd" style="color:#dc2626;">Sat</div><div class="cal-hd" style="color:#dc2626;">Sun</div>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div style="display:flex;gap:10px;margin-top:8px;font-size:11px;color:#64748b;">
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#f0fdf4;border:1px solid #bbf7d0;vertical-align:middle;margin-right:3px;"></span>Available</span>
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#fee2e2;border:1px solid #fca5a5;vertical-align:middle;margin-right:3px;"></span>Unavailable (click to remove)</span>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:12px;font-weight:700;color:#374151;">Unavailability Periods</span>
+          <button class="btn-red btn-sm no-print" onclick="showUnavailForm()">+ Mark Unavailable</button>
+        </div>
+        <div id="unavailList"></div>
+        <div id="unavailForm" class="uf-box" style="display:none;">
+          <div class="fr" style="margin-bottom:0;">
+            <div class="fg"><label class="fl">From *</label><input type="date" id="ufStart"/></div>
+            <div class="fg"><label class="fl">To *</label><input type="date" id="ufEnd"/></div>
+          </div>
+          <div class="fg">
+            <label class="fl">Reason *</label>
+            <select id="ufReason">
+              <option value="">— Select reason —</option>
+              <option>Annual Leave</option>
+              <option>Sick Leave</option>
+              <option>Training / Course</option>
+              <option>Conference / Workshop</option>
+              <option>Administrative Duty</option>
+              <option>Off Day</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Notes <span style="font-weight:400;text-transform:none;">(optional)</span></label><input type="text" id="ufNotes" placeholder="Additional details…"/></div>
+          <div style="display:flex;gap:7px;justify-content:flex-end;margin-top:10px;">
+            <button class="btn-ghost btn-sm" onclick="hideUnavailForm()">Cancel</button>
+            <button class="btn-red btn-sm" onclick="saveUnavail()">💾 Save Period</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mAvail')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="smsg" id="sb"></div>
 <script src="config.js"></script>
 <script src="js/auth.js"></script>
@@ -357,6 +444,9 @@
   let _selId      = null;
   let _typeFilter = 'All';
   let _psResults  = [];
+  let _availPrecId = null;
+  let _calYear     = new Date().getFullYear();
+  let _calMonth    = new Date().getMonth();
 
   const _key  = () => (window.BCOT_APP_KEY||'').trim();
   const tColl = () => collection(db,'bcot_overtime_secure',_key(),'trainees');
@@ -612,7 +702,8 @@
         <td>${esc(p.area||'—')}</td>
         <td style="text-align:center;font-weight:700;color:${active>0?'#166534':'#94a3b8'};">${active}</td>
         <td><span class="chip ${p.active!==false?'ch-active':'ch-completed'}">${p.active!==false?'Active':'Inactive'}</span></td>
-        <td class="no-print"><div style="display:flex;gap:5px;">
+        <td class="no-print"><div style="display:flex;gap:5px;flex-wrap:wrap;">
+          <button class="btn-sm" style="background:#0f766e;" onclick="openAvail('${p._id}')">📅 Availability</button>
           <button class="btn-sm btn-ghost" onclick="togPrec('${p._id}')">${p.active!==false?'Deactivate':'Activate'}</button>
           <button class="btn-sm btn-red" onclick="delPrec('${p._id}')">🗑</button>
         </div></td>
@@ -680,6 +771,142 @@
     catch(e){ ss('Delete failed: '+(e?.message||e),false); }
   };
 
+  // ── Availability calendar ────────────────────────────────────────────────
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const REASONS = ['Annual Leave','Sick Leave','Training / Course','Conference / Workshop','Administrative Duty','Off Day','Other'];
+
+  window.openAvail = function(id){
+    _availPrecId = id;
+    _calYear  = new Date().getFullYear();
+    _calMonth = new Date().getMonth();
+    const p = _preceptors.find(x=>x._id===id);
+    document.getElementById('mAvailTitle').textContent = `📅 ${p?.name||'Preceptor'} — Availability`;
+    document.getElementById('avPrecId').value = id;
+    hideUnavailForm();
+    renderCal(); renderUnavailList();
+    document.getElementById('mAvail').classList.add('show');
+  };
+
+  window.navCal = function(dir){
+    _calMonth += dir;
+    if(_calMonth<0){ _calMonth=11; _calYear--; }
+    if(_calMonth>11){ _calMonth=0; _calYear++; }
+    renderCal();
+  };
+
+  function renderCal(){
+    const p       = _preceptors.find(x=>x._id===_availPrecId);
+    const periods = p?.unavailability || [];
+    const today   = new Date().toISOString().slice(0,10);
+    const firstDow = (new Date(_calYear,_calMonth,1).getDay()+6)%7; // Mon=0
+    const daysInM  = new Date(_calYear,_calMonth+1,0).getDate();
+    document.getElementById('calLabel').textContent = `${MONTHS[_calMonth]} ${_calYear}`;
+    let cells='';
+    for(let i=0;i<firstDow;i++) cells+=`<div class="cd blank"></div>`;
+    for(let d=1;d<=daysInM;d++){
+      const ds  = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const per = periods.find(p=>p.startDate<=ds&&p.endDate>=ds);
+      const cls = per?'unavail':'avail';
+      const tip = per?`${per.reason}${per.notes?' — '+per.notes:''}` : 'Available — click to mark unavailable';
+      const fn  = per?`removeUnavailDay('${ds}')`:`prefillDate('${ds}')`;
+      cells+=`<div class="cd ${cls}${ds===today?' today':''}" title="${esc(tip)}" onclick="${fn}">${d}</div>`;
+    }
+    document.getElementById('calGrid').innerHTML=cells;
+  }
+
+  function renderUnavailList(){
+    const p       = _preceptors.find(x=>x._id===_availPrecId);
+    const periods = [...(p?.unavailability||[])].sort((a,b)=>a.startDate.localeCompare(b.startDate));
+    const el      = document.getElementById('unavailList');
+    if(!periods.length){ el.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:4px 0;">No unavailability periods logged.</div>'; return; }
+    el.innerHTML = periods.map((per,i)=>`
+      <div class="uperiod">
+        <div class="uperiod-info">
+          <strong>${fd(per.startDate)}</strong> → <strong>${fd(per.endDate)}</strong>
+          <span class="chip ch-r3" style="margin-left:6px;">${esc(per.reason||'—')}</span>
+          ${per.notes?`<span style="color:#64748b;font-size:11px;display:block;margin-top:2px;">${esc(per.notes)}</span>`:''}
+        </div>
+        <button class="btn-sm btn-red" onclick="delUnavail('${esc(per.id||'')}')">🗑</button>
+      </div>`).join('');
+  }
+
+  window.showUnavailForm = function(){
+    document.getElementById('unavailForm').style.display='block';
+    ['ufStart','ufEnd','ufNotes'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('ufReason').value='';
+    setTimeout(()=>document.getElementById('ufStart').focus(),80);
+  };
+  window.hideUnavailForm = function(){ document.getElementById('unavailForm').style.display='none'; };
+
+  window.prefillDate = function(d){
+    document.getElementById('unavailForm').style.display='block';
+    document.getElementById('ufStart').value=d;
+    document.getElementById('ufEnd').value=d;
+    setTimeout(()=>document.getElementById('ufReason').focus(),80);
+  };
+
+  window.saveUnavail = async function(){
+    const id     = document.getElementById('avPrecId').value;
+    const start  = document.getElementById('ufStart').value;
+    const end    = document.getElementById('ufEnd').value;
+    const reason = document.getElementById('ufReason').value;
+    const notes  = document.getElementById('ufNotes').value.trim();
+    if(!start) { ss('Start date is required.',false); return; }
+    if(!end)   { ss('End date is required.',false); return; }
+    if(end<start){ ss('End date must be after start date.',false); return; }
+    if(!reason){ ss('Reason is required.',false); return; }
+    const p       = _preceptors.find(x=>x._id===id);
+    const periods = [...(p?.unavailability||[]), { id:`uav_${Date.now()}`, startDate:start, endDate:end, reason, notes }];
+    try{
+      await updateDoc(pDoc(id),{unavailability:periods});
+      p.unavailability=periods;
+      hideUnavailForm(); renderCal(); renderUnavailList();
+      ss('Unavailability period saved ✅');
+    } catch(e){ ss('Save failed: '+(e?.message||e),false); }
+  };
+
+  window.delUnavail = async function(uid){
+    const id  = document.getElementById('avPrecId').value;
+    const p   = _preceptors.find(x=>x._id===id);
+    const per = (p?.unavailability||[]).find(x=>x.id===uid);
+    if(!per) return;
+    const ok  = await window.BCOT_AUTH.confirm(
+      `Remove "${per.reason}" (${fd(per.startDate)} → ${fd(per.endDate)})?`,
+      {title:'🗑 Remove Period',confirmLabel:'Remove'}
+    );
+    if(!ok) return;
+    const newP=(p.unavailability||[]).filter(x=>x.id!==uid);
+    try{
+      await updateDoc(pDoc(id),{unavailability:newP});
+      p.unavailability=newP; renderCal(); renderUnavailList();
+      ss('Period removed.');
+    } catch(e){ ss('Remove failed: '+(e?.message||e),false); }
+  };
+
+  window.removeUnavailDay = async function(ds){
+    const p   = _preceptors.find(x=>x._id===_availPrecId);
+    const per = (p?.unavailability||[]).find(x=>x.startDate<=ds&&x.endDate>=ds);
+    if(per) window.delUnavail(per.id);
+  };
+
+  // Show warning in rotation modal when preceptor is unavailable for selected dates
+  function checkPrecAvailWarning(){
+    const pid   = document.getElementById('rmPrec').value;
+    const start = document.getElementById('rmStart').value;
+    const end   = document.getElementById('rmEnd').value;
+    const wEl   = document.getElementById('precAvailWarn');
+    if(!wEl) return;
+    if(!pid||!start||!end){ wEl.style.display='none'; return; }
+    const p      = _preceptors.find(x=>x._id===pid);
+    const periods= p?.unavailability||[];
+    const clash  = periods.find(per=>per.startDate<=end&&per.endDate>=start);
+    if(clash){
+      wEl.textContent=`⚠ ${p.name} is marked unavailable (${clash.reason}) from ${fd(clash.startDate)} to ${fd(clash.endDate)}.`;
+      wEl.style.display='block';
+    } else { wEl.style.display='none'; }
+  }
+  window.checkPrecAvailWarning = checkPrecAvailWarning;
+
   // ── Reports ───────────────────────────────────────────────────────────────
   function renderReports(){
     const in30=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
@@ -731,8 +958,12 @@
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
   window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
-  ['mTrainee','mRotation','mPreceptor'].forEach(id=>{
+  ['mTrainee','mRotation','mPreceptor','mAvail'].forEach(id=>{
     document.getElementById(id).addEventListener('click',e=>{ if(e.target.id===id) window.closeModal(id); });
+  });
+  // Re-check availability warning whenever preceptor or dates change in rotation modal
+  ['rmPrec','rmStart','rmEnd'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', checkPrecAvailWarning);
   });
 
   // ── Init ──────────────────────────────────────────────────────────────────
