@@ -138,11 +138,12 @@
     // ── Record helpers ─────────────────────────────────────────────────────────
     function normalizeRecord(r) {
       return {
-        name:  String(r?.name  || "").trim(),
-        badge: String(r?.badge || "").trim(),
-        role:  String(r?.role  || "Pharmacist").trim() || "Pharmacist",
-        hrr:   Number(r?.hrr  ?? 0) || 0,
-        area:  String(r?.area  || "").trim().toUpperCase()
+        name:         String(r?.name         || "").trim(),
+        badge:        String(r?.badge        || "").trim(),
+        role:         String(r?.role         || "Pharmacist").trim() || "Pharmacist",
+        hrr:          Number(r?.hrr         ?? 0) || 0,
+        area:         String(r?.area         || "").trim().toUpperCase(),
+        contractDate: String(r?.contractDate || "").trim(),
       };
     }
 
@@ -471,7 +472,7 @@
       modal.id = "editStaffModal";
       modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:3000;";
       modal.innerHTML = `
-        <div style="background:#fff;border-radius:12px;padding:22px 24px;min-width:360px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+        <div style="background:#fff;border-radius:12px;padding:22px 24px;min-width:360px;max-width:540px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);max-height:92vh;overflow-y:auto;">
           <h3 style="margin:0 0 16px;font-size:13px;color:#1a4f8b;">Edit Staff Record</h3>
           <div style="display:grid;gap:10px;">
             <label style="font-size:11px;font-weight:700;color:#374151;">Name
@@ -493,6 +494,10 @@
               <input id="editHRR" type="number" step="0.01" value="${rec.hrr||0}"
                 style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/>
             </label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Contract Date
+              <input id="editContractDate" type="date" value="${escapeHtml(rec.contractDate||'')}"
+                style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/>
+            </label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Areas (this record only)
               <div style="display:flex;gap:6px;align-items:center;margin-top:3px;">
                 <div id="editAreaDisplay" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#f9fafb;min-height:32px;color:#374151;word-break:break-all;">
@@ -502,7 +507,12 @@
               </div>
             </label>
             <div style="font-size:10px;color:#6b7280;background:#f9fbfd;border-radius:6px;padding:6px 8px;">
-              ℹ️ Name, Badge, Role and HRR changes apply to <b>all area copies</b> of this staff member (matched by badge). Area change applies only to this record.
+              ℹ️ Name, Badge, Role, HRR and Contract Date changes apply to <b>all area copies</b> of this staff member (matched by badge). Area change applies only to this record.
+            </div>
+            <!-- Lieu days balance (read-only, fetched from Firestore) -->
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;">
+              <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:5px;">Lieu Days Balance</div>
+              <div id="editLieuBalance" style="font-size:12px;color:#374151;">Loading…</div>
             </div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
@@ -511,6 +521,46 @@
           </div>
         </div>`;
       document.body.appendChild(modal);
+
+      // ── Fetch lieu balance asynchronously ────────────────────────────────────
+      (async () => {
+        const balEl = document.getElementById("editLieuBalance");
+        if (!balEl || !window.FB || !rec.badge) {
+          if (balEl) balEl.textContent = rec.badge ? "Firebase not ready." : "No badge — save a badge to track lieu days.";
+          return;
+        }
+        const k = (window.BCOT_APP_KEY || "").trim();
+        if (!k) { balEl.textContent = "App key missing."; return; }
+        try {
+          const snap = await window.FB.getDoc(
+            window.FB.doc(window.FB.db, "bcot_overtime_secure", k, "lieu_days", rec.badge)
+          );
+          if (!snap.exists()) {
+            balEl.innerHTML = `Not set up yet. <a href="LieuDays.html" target="_blank"
+              style="color:#0f766e;font-weight:700;">Set up in Lieu Days page ↗</a>`;
+            return;
+          }
+          const lieu = snap.data() || {};
+          const starting = Number(lieu.startingBalance) || 0;
+          let earned = 0, used = 0, adjusted = 0;
+          (lieu.transactions || []).forEach(t => {
+            const d = Number(t.days) || 0;
+            if (t.type === "earn")   earned   += d;
+            if (t.type === "use")    used     += d;
+            if (t.type === "adjust") adjusted += d;
+          });
+          const current = starting + earned - used + adjusted;
+          const clr = current > 0 ? "#166534" : current < 0 ? "#dc2626" : "#64748b";
+          const fmt = n => (n === Math.floor(n) ? String(n) : n.toFixed(1));
+          balEl.innerHTML =
+            `<span style="color:#64748b;">${fmt(starting)} starting + ${fmt(earned)} earned − ${fmt(used)} used`
+            + ` + ${adjusted >= 0 ? '' : '−'}${fmt(Math.abs(adjusted))} adj =</span>`
+            + ` <strong style="color:${clr};font-size:14px;">${fmt(current)} days</strong>`
+            + ` <a href="LieuDays.html" target="_blank" style="margin-left:8px;font-size:11px;color:#0f766e;">Manage ↗</a>`;
+        } catch (e) {
+          if (balEl) balEl.textContent = "Could not load lieu balance.";
+        }
+      })();
 
       document.getElementById("editCancelBtn").onclick = () => modal.remove();
       modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
@@ -523,23 +573,25 @@
       };
 
       document.getElementById("editSaveBtn").onclick = () => {
-        const newName  = document.getElementById("editName").value.trim();
-        const newBadge = document.getElementById("editBadge").value.trim();
-        const newRole  = document.getElementById("editRole").value;
-        const newHRR   = parseFloat(document.getElementById("editHRR").value) || 0;
-        const newArea  = _editAreas.toUpperCase();
+        const newName         = document.getElementById("editName").value.trim();
+        const newBadge        = document.getElementById("editBadge").value.trim();
+        const newRole         = document.getElementById("editRole").value;
+        const newHRR          = parseFloat(document.getElementById("editHRR").value) || 0;
+        const newContractDate = (document.getElementById("editContractDate").value || "").trim();
+        const newArea         = _editAreas.toUpperCase();
 
         if (!newName) { alert("Name is required."); return; }
 
         const oldBadge = rec.badge;
 
-        // Update ALL records with same badge (across all areas) — name, badge, role, HRR
+        // Update ALL records with same badge (across all areas) — name, badge, role, HRR, contractDate
         staffRecords.forEach(r => {
           if (oldBadge && r.badge === oldBadge) {
-            r.name  = newName;
-            r.badge = newBadge;
-            r.role  = newRole;
-            r.hrr   = newHRR;
+            r.name         = newName;
+            r.badge        = newBadge;
+            r.role         = newRole;
+            r.hrr          = newHRR;
+            r.contractDate = newContractDate;
           }
         });
         // Area change only for this specific record
