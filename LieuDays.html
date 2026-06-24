@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lieu Days Management</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --danger:#dc2626; --warn:#d97706; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:#f1f5f9; font-size:13px; color:#1e293b; }
+
+    /* ── Controls ── */
+    .controls-bar{
+      background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.12);
+      padding:10px 16px; margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    .page-badge{
+      background:linear-gradient(135deg,#1a4f8b,#0f766e); color:#fff; font-weight:800;
+      font-size:13px; padding:6px 16px; border-radius:20px; letter-spacing:.3px; white-space:nowrap;
+    }
+    .controls-bar label{ font-weight:700; color:#334155; white-space:nowrap; }
+    select,input[type="text"],input[type="number"],input[type="date"],textarea{
+      padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px;
+      font-family:Arial,sans-serif; outline:none;
+    }
+    select:focus,input:focus,textarea:focus{ border-color:var(--primary); box-shadow:0 0 0 2px rgba(26,79,139,.15); }
+    button{
+      padding:7px 14px; border:none; border-radius:7px; font-size:13px; font-weight:700;
+      cursor:pointer; background:var(--primary); color:#fff; transition:background .15s;
+    }
+    button:hover{ background:#163e70; }
+    .btn-green{ background:#16a34a; }  .btn-green:hover{ background:#15803d; }
+    .btn-teal{ background:#0f766e; }   .btn-teal:hover{ background:#0b5c56; }
+    .btn-red{ background:var(--danger); }     .btn-red:hover{ background:#b91c1c; }
+    .btn-orange{ background:var(--warn); }    .btn-orange:hover{ background:#b45309; }
+    .btn-ghost{ background:#e2e8f0; color:#334155; } .btn-ghost:hover{ background:#cbd5e1; }
+
+    /* ── Summary table ── */
+    .table-wrap{
+      overflow-x:auto; background:#fff; border-radius:12px;
+      box-shadow:0 1px 4px rgba(0,0,0,.09); border:1px solid #e2e8f0;
+    }
+    table.sum-table{ width:100%; border-collapse:collapse; font-size:12px; }
+    .sum-table th{
+      background:#1a4f8b; color:#fff; padding:9px 11px; text-align:left; font-size:11px;
+      white-space:nowrap; position:sticky; top:0; z-index:2;
+    }
+    .sum-table td{ padding:8px 11px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .sum-table tbody tr:hover{ background:#f8fafc; }
+    .sum-table tbody tr:last-child td{ border-bottom:none; }
+    .bal-chip{
+      display:inline-block; padding:3px 10px; border-radius:10px; font-size:11px; font-weight:800;
+    }
+    .chip-pos{ background:#dcfce7; color:#166534; }
+    .chip-neg{ background:#fee2e2; color:#dc2626; }
+    .chip-zero{ background:#f1f5f9; color:#64748b; }
+
+    /* ── Detail modal ── */
+    #detailModal{
+      position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9000;
+      display:none; align-items:flex-start; justify-content:center;
+      padding:16px; overflow-y:auto;
+    }
+    #detailModal.show{ display:flex; }
+    .detail-box{
+      background:#fff; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+      width:min(960px,98%); margin:auto;
+    }
+    .detail-header{
+      background:linear-gradient(135deg,#1a4f8b,#0f766e); color:#fff;
+      padding:14px 20px; border-radius:14px 14px 0 0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .detail-header h2{ margin:0; font-size:15px; font-weight:800; }
+    .detail-close{ background:transparent; border:none; color:#fff; font-size:22px; cursor:pointer; padding:0 4px; line-height:1; }
+    .detail-body{ padding:22px; }
+
+    /* ── Balance formula ── */
+    .bal-formula{
+      background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+      padding:14px 20px; margin-bottom:18px;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    .bf-block{ text-align:center; min-width:56px; }
+    .bf-val{ font-size:22px; font-weight:800; line-height:1.2; }
+    .bf-label{ font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
+    .bf-op{ font-size:22px; color:#94a3b8; font-weight:300; }
+    .bf-current{
+      background:#1a4f8b; color:#fff; border-radius:10px; padding:8px 18px;
+    }
+    .bf-current .bf-val{ color:#fff; }
+    .bf-current .bf-label{ color:rgba(255,255,255,.7); }
+
+    /* ── Starting data box ── */
+    .start-box{
+      background:#fafafa; border:1px solid #e2e8f0; border-radius:10px;
+      padding:14px 16px; margin-bottom:18px;
+    }
+    .start-box h4{
+      margin:0 0 12px; font-size:11px; color:#64748b;
+      text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; gap:8px;
+    }
+    .lock-chip{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:8px; }
+    .lock-chip.locked{ background:#dcfce7; color:#166534; }
+    .lock-chip.unlocked{ background:#fef3c7; color:#92400e; }
+    .ro-field{ margin-bottom:10px; }
+    .ro-field:last-of-type{ margin-bottom:0; }
+    .ro-field label{ font-size:11px; font-weight:700; color:#374151; display:block; margin-bottom:4px; }
+    .ro-value{
+      padding:7px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:6px;
+      font-size:12px; color:#1e293b; min-height:34px; white-space:pre-wrap; word-break:break-word;
+    }
+    .ro-value.empty{ color:#94a3b8; font-style:italic; }
+
+    /* ── Transaction table ── */
+    .txn-list{
+      max-height:280px; overflow-y:auto; border:1px solid #e2e8f0;
+      border-radius:8px; margin-bottom:16px;
+    }
+    table.txn-table{ width:100%; border-collapse:collapse; font-size:11px; }
+    .txn-table th{
+      background:#f8fafc; color:#374151; padding:7px 10px; text-align:left;
+      font-size:10px; border-bottom:1px solid #e2e8f0; position:sticky; top:0;
+    }
+    .txn-table td{ padding:6px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .txn-table tr:last-child td{ border-bottom:none; }
+    .type-earn{ color:#166534; font-weight:700; }
+    .type-use{ color:#dc2626; font-weight:700; }
+    .type-adjust{ color:#d97706; font-weight:700; }
+
+    /* ── Add transaction form ── */
+    .txn-form{
+      background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px;
+    }
+    .txn-form h4{ margin:0 0 12px; font-size:12px; color:#1a4f8b; font-weight:800; }
+    .form-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .fg{ display:flex; flex-direction:column; gap:4px; }
+    .fg label{ font-size:11px; font-weight:700; color:#374151; }
+    .fg input,.fg select,.fg textarea{ padding:6px 9px; border:1px solid #d1d5db; border-radius:6px; font-size:12px; font-family:Arial,sans-serif; }
+    .fg input:focus,.fg select:focus,.fg textarea:focus{ border-color:var(--primary); outline:none; }
+
+    /* ── Status ── */
+    .status-message{
+      position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+      padding:10px 22px; border-radius:10px; font-weight:700; font-size:13px;
+      box-shadow:0 4px 16px rgba(0,0,0,.18); display:none; z-index:9999; max-width:90vw; text-align:center;
+    }
+    .status-ok{ background:#166534; color:#fff; display:block !important; }
+    .status-err{ background:var(--danger); color:#fff; display:block !important; }
+
+    /* ── Auth overlay ── */
+    #authOverlay{
+      position:fixed; inset:0; background:#f1f5f9; z-index:99999;
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* ── Print ── */
+    @media print{
+      .no-print,.controls-bar,#detailModal{ display:none !important; }
+      body{ padding:0; background:#fff; }
+      .table-wrap{ box-shadow:none; border:none; }
+      .sum-table th{ background:#1a4f8b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .bal-chip{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Auth overlay -->
+<div id="authOverlay">
+  <div style="text-align:center;color:#64748b;font-size:14px;">
+    <div style="font-size:36px;margin-bottom:12px;">🔑</div>
+    Verifying access…
+  </div>
+</div>
+
+<!-- Controls bar -->
+<div class="controls-bar no-print">
+  <span class="page-badge">Lieu Days Management</span>
+  <label>Area</label>
+  <select id="areaFilter" onchange="applyFilter()">
+    <option value="">All Areas</option>
+  </select>
+  <input type="text" id="staffSearch" placeholder="Name or badge…"
+    style="min-width:200px;" oninput="applyFilter()"/>
+  <button onclick="loadAll()" class="btn-ghost">&#8635; Refresh</button>
+  <button onclick="window.print()" class="btn-ghost">Print Summary</button>
+  <a href="Staff.html" style="text-decoration:none;"><button type="button" class="btn-ghost">Staff Management</button></a>
+  <a href="index.html" style="text-decoration:none;margin-left:auto;"><button type="button" class="btn-ghost">&#8592; Back to Rota</button></a>
+</div>
+
+<!-- Summary table -->
+<div class="table-wrap">
+  <table class="sum-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Badge</th>
+        <th>Role</th>
+        <th>Area</th>
+        <th style="text-align:center;">Starting</th>
+        <th>History Reference</th>
+        <th style="text-align:center;">Earned</th>
+        <th style="text-align:center;">Used</th>
+        <th style="text-align:center;">Adjustments</th>
+        <th style="text-align:center;">Current Balance</th>
+        <th class="no-print" style="text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="sumBody">
+      <tr><td colspan="12" style="padding:40px;text-align:center;color:#94a3b8;">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Detail modal -->
+<div id="detailModal">
+  <div class="detail-box">
+    <div class="detail-header">
+      <h2 id="detailTitle">Lieu Days</h2>
+      <button class="detail-close" onclick="closeDetail()">&#10005;</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
+<div class="status-message" id="statusBox"></div>
+
+<script src="config.js"></script>
+<script src="js/auth.js"></script>
+
+<script type="module">
+  import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, collection, doc, getDocs, setDoc }
+    from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:        "bcotrota.firebaseapp.com",
+    projectId:         "bcotrota",
+    storageBucket:     "bcotrota.firebasestorage.app",
+    messagingSenderId: "659421824894",
+    appId:             "1:659421824894:web:f0546879df8808491ad52f"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
+  const AREAS_KEY = 'BCOT_AREAS_LIST_V1';
+  const COLL      = 'lieu_days';
+
+  let _staffRecords  = [];
+  let _lieuData      = {};   // badge → lieu doc
+  let _currentBadge  = null;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function appKey() { return (window.BCOT_APP_KEY || '').trim(); }
+
+  function lieuRef(badge) {
+    return doc(db, 'bcot_overtime_secure', appKey(), COLL, String(badge));
+  }
+
+  function showStatus(msg, ok = true) {
+    const el = document.getElementById('statusBox');
+    el.textContent = msg;
+    el.className = 'status-message ' + (ok ? 'status-ok' : 'status-err');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.className = 'status-message'; }, ok ? 3500 : 5000);
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function calcBalance(lieu) {
+    const starting = Number(lieu?.startingBalance) || 0;
+    let earned = 0, used = 0, adjusted = 0;
+    (lieu?.transactions || []).forEach(t => {
+      const d = Number(t.days) || 0;
+      if (t.type === 'earn')   earned   += d;
+      if (t.type === 'use')    used     += d;
+      if (t.type === 'adjust') adjusted += d;
+    });
+    return { starting, earned, used, adjusted, current: starting + earned - used + adjusted };
+  }
+
+  function fmtDays(n) {
+    const v = Number(n) || 0;
+    return v === Math.floor(v) ? String(v) : v.toFixed(1);
+  }
+
+  function getStaffRecords() {
+    try { return JSON.parse(localStorage.getItem(STAFF_KEY) || '[]') || []; }
+    catch { return []; }
+  }
+
+  function getAreasList() {
+    try { return JSON.parse(localStorage.getItem(AREAS_KEY) || '[]') || []; }
+    catch { return []; }
+  }
+
+  function getSubmitter() {
+    try {
+      const s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
+      return [s.nameTitle, s.name].filter(Boolean).join(' ') || 'Admin';
+    } catch { return 'Admin'; }
+  }
+
+  function today() { return new Date().toISOString().slice(0, 10); }
+
+  // ── Load ─────────────────────────────────────────────────────────────────────
+  async function loadAll() {
+    _staffRecords = getStaffRecords();
+
+    if (!_staffRecords.length) {
+      document.getElementById('sumBody').innerHTML =
+        `<tr><td colspan="12" style="padding:40px;text-align:center;color:#94a3b8;">
+          No staff records found. Open Staff Management and load staff from cloud first.
+        </td></tr>`;
+      return;
+    }
+
+    document.getElementById('sumBody').innerHTML =
+      `<tr><td colspan="12" style="padding:28px;text-align:center;color:#94a3b8;">Loading lieu data from cloud…</td></tr>`;
+
+    const k = appKey();
+    if (k) {
+      try {
+        const snap = await getDocs(collection(db, 'bcot_overtime_secure', k, COLL));
+        _lieuData = {};
+        snap.forEach(d => { _lieuData[d.id] = d.data(); });
+      } catch (e) {
+        console.error(e);
+        showStatus('Failed to load lieu data: ' + (e?.message || e), false);
+      }
+    }
+
+    buildAreaFilter();
+    renderSummary();
+  }
+
+  function buildAreaFilter() {
+    const areas  = getAreasList();
+    const sel    = document.getElementById('areaFilter');
+    const prev   = sel.value;
+    sel.innerHTML = '<option value="">All Areas</option>';
+    areas.forEach(a => {
+      const o = document.createElement('option');
+      o.value = a; o.textContent = a;
+      sel.appendChild(o);
+    });
+    if (prev && areas.includes(prev)) sel.value = prev;
+  }
+
+  // ── Render summary ────────────────────────────────────────────────────────────
+  function renderSummary() {
+    const areaFilter = document.getElementById('areaFilter').value;
+    const query = (document.getElementById('staffSearch').value || '').trim().toLowerCase();
+
+    let list = _staffRecords;
+    if (areaFilter) {
+      list = list.filter(s =>
+        (s.area || '').toUpperCase().split(',').map(x => x.trim()).includes(areaFilter)
+      );
+    }
+    if (query) {
+      list = list.filter(s =>
+        (s.name || '').toLowerCase().includes(query) ||
+        (s.badge || '').toLowerCase().includes(query)
+      );
+    }
+
+    const tbody = document.getElementById('sumBody');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="12" style="padding:30px;text-align:center;color:#94a3b8;">No staff match the current filter.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map((s, idx) => {
+      const lieu = _lieuData[s.badge] || {};
+      const bal  = calcBalance(lieu);
+
+      const chipClass = bal.current > 0 ? 'chip-pos' : bal.current < 0 ? 'chip-neg' : 'chip-zero';
+      const adjSign   = bal.adjusted >= 0 ? '+' : '';
+      const histShort = (lieu.history || '').length > 35
+        ? (lieu.history || '').substring(0, 35) + '…'
+        : (lieu.history || '—');
+
+      return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td style="font-weight:700;white-space:nowrap;">${esc(s.name)}</td>
+        <td style="white-space:nowrap;">${esc(s.badge || '—')}</td>
+        <td style="font-size:11px;color:#475569;">${esc(s.role || '—')}</td>
+        <td style="font-size:11px;">${esc(s.area || '—')}</td>
+        <td style="text-align:center;font-weight:700;">${fmtDays(bal.starting)}</td>
+        <td style="max-width:180px;font-size:11px;color:#64748b;" title="${esc(lieu.history || '')}">${esc(histShort)}</td>
+        <td style="text-align:center;color:#166534;font-weight:700;">+${fmtDays(bal.earned)}</td>
+        <td style="text-align:center;color:#dc2626;font-weight:700;">-${fmtDays(bal.used)}</td>
+        <td style="text-align:center;color:#d97706;font-weight:700;">${adjSign}${fmtDays(bal.adjusted)}</td>
+        <td style="text-align:center;"><span class="bal-chip ${chipClass}">${fmtDays(bal.current)}</span></td>
+        <td class="no-print" style="text-align:center;">
+          <button onclick="openDetail('${esc(s.badge)}')" class="btn-teal"
+            style="padding:4px 12px;font-size:11px;">Manage</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  window.applyFilter = renderSummary;
+
+  // ── Detail modal ──────────────────────────────────────────────────────────────
+  window.openDetail = function (badge) {
+    const s = _staffRecords.find(r => r.badge === badge);
+    if (!s) { showStatus('Staff record not found.', false); return; }
+    _currentBadge = badge;
+    document.getElementById('detailTitle').textContent = `Lieu Days — ${s.name}`;
+    document.getElementById('detailModal').classList.add('show');
+    _renderDetail(badge);
+  };
+
+  window.closeDetail = function () {
+    document.getElementById('detailModal').classList.remove('show');
+    _currentBadge = null;
+  };
+
+  function _renderDetail(badge) {
+    const s    = _staffRecords.find(r => r.badge === badge);
+    const lieu = _lieuData[badge] || {};
+    const bal  = calcBalance(lieu);
+    const txns = (lieu.transactions || []).slice().sort((a, b) =>
+      (b.date || '').localeCompare(a.date || '')
+    );
+    const startSet = !!lieu.startingSet;
+    const adjSign  = bal.adjusted >= 0 ? '' : '−';
+
+    document.getElementById('detailBody').innerHTML = `
+      <!-- Staff info strip -->
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
+        <div>
+          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Badge</div>
+          <div style="font-weight:700;font-size:14px;">${esc(s.badge || '—')}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Role</div>
+          <div style="font-weight:700;">${esc(s.role || '—')}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Area</div>
+          <div style="font-weight:700;">${esc(s.area || '—')}</div>
+        </div>
+      </div>
+
+      <!-- Balance formula -->
+      <div class="bal-formula">
+        <div class="bf-block">
+          <div class="bf-val" style="color:#1a4f8b;">${fmtDays(bal.starting)}</div>
+          <div class="bf-label">Starting</div>
+        </div>
+        <div class="bf-op">+</div>
+        <div class="bf-block">
+          <div class="bf-val" style="color:#166534;">${fmtDays(bal.earned)}</div>
+          <div class="bf-label">Earned</div>
+        </div>
+        <div class="bf-op">−</div>
+        <div class="bf-block">
+          <div class="bf-val" style="color:#dc2626;">${fmtDays(bal.used)}</div>
+          <div class="bf-label">Used</div>
+        </div>
+        <div class="bf-op">+</div>
+        <div class="bf-block">
+          <div class="bf-val" style="color:#d97706;">${adjSign}${fmtDays(Math.abs(bal.adjusted))}</div>
+          <div class="bf-label">Adjustments</div>
+        </div>
+        <div class="bf-op">=</div>
+        <div class="bf-block bf-current">
+          <div class="bf-val">${fmtDays(bal.current)}</div>
+          <div class="bf-label">Current Balance</div>
+        </div>
+      </div>
+
+      <!-- Starting data (read-only once set) -->
+      <div class="start-box">
+        <h4>
+          Starting Data
+          <span class="lock-chip ${startSet ? 'locked' : 'unlocked'}">
+            ${startSet ? 'Locked — Read Only' : 'Not yet entered'}
+          </span>
+        </h4>
+        ${startSet ? `
+          <div class="ro-field">
+            <label>Starting Balance (days)</label>
+            <div class="ro-value">${fmtDays(bal.starting)}</div>
+          </div>
+          <div class="ro-field">
+            <label>Previous History / Legacy System Notes</label>
+            <div class="ro-value ${lieu.history ? '' : 'empty'}">${esc(lieu.history || 'No history notes entered.')}</div>
+          </div>
+          <div class="no-print" style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+            <button onclick="unlockStarting('${esc(badge)}')" class="btn-orange"
+              style="padding:5px 12px;font-size:11px;">Override Starting Data</button>
+            <span style="font-size:11px;color:#94a3b8;">Administrative override — use only to correct entry errors.</span>
+          </div>
+        ` : `
+          <p style="margin:0 0 14px;font-size:12px;color:#64748b;line-height:1.5;">
+            Enter the initial lieu day balance and any notes from the legacy system.
+            Once saved, these fields become read-only reference data.
+          </p>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
+            <div class="fg">
+              <label>Starting Balance (days)</label>
+              <input type="number" id="initBalance" value="0" min="0" step="0.5"
+                style="width:130px;"/>
+            </div>
+            <div class="fg" style="flex:1;min-width:240px;">
+              <label>Previous History / Legacy System Notes</label>
+              <textarea id="initHistory" rows="3" style="width:100%;resize:vertical;"
+                placeholder="e.g. 5 days carried over from 2025 as per legacy HRIS report."></textarea>
+            </div>
+          </div>
+          <button onclick="saveStarting('${esc(badge)}')" class="btn-green"
+            style="padding:6px 16px;font-size:12px;">Save and Lock Starting Data</button>
+        `}
+      </div>
+
+      <!-- Transaction history -->
+      <div style="font-size:12px;font-weight:800;color:#1a4f8b;margin-bottom:8px;">
+        Transaction History
+        <span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px;">${txns.length} record(s)</span>
+      </div>
+      ${txns.length ? `
+        <div class="txn-list">
+          <table class="txn-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th style="text-align:center;">Days</th>
+                <th>Reason</th>
+                <th>Recorded By</th>
+                <th class="no-print" style="text-align:center;">Del</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${txns.map(t => {
+                const d = Number(t.days) || 0;
+                const sign = t.type === 'earn' ? '+' : t.type === 'use' ? '−' : (d >= 0 ? '+' : '');
+                const cls  = t.type === 'earn' ? 'type-earn' : t.type === 'use' ? 'type-use' : 'type-adjust';
+                const label = t.type === 'earn' ? 'Earned' : t.type === 'use' ? 'Used' : 'Adjustment';
+                return `
+                <tr>
+                  <td style="white-space:nowrap;">${esc(t.date || '—')}</td>
+                  <td><span class="${cls}">${label}</span></td>
+                  <td style="text-align:center;font-weight:700;">${sign}${fmtDays(Math.abs(d))}</td>
+                  <td>${esc(t.reason || '—')}</td>
+                  <td style="font-size:10px;color:#64748b;">${esc(t.by || '—')}</td>
+                  <td class="no-print" style="text-align:center;">
+                    <button onclick="deleteTxn('${esc(badge)}','${esc(t.id)}')"
+                      class="btn-red" style="padding:2px 7px;font-size:10px;">&#10005;</button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : `
+        <div style="padding:22px;text-align:center;color:#94a3b8;font-size:12px;
+          border:1px solid #e2e8f0;border-radius:8px;margin-bottom:16px;">
+          No transactions recorded yet.
+        </div>`}
+
+      <!-- Add transaction form -->
+      <div class="txn-form no-print">
+        <h4>Add Transaction</h4>
+        <div class="form-row">
+          <div class="fg">
+            <label>Date</label>
+            <input type="date" id="txnDate" value="${today()}" style="width:150px;"/>
+          </div>
+          <div class="fg">
+            <label>Type</label>
+            <select id="txnType" onchange="onTxnTypeChange()" style="width:160px;">
+              <option value="earn">Earned</option>
+              <option value="use">Used</option>
+              <option value="adjust">Manual Adjustment</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Days <span id="txnDaysHint" style="font-weight:400;color:#94a3b8;font-size:10px;"></span></label>
+            <input type="number" id="txnDays" min="0.5" step="0.5" placeholder="e.g. 1"
+              style="width:100px;"/>
+          </div>
+          <div class="fg" style="flex:1;min-width:220px;">
+            <label>Reason</label>
+            <input type="text" id="txnReason"
+              placeholder="e.g. Weekend on-call, Annual leave taken…" style="width:100%;"/>
+          </div>
+          <div class="fg" style="justify-content:flex-end;">
+            <label style="visibility:hidden;">.</label>
+            <button onclick="addTxn('${esc(badge)}')" class="btn-green">Add Transaction</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── Days field hint based on type ─────────────────────────────────────────────
+  window.onTxnTypeChange = function () {
+    const type = document.getElementById('txnType')?.value;
+    const hint = document.getElementById('txnDaysHint');
+    if (!hint) return;
+    if (type === 'adjust') {
+      hint.textContent = '(negative allowed)';
+      document.getElementById('txnDays').min = '-999';
+    } else {
+      hint.textContent = '';
+      document.getElementById('txnDays').min = '0.5';
+    }
+  };
+
+  // ── Save starting data ────────────────────────────────────────────────────────
+  window.saveStarting = async function (badge) {
+    const s  = _staffRecords.find(r => r.badge === badge);
+    if (!s) return;
+    const k  = appKey();
+    if (!k) { showStatus('App key missing.', false); return; }
+
+    const startBal = parseFloat(document.getElementById('initBalance')?.value) || 0;
+    const history  = (document.getElementById('initHistory')?.value || '').trim();
+
+    const existing = _lieuData[badge] || {};
+    const newDoc = {
+      badge,
+      staffName:        s.name,
+      role:             s.role  || '',
+      area:             s.area  || '',
+      startingBalance:  startBal,
+      history,
+      startingSet:      true,
+      transactions:     existing.transactions || [],
+    };
+
+    try {
+      await setDoc(lieuRef(badge), newDoc);
+      _lieuData[badge] = newDoc;
+      _renderDetail(badge);
+      renderSummary();
+      showStatus('Starting data saved and locked ✅');
+    } catch (e) {
+      console.error(e);
+      showStatus('Save failed: ' + (e?.message || e), false);
+    }
+  };
+
+  // ── Override locked starting data ─────────────────────────────────────────────
+  window.unlockStarting = async function (badge) {
+    const confirmed = await window.BCOT_AUTH.confirm(
+      'Override the locked starting data?\n\nThis should only be used to correct an entry error. The action will be re-locked after saving.',
+      { title: 'Override Starting Data', confirmLabel: 'Yes, Override', confirmClass: 'btn-orange' }
+    );
+    if (!confirmed) return;
+
+    const lieu = _lieuData[badge] || {};
+    _lieuData[badge] = { ...lieu, startingSet: false };
+    _renderDetail(badge);
+
+    if (document.getElementById('initBalance'))
+      document.getElementById('initBalance').value = lieu.startingBalance || 0;
+    if (document.getElementById('initHistory'))
+      document.getElementById('initHistory').value = lieu.history || '';
+  };
+
+  // ── Add transaction ───────────────────────────────────────────────────────────
+  window.addTxn = async function (badge) {
+    const s = _staffRecords.find(r => r.badge === badge);
+    if (!s) return;
+    const k = appKey();
+    if (!k) { showStatus('App key missing.', false); return; }
+
+    const date   = (document.getElementById('txnDate')?.value || '').trim();
+    const type   = document.getElementById('txnType')?.value || 'earn';
+    const days   = parseFloat(document.getElementById('txnDays')?.value);
+    const reason = (document.getElementById('txnReason')?.value || '').trim();
+
+    if (!date)         { showStatus('Select a date.', false); return; }
+    if (type !== 'adjust' && (!days || days <= 0))
+      { showStatus('Enter a valid number of days (> 0).', false); return; }
+    if (type === 'adjust' && (!days || days === 0))
+      { showStatus('Enter a non-zero adjustment (positive or negative).', false); return; }
+    if (!reason)       { showStatus('Reason is required.', false); return; }
+
+    const txn = {
+      id:        'txn_' + Date.now(),
+      date,
+      type,
+      days,
+      reason,
+      by:        getSubmitter(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const existing = _lieuData[badge] || {};
+    const newDoc = {
+      badge,
+      staffName:       s.name,
+      role:            s.role  || '',
+      area:            s.area  || '',
+      startingBalance: Number(existing.startingBalance) || 0,
+      history:         existing.history     || '',
+      startingSet:     existing.startingSet || false,
+      transactions:    [...(existing.transactions || []), txn],
+    };
+
+    try {
+      await setDoc(lieuRef(badge), newDoc);
+      _lieuData[badge] = newDoc;
+      _renderDetail(badge);
+      renderSummary();
+      const label = type === 'earn' ? `+${fmtDays(days)} earned` : type === 'use' ? `−${fmtDays(days)} used` : `${days >= 0 ? '+' : ''}${fmtDays(days)} adjusted`;
+      showStatus(`Transaction recorded: ${label} ✅`);
+    } catch (e) {
+      console.error(e);
+      showStatus('Save failed: ' + (e?.message || e), false);
+    }
+  };
+
+  // ── Delete transaction ────────────────────────────────────────────────────────
+  window.deleteTxn = async function (badge, txnId) {
+    const confirmed = await window.BCOT_AUTH.confirm(
+      'Delete this transaction? The balance will update immediately.',
+      { title: 'Delete Transaction', confirmLabel: 'Delete', confirmClass: 'btn-red' }
+    );
+    if (!confirmed) return;
+
+    const s = _staffRecords.find(r => r.badge === badge);
+    if (!s) return;
+    const k = appKey();
+    if (!k) { showStatus('App key missing.', false); return; }
+
+    const existing = _lieuData[badge] || {};
+    const newDoc   = {
+      ...existing,
+      transactions: (existing.transactions || []).filter(t => t.id !== txnId),
+    };
+
+    try {
+      await setDoc(lieuRef(badge), newDoc);
+      _lieuData[badge] = newDoc;
+      _renderDetail(badge);
+      renderSummary();
+      showStatus('Transaction deleted.');
+    } catch (e) {
+      console.error(e);
+      showStatus('Delete failed: ' + (e?.message || e), false);
+    }
+  };
+
+  // ── Wire-up ───────────────────────────────────────────────────────────────────
+  document.getElementById('detailModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('detailModal')) closeDetail();
+  });
+
+  // ── Init: password gate ───────────────────────────────────────────────────────
+  async function init() {
+    const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
+    if (pwd) {
+      const entered = await window.BCOT_AUTH.prompt(
+        'Enter the password to access Lieu Days Management.',
+        { title: 'Lieu Days Management', placeholder: 'Password', type: 'password', confirmLabel: 'Enter' }
+      );
+      if (entered === null || entered.trim() !== pwd) {
+        document.getElementById('authOverlay').innerHTML = `
+          <div style="text-align:center;color:#dc2626;font-size:14px;">
+            <div style="font-size:36px;margin-bottom:12px;">&#128683;</div>
+            Incorrect password. Returning…
+          </div>`;
+        setTimeout(() => { window.location.href = 'index.html'; }, 1800);
+        return;
+      }
+    }
+    document.getElementById('authOverlay').style.display = 'none';
+    await loadAll();
+  }
+
+  window.loadAll = loadAll;
+  init();
+</script>
+</body>
+</html>
