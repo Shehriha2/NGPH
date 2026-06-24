@@ -94,6 +94,9 @@
     .empty-log{ padding:40px; text-align:center; color:#94a3b8; font-size:13px; }
     .action-btns{ display:flex; gap:5px; white-space:nowrap; }
     .action-btns button{ padding:3px 9px; font-size:11px; font-weight:700; border-radius:5px; }
+    .btn-teal{ background:#0f766e; } .btn-teal:hover{ background:#0b5c56; }
+    .adj-table tbody tr.done-row td{ background:#f0fdf4; }
+    .done-chip{ display:inline-block; background:#166534; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; }
 
     /* ── Edit modal ── */
     #editModal{
@@ -519,6 +522,28 @@
     }
   }
 
+  // ── Mark as Done ─────────────────────────────────────────────────────────
+  async function toggleDone(id) {
+    const a = _allAdjustments.find(x => x._id === id);
+    if (!a) return;
+    const nowDone = !a.done;
+    try {
+      await updateDoc(adjDocRef(id), {
+        done:   nowDone,
+        doneAt: nowDone ? new Date().toISOString() : null,
+        doneBy: nowDone ? getSubmitter() : null,
+      });
+      a.done   = nowDone;
+      a.doneAt = nowDone ? new Date().toISOString() : null;
+      a.doneBy = nowDone ? getSubmitter() : null;
+      renderLog();
+      showStatus(nowDone ? 'Marked as done ✅' : 'Marked as pending.');
+    } catch (e) {
+      console.error(e);
+      showStatus('Update failed: ' + (e?.message || e), false);
+    }
+  }
+
   // ── Log ───────────────────────────────────────────────────────────────────
   async function refreshLog() {
     const k = _key();
@@ -566,10 +591,10 @@
     }
 
     tbody.innerHTML = rows.map(a => `
-      <tr>
+      <tr class="${a.done ? 'done-row' : ''}">
         <td class="ts-cell">${fmtDate(a.submittedAt)}</td>
         <td style="white-space:nowrap;font-weight:700;">${esc(a.badge)}</td>
-        <td style="white-space:nowrap;">${esc(a.staffName)}</td>
+        <td style="white-space:nowrap;">${esc(a.staffName)}${a.done ? '<span class="done-chip">&#10003; Done</span>' : ''}</td>
         <td style="font-size:11px;color:#475569;">${esc(a.role)}</td>
         <td class="hours-cell">+${Number(a.additionalHours) || 0} hrs</td>
         <td class="notes-cell" title="${esc(a.notes)}">${esc(a.notes)}</td>
@@ -577,6 +602,7 @@
         <td class="by-cell">${esc(a.submittedBy)}</td>
         <td class="no-print">
           <div class="action-btns">
+            <button onclick="toggleDone('${esc(a._id)}')" class="${a.done ? 'btn-ghost' : 'btn-teal'}">${a.done ? '↩ Undo' : '✓ Done'}</button>
             <button onclick="openEditModal('${esc(a._id)}')" style="background:#1a4f8b;">✏️ Edit</button>
             <button onclick="deleteAdjustment('${esc(a._id)}')" class="btn-red">🗑</button>
           </div>
@@ -592,6 +618,7 @@
   window.closeEditModal   = closeEditModal;
   window.saveEdit         = saveEdit;
   window.deleteAdjustment = deleteAdjustment;
+  window.toggleDone       = toggleDone;
 
   document.getElementById('monthSel').addEventListener('change', () => {
     if (_logLoaded) renderLog();
