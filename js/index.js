@@ -3719,8 +3719,71 @@
         tr.cells[2].querySelector("input").addEventListener("input",re);
         tr.cells[7].querySelector("select").addEventListener("change",re); re();
         tr.querySelector("button").addEventListener("click",async()=>{
-          const ok=await showConfirmModal({title:"Delete this duty?",message:"This duty will be removed from the list.",confirmLabel:"Delete",danger:true});
-          if(ok)tr.remove();
+          const code=(tr.cells[0].querySelector("input").value||"").trim().toUpperCase();
+          if(!code){tr.remove();return;}
+          const key=(window.BCOT_APP_KEY||"").trim();
+          if(!key){showStatusMessage("config.js not found.","error");return;}
+          // Build month doc ID using selected year/month
+          const yr=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
+          const mo=Number(document.getElementById('monthSelect')?.value||1);
+          const docId=`${yr}-${String(mo).padStart(2,'0')}`;
+          // Scan all areas for usage of this duty code in the current month rota
+          const areas=getAreasList();
+          const usedIn=[];
+          showStatusMessage("Checking rota assignments…","info");
+          for(const area of areas){
+            try{
+              const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId));
+              if(!snap.exists())continue;
+              const inUse=(snap.data()?.records||[]).some(rec=>Object.values(rec.daysData||{}).some(v=>{const bv=(v||"").toUpperCase().replace(/_O$/,"");return bv===code;}));
+              if(inUse)usedIn.push(area);
+            }catch{/*skip area*/}
+          }
+          // Confirm deletion
+          const warnTxt=usedIn.length?`\n\nWARNING: This duty is currently assigned in ${usedIn.length} area(s): ${usedIn.join(", ")}.\nAll assignments will be removed from the ${docId} rota.`:"";
+          const ok=await showConfirmModal({
+            title:usedIn.length?`Duty "${code}" is in use!`:`Delete duty "${code}"?`,
+            message:`Permanently delete duty "${code}"?${warnTxt}\n\nThis cannot be undone.`,
+            confirmLabel:"Delete",danger:true
+          });
+          if(!ok){showStatusMessage("Deletion cancelled.","info");return;}
+          showStatusMessage("Deleting duty…","info");
+          // 1. Remove from UI
+          tr.remove();
+          // 2. Save remaining duties to localStorage + Firestore DUTIES_POOL
+          const remaining=readTable();
+          localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(remaining));
+          try{
+            await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'duties_named',CLOUD_DOC),
+              {savedAt:new Date().toISOString(),duties:remaining},{merge:true});
+          }catch(e){console.error("Duties save failed:",e);}
+          // 3. Clear duty from all affected area month docs
+          for(const area of usedIn){
+            try{
+              const ref=window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId);
+              const snap=await window.FB.getDoc(ref);
+              if(!snap.exists())continue;
+              const data=snap.data();
+              const cleaned=(data.records||[]).map(rec=>{
+                const days={...(rec.daysData||{})};
+                for(const dk of Object.keys(days)){const bv=(days[dk]||"").toUpperCase().replace(/_O$/,"");if(bv===code)delete days[dk];}
+                return{...rec,daysData:days};
+              });
+              await window.FB.setDoc(ref,{...data,records:cleaned});
+            }catch(e){console.error("Failed to clean area rota",area,e);}
+          }
+          // 4. Log deletion to Firestore
+          const _sess=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};}catch{return{};}})();
+          const _who=[_sess.nameTitle,_sess.name].filter(Boolean).join(' ')||_sess.name||'Unknown';
+          try{
+            await window.FB.setDoc(
+              window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'duty_deletion_log',`${Date.now()}_${code}`),
+              {code,deletedAt:new Date().toISOString(),deletedBy:_who,affectedAreas:usedIn,monthDocId:docId}
+            );
+          }catch(e){console.error("Deletion log failed:",e);}
+          // 5. Reload DUTIES global so rota renders correctly
+          await reloadDutiesFromStorage();
+          showStatusMessage(`Duty "${code}" deleted${usedIn.length?` — cleared from ${usedIn.length} area(s) in ${docId}`:''}. ✅`);
         });
         tbody.appendChild(tr);
         if(f!=="ALL"&&area&&area!==f)tr.classList.add("hidden-row");
