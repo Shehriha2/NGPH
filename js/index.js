@@ -1733,7 +1733,7 @@
         showStatusMessage("Loading staff from cloud…", "info");
         const ref  = window.FB.doc(window.FB.db, "bcot_overtime_secure", key, "staff_named", "STAFF_POOL");
         const snap = await window.FB.getDoc(ref);
-        if (!snap.exists()) { showStatusMessage("No staff found in cloud. Save staff from Staff.html first.", "info"); return; }
+        if (!snap.exists()) { showStatusMessage("No staff found in cloud. Open Staff Management and save to cloud first.", "info"); return; }
         const records = snap.data()?.records || [];
         const filtered = area === "ALL"
           ? records
@@ -3965,7 +3965,7 @@
         },1500);
       }
 
-      function normalize(r) { return {name:String(r?.name||"").trim(),badge:String(r?.badge||"").trim(),role:String(r?.role||"Pharmacist").trim()||"Pharmacist",hrr:Number(r?.hrr??0)||0,area:String(r?.area||"").trim().toUpperCase()}; }
+      function normalize(r) { return {name:String(r?.name||"").trim(),badge:String(r?.badge||"").trim(),role:String(r?.role||"Pharmacist").trim()||"Pharmacist",hrr:Number(r?.hrr??0)||0,area:String(r?.area||"").trim().toUpperCase(),contractDate:String(r?.contractDate||"").trim()}; }
 
       function rebuildUI() {
         const list=getAreasList();
@@ -4090,19 +4090,24 @@
         const modal=document.createElement("div");
         modal.id="sm-editModal";
         modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9600;";
-        modal.innerHTML=`<div style="background:#fff;border-radius:12px;padding:22px 24px;min-width:360px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+        modal.innerHTML=`<div style="background:#fff;border-radius:12px;padding:22px 24px;min-width:360px;max-width:540px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);max-height:92vh;overflow-y:auto;">
           <h3 style="margin:0 0 16px;font-size:13px;color:#1a4f8b;">Edit Staff Record</h3>
           <div style="display:grid;gap:10px;">
             <label style="font-size:11px;font-weight:700;color:#374151;">Name<input id="sm-eName" type="text" value="${rec.name.replace(/"/g,"&quot;")}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Badge<input id="sm-eBadge" type="text" value="${rec.badge}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Role<select id="sm-eRole" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"><option${rec.role==="Pharmacist"?" selected":""}>Pharmacist</option><option${rec.role==="Technician"?" selected":""}>Technician</option><option${rec.role==="Pharmacy Aide"?" selected":""}>Pharmacy Aide</option></select></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">HRR<input id="sm-eHRR" type="number" step="0.01" value="${rec.hrr||0}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Contract Date<input id="sm-eContractDate" type="date" value="${rec.contractDate||""}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Areas
               <div style="display:flex;gap:6px;align-items:center;margin-top:3px;">
                 <div id="sm-eAreaDisplay" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#f9fafb;min-height:32px;color:#374151;">${rec.area||"—"}</div>
                 <button type="button" id="sm-eAreaBtn" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;cursor:pointer;flex-shrink:0;">Edit Areas</button>
               </div>
             </label>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;">
+              <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:5px;">Lieu Days Balance</div>
+              <div id="sm-eLieuBalance" style="font-size:12px;color:#374151;">Loading…</div>
+            </div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
             <button id="sm-eSave" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:12px;cursor:pointer;font-weight:700;">Save</button>
@@ -4110,6 +4115,34 @@
           </div>
         </div>`;
         document.body.appendChild(modal);
+
+        // ── Fetch lieu balance ────────────────────────────────────────────────
+        (async () => {
+          const balEl=document.getElementById("sm-eLieuBalance");
+          if(!balEl||!rec.badge){if(balEl)balEl.textContent="No badge — add a badge to track lieu days.";return;}
+          const k=(window.BCOT_APP_KEY||"").trim();
+          if(!k){if(balEl)balEl.textContent="App key missing.";return;}
+          let t=0; while(!window.FB&&t++<60) await new Promise(r=>setTimeout(r,50));
+          if(!window.FB){if(balEl)balEl.textContent="Firebase not ready.";return;}
+          try {
+            const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,"bcot_overtime_secure",k,"lieu_days",rec.badge));
+            if(!snap.exists()){
+              balEl.innerHTML='Not set up yet. <a href="LieuDays.html" target="_blank" style="color:#0f766e;font-weight:700;">Set up in Lieu Days ↗</a>';
+              return;
+            }
+            const lieu=snap.data()||{};
+            const starting=Number(lieu.startingBalance)||0;
+            let earned=0,used=0,adjusted=0;
+            (lieu.transactions||[]).forEach(t=>{const d=Number(t.days)||0;if(t.type==="earn")earned+=d;else if(t.type==="use")used+=d;else if(t.type==="adjust")adjusted+=d;});
+            const current=starting+earned-used+adjusted;
+            const clr=current>0?"#166534":current<0?"#dc2626":"#64748b";
+            const fmt=n=>(n===Math.floor(n)?String(n):n.toFixed(1));
+            balEl.innerHTML=`<span style="color:#64748b;">${fmt(starting)} starting + ${fmt(earned)} earned − ${fmt(used)} used + ${adjusted>=0?"":"−"}${fmt(Math.abs(adjusted))} adj =</span>`
+              +` <strong style="color:${clr};font-size:14px;">${fmt(current)} days</strong>`
+              +` <a href="LieuDays.html" target="_blank" style="margin-left:8px;font-size:11px;color:#0f766e;">Manage ↗</a>`;
+          } catch(e){if(balEl)balEl.textContent="Could not load lieu balance.";}
+        })();
+
         document.getElementById("sm-eCancel").onclick=()=>modal.remove();
         modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
         document.getElementById("sm-eAreaBtn").onclick=()=>{
@@ -4120,10 +4153,11 @@
           const newBadge=document.getElementById("sm-eBadge").value.trim();
           const newRole=document.getElementById("sm-eRole").value;
           const newHRR=parseFloat(document.getElementById("sm-eHRR").value)||0;
+          const newContractDate=(document.getElementById("sm-eContractDate").value||"").trim();
           const newArea=_editAreas.toUpperCase();
           if(!newName){alert("Name is required.");return;}
           const oldBadge=rec.badge;
-          records.forEach(r=>{if(oldBadge&&r.badge===oldBadge){r.name=newName;r.badge=newBadge;r.role=newRole;r.hrr=newHRR;}});
+          records.forEach(r=>{if(oldBadge&&r.badge===oldBadge){r.name=newName;r.badge=newBadge;r.role=newRole;r.hrr=newHRR;r.contractDate=newContractDate;}});
           records[idx].area=newArea;
           if(newArea)newArea.split(",").forEach(a=>{if(a.trim())saveAreaToList(a.trim());});
           renderTable(); writeLocal(); rebuildUI(); applyFilter(); modal.remove();
@@ -4331,7 +4365,7 @@
 
       if (!Object.keys(DUTIES).length) showStatusMessage('No duties found. Open Duties.html to add duties.','error');
       else if (restored)               showStatusMessage('Your previous rota work has been restored ✅');
-      else if (!staffList.length)      showStatusMessage('No staff for this filter. Open Staff.html to add staff.','error');
+      else if (!staffList.length)      showStatusMessage('No staff for this filter. Open Staff Management to add staff.','error');
 
       // Load release number for current area and show rota label
       releaseNum = loadReleaseNum(getCurrentArea());
