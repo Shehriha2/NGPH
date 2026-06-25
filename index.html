@@ -1010,7 +1010,7 @@
     window.FB = { db, doc, setDoc, getDoc, onSnapshot };
   </script>
 
-  <script src="js/index.js?v=3"></script>
+  <script src="js/index.js?v=4"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL
@@ -1031,6 +1031,8 @@
         <select id="dm-areaFilter" onchange="DM.applyAreaFilter()" style="min-width:120px;"></select>
         <input id="dm-newAreaInput" type="text" placeholder="New area…" style="width:110px;text-transform:uppercase"/>
         <button type="button" onclick="DM.addNewArea()" style="background:#3730a3;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">+ Add</button>
+        <input id="dm-search" type="text" placeholder="🔍 Search code or label…" oninput="DM.applyDutySearchFilter()" style="min-width:180px;font-size:12px;padding:5px 8px;border:1px solid #c7d2fe;border-radius:6px;background:#fff;"/>
+        <span id="dm-dutyCount" style="font-size:11px;color:#6b7280;font-weight:700;"></span>
         <a href="https://color.adobe.com/create/color-wheel" target="_blank" style="background:#e8422f;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px;margin-left:auto;">🎨 Adobe Color</a>
         <button type="button" onclick="DM.addDutyRow()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">+ Add Duty</button>
         <button type="button" onclick="DM.clearFiltered()" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">🗑 Clear Filtered</button>
@@ -1058,9 +1060,9 @@
         <table style="width:100%;border-collapse:collapse;font-size:11px;">
           <thead>
             <tr style="background:#1a4f8b;color:#fff;position:sticky;top:0;">
-              <th style="padding:6px;">Code</th><th>Label</th><th>Hours</th><th>Color</th>
-              <th>Area</th><th>Assigned St</th><th>Start Day</th><th>Start Time</th>
-              <th>End Time</th><th>Default Days</th><th>Del</th>
+              <th style="padding:6px;">#</th><th>Code</th><th>Label</th><th>Hours</th><th>Color</th>
+              <th>Area</th><th>Start Day</th><th>Start Time</th>
+              <th>End Time</th><th>Def Days</th><th>St.</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="dm-dutiesBody"></tbody>

@@ -3653,15 +3653,7 @@
         if (ct) { const pv=ct.value; ct.innerHTML='<option value="">— Target Area —</option>'; list.forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;ct.appendChild(o);}); if(pv&&list.includes(pv))ct.value=pv; }
       }
 
-      function applyAreaFilter() {
-        const f = getFilter();
-        Array.from(document.querySelectorAll("#dm-dutiesBody tr")).forEach(tr => {
-          if (f==="ALL"){tr.classList.remove("hidden-row");return;}
-          const ra=(tr.querySelector(".dm-area-cell")?.value||"").trim().toUpperCase();
-          const ar=ra.split(",").map(x=>x.trim()).filter(Boolean);
-          tr.classList.toggle("hidden-row", !(!ra||ar.includes(f)));
-        });
-      }
+      function applyAreaFilter() { applyDutySearchFilter(); }
 
       function addNewArea() {
         const raw=(document.getElementById("dm-newAreaInput").value||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
@@ -3677,138 +3669,199 @@
       function calcEnd(st,h){const s=(st||"Any").toString().trim();if(s.toUpperCase()==="ANY")return"Any";const sm=ptm(s);if(sm===null)return"Any";return mtt(sm+Math.round((Number(h)||0)*60));}
       function buildTOpts(){const o=[];for(let h=0;h<24;h++)for(let m=0;m<60;m+=30){const t=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");o.push(`<option value="${t}">${t}</option>`);}return o.join("");}
       function buildDOpts(){return Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join("");}
-      function nextColor(){const used=new Set(Array.from(document.querySelectorAll('#dm-dutiesBody input[type="color"]')).map(e=>e.value.toLowerCase()));return PALETTE.find(c=>!used.has(c.toLowerCase()))||PALETTE[used.size%PALETTE.length];}
+      function nextColor(){let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}const used=new Set(Object.values(all).map(m=>(m.color||"").toLowerCase()));return PALETTE.find(c=>!used.has(c.toLowerCase()))||PALETTE[Object.keys(all).length%PALETTE.length];}
+
+      async function deleteDuty(code) {
+        const key=(window.BCOT_APP_KEY||"").trim();
+        if(!key){showStatusMessage("config.js not found.","error");return;}
+        const yr=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
+        const mo=Number(document.getElementById('monthSelect')?.value||1);
+        const docId=`${yr}-${String(mo).padStart(2,'0')}`;
+        const areas=getAreasList(); const usedIn=[];
+        showStatusMessage("Checking rota assignments…","info");
+        for(const area of areas){
+          try{
+            const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId));
+            if(!snap.exists())continue;
+            const inUse=(snap.data()?.records||[]).some(rec=>Object.values(rec.daysData||{}).some(v=>{const bv=(v||"").toUpperCase().replace(/_O$/,"");return bv===code;}));
+            if(inUse)usedIn.push(area);
+          }catch{/*skip*/}
+        }
+        const warnTxt=usedIn.length?`\n\nWARNING: This duty is currently assigned in ${usedIn.length} area(s): ${usedIn.join(", ")}.\nAll assignments will be removed from the ${docId} rota.`:"";
+        const ok=await showConfirmModal({title:usedIn.length?`Duty "${code}" is in use!`:`Delete duty "${code}"?`,message:`Permanently delete duty "${code}"?${warnTxt}\n\nThis cannot be undone.`,confirmLabel:"Delete",danger:true});
+        if(!ok){showStatusMessage("Deletion cancelled.","info");return;}
+        showStatusMessage("Deleting duty…","info");
+        let remaining={};try{remaining=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+        delete remaining[code];
+        localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(remaining));
+        try{await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'duties_named',CLOUD_DOC),{savedAt:new Date().toISOString(),duties:remaining},{merge:true});}catch(e){console.error("Duties save failed:",e);}
+        for(const area of usedIn){
+          try{
+            const ref=window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId);
+            const snap=await window.FB.getDoc(ref); if(!snap.exists())continue;
+            const data=snap.data();
+            const cleaned=(data.records||[]).map(rec=>{const days={...(rec.daysData||{})};for(const dk of Object.keys(days)){const bv=(days[dk]||"").toUpperCase().replace(/_O$/,"");if(bv===code)delete days[dk];}return{...rec,daysData:days};});
+            await window.FB.setDoc(ref,{...data,records:cleaned});
+          }catch(e){console.error("Failed to clean area rota",area,e);}
+        }
+        const _sess=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};}catch{return{};}})();
+        const _who=[_sess.nameTitle,_sess.name].filter(Boolean).join(' ')||_sess.name||'Unknown';
+        try{await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'duty_deletion_log',`${Date.now()}_${code}`),{code,deletedAt:new Date().toISOString(),deletedBy:_who,affectedAreas:usedIn,monthDocId:docId});}catch(e){console.error("Deletion log failed:",e);}
+        await reloadDutiesFromStorage();
+        renderDutyTable();
+        showStatusMessage(`Duty "${code}" deleted${usedIn.length?` — cleared from ${usedIn.length} area(s)`:''}. ✅`);
+      }
+
+      function renderDutyTable() {
+        const tbody=document.getElementById("dm-dutiesBody"); if(!tbody)return;
+        tbody.innerHTML="";
+        let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+        const entries=Object.entries(all);
+        const ce=document.getElementById("dm-dutyCount");
+        if(!entries.length){
+          tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No duties yet. Click "+ Add Duty" to create one.</td></tr>`;
+          if(ce)ce.textContent="0 duties"; return;
+        }
+        entries.forEach(([code,meta],idx)=>{
+          const color=meta.color||"#1a4f8b"; const fg=contrastColor(color);
+          const endTime=calcEnd(meta.startTime||'Any',meta.hours||0);
+          const area=(meta.area||"").toUpperCase();
+          const tr=document.createElement("tr");
+          tr.dataset.dmCode=code; tr.dataset.dmLabel=(meta.label||"").toLowerCase(); tr.dataset.dmArea=area.toLowerCase();
+          tr.style.cssText="cursor:default;transition:background .1s;";
+          tr.innerHTML=`
+            <td style="padding:5px;text-align:center;font-size:11px;color:#9ca3af;">${idx+1}</td>
+            <td style="padding:5px;text-align:center;"><span style="display:inline-block;background:${color};color:${fg};font-weight:700;border-radius:5px;padding:2px 9px;font-size:12px;font-family:monospace;letter-spacing:.5px;">${code}</span></td>
+            <td style="padding:5px;font-size:12px;">${(meta.label||"—").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</td>
+            <td style="padding:5px;text-align:center;font-size:12px;">${meta.hours||0}</td>
+            <td style="padding:5px;text-align:center;"><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${color};border:1px solid rgba(0,0,0,.15);vertical-align:middle;"></span></td>
+            <td style="padding:5px;text-align:center;font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${area}">${area||"—"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${meta.startDay||"Any"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${meta.startTime||"Any"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${endTime}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${meta.defaultDays||"Any"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${meta.assignedSt||0}</td>
+            <td style="padding:5px;white-space:nowrap;">
+              <button type="button" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;">Edit</button>
+              <button type="button" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;margin-left:3px;">Del</button>
+            </td>`;
+          tr.querySelectorAll("button")[0].addEventListener("click",()=>openEditByCode(code));
+          tr.querySelectorAll("button")[1].addEventListener("click",()=>deleteDuty(code));
+          tr.addEventListener("mouseenter",()=>tr.style.background="#f0f9ff");
+          tr.addEventListener("mouseleave",()=>tr.style.background="");
+          tbody.appendChild(tr);
+        });
+        if(ce)ce.textContent=`${entries.length} duties`;
+        applyDutySearchFilter();
+      }
+
+      function applyDutySearchFilter() {
+        const f=getFilter();
+        const q=(document.getElementById("dm-search")?.value||"").trim().toLowerCase();
+        let vis=0;
+        Array.from(document.querySelectorAll("#dm-dutiesBody tr[data-dm-code]")).forEach(tr=>{
+          const areaStr=(tr.dataset.dmArea||"");
+          const aok=f==="ALL"||areaStr.split(",").map(x=>x.trim()).some(a=>a===f.toLowerCase());
+          const tok=!q||(tr.dataset.dmCode||"").toLowerCase().includes(q)||(tr.dataset.dmLabel||"").includes(q);
+          const hide=!(aok&&tok); tr.classList.toggle("hidden-row",hide); if(!hide)vis++;
+        });
+        const ce=document.getElementById("dm-dutyCount");
+        if(ce){const total=document.querySelectorAll("#dm-dutiesBody tr[data-dm-code]").length;ce.textContent=q||f!=="ALL"?`${vis} of ${total} shown`:`${total} duties`;}
+      }
+
+      function openAddModal() {
+        const overlay=document.createElement('div');
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        const defColor=nextColor();
+        overlay.innerHTML=`
+          <div style="background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(460px,96%);font-family:Arial,sans-serif;overflow:hidden;">
+            <div style="background:#1a4f8b;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:15px;font-weight:700;color:#fff;">+ New Duty</span>
+              <button id="_dan_x" style="background:transparent;border:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:0 4px;">✕</button>
+            </div>
+            <div style="padding:16px 20px;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <tr><td style="padding:5px 6px;color:#6b7280;width:130px;">Code <span style="color:#dc2626;">*</span></td>
+                    <td style="padding:5px 6px;"><input id="_dan_code" type="text" maxlength="6" placeholder="e.g. DAY" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;text-transform:uppercase;font-family:monospace;font-weight:700;"/>
+                      <div id="_dan_codeErr" style="color:#dc2626;font-size:11px;margin-top:2px;"></div></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Label</td>
+                    <td style="padding:5px 6px;"><input id="_dan_lbl" type="text" maxlength="60" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Hours</td>
+                    <td style="padding:5px 6px;"><input id="_dan_hrs" type="number" min="0" step="0.25" value="0" style="width:80px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Color</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <input id="_dan_cp" type="color" value="${defColor}" style="width:38px;height:28px;padding:0;border:none;cursor:pointer;"/>
+                      <div id="_dan_sw" style="width:22px;height:22px;border-radius:4px;border:1px solid rgba(0,0,0,.15);flex-shrink:0;background:${defColor};"></div>
+                      <input id="_dan_hx" type="text" maxlength="7" value="${defColor.toUpperCase()}" placeholder="#rrggbb" style="width:78px;font-family:monospace;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;text-transform:uppercase;"/>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Area</td>
+                    <td style="padding:5px 6px;"><input id="_dan_ar" type="text" maxlength="80" value="${getFilter()==="ALL"?"":getFilter()}" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;text-transform:uppercase;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Assigned Staff</td>
+                    <td style="padding:5px 6px;"><input id="_dan_st" type="number" min="0" step="1" value="0" style="width:78px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Start Day</td>
+                    <td style="padding:5px 6px;"><select id="_dan_sd" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;">${DAYS.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Start Time</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <select id="_dan_st2" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildTOpts()}</select>
+                      <span id="_dan_et" style="color:#6b7280;font-size:12px;"></span>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Default Days</td>
+                    <td style="padding:5px 6px;"><select id="_dan_dd" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildDOpts()}</select></td></tr>
+              </table>
+            </div>
+            <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
+              <button id="_dan_cn" style="background:#f3f4f6;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:Arial,sans-serif;">Cancel</button>
+              <button id="_dan_sv" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-weight:700;font-family:Arial,sans-serif;">Add Duty</button>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+        const $=id=>overlay.querySelector(id);
+        const cp=$('#_dan_cp'),sw=$('#_dan_sw'),hx=$('#_dan_hx'),st2=$('#_dan_st2'),hrs=$('#_dan_hrs'),et=$('#_dan_et');
+        const updEnd=()=>{const e=calcEnd(st2.value,hrs.value);et.textContent=e!=='Any'?`→ ${e}`:'';}
+        const syncPicker=()=>{sw.style.background=cp.value;hx.value=cp.value.toUpperCase();};
+        const syncHex=()=>{const v=hx.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v)){cp.value=v;sw.style.background=v;}};
+        cp.addEventListener('input',syncPicker); hx.addEventListener('input',syncHex);
+        hx.addEventListener('blur',()=>{hx.value=cp.value.toUpperCase();});
+        st2.addEventListener('change',updEnd); hrs.addEventListener('input',updEnd); updEnd();
+        const codeInput=$('#_dan_code');
+        codeInput.addEventListener('input',()=>{codeInput.value=codeInput.value.toUpperCase().replace(/[^A-Z0-9_]/g,'');});
+        const dismiss=()=>overlay.remove();
+        $('#_dan_x').addEventListener('click',dismiss); $('#_dan_cn').addEventListener('click',dismiss);
+        overlay.addEventListener('click',e=>{if(e.target===overlay)dismiss();});
+        $('#_dan_sv').addEventListener('click',async()=>{
+          const code=($('#_dan_code').value||"").trim().toUpperCase();
+          const errEl=$('#_dan_codeErr');
+          if(!code){errEl.textContent="Code is required.";return;}
+          if(!/^[A-Z][A-Z0-9_]{0,5}$/.test(code)){errEl.textContent="Code must start with a letter, 1–6 chars (A-Z, 0-9, _).";return;}
+          let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+          if(all[code]){errEl.textContent=`Code "${code}" already exists.`;return;}
+          const newDuty={label:($('#_dan_lbl').value||code).trim(),hours:Number(hrs.value)||0,color:cp.value||'#1a4f8b',area:($('#_dan_ar').value||'').trim().toUpperCase(),assignedSt:Number($('#_dan_st').value)||0,startDay:$('#_dan_sd').value||'Any',startTime:st2.value||'Any',defaultDays:$('#_dan_dd').value||'Any'};
+          all[code]=newDuty; DUTIES[code]=newDuty;
+          localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all)); injectDutyStyles();
+          try{
+            const appKey=(window.BCOT_APP_KEY||'').trim();
+            if(appKey)await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',appKey,'duties_named','DUTIES_POOL'),{savedAt:new Date().toISOString(),duties:all},{merge:true});
+          }catch(e){console.error(e);showStatusMessage('Cloud save failed: '+(e?.message||e),'error');}
+          showStatusMessage(`Duty "${code}" added ✅`);
+          dismiss(); renderDutyTable();
+        });
+        setTimeout(()=>codeInput.focus(),50);
+      }
 
       function addDutyRow(data) {
-        const tbody=document.getElementById("dm-dutiesBody");
-        const tr=document.createElement("tr");
-        const code=(data?.code||data?.dutyCode||"").toString().trim().toUpperCase();
-        const color=data?.color?data.color.toString():nextColor();
-        const f=getFilter(), defArea=f==="ALL"?"":f;
-        const area=(data?.area||defArea||"").toString().toUpperCase();
-        tr.innerHTML=`
-          <td style="padding:3px;"><input placeholder="CODE" value="${code}" style="width:64px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
-          <td style="padding:3px;"><input placeholder="Label" value="${(data?.label||"").toString()}" style="width:130px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
-          <td style="padding:3px;"><input type="number" min="0" step="0.25" value="${Number(data?.hours??0)}" style="width:54px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
-          <td style="padding:3px;text-align:center;">
-            <input type="color" value="${color}" style="width:36px;height:24px;padding:0;border:none;background:transparent;cursor:pointer;"/>
-            <div class="dm-sw" style="background:${color};width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.15);vertical-align:middle;margin:0 2px;"></div>
-            <input type="text" class="dm-hex" value="${color.toUpperCase()}" maxlength="7" placeholder="#rrggbb" style="width:62px;font-size:10px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;font-family:monospace;text-transform:uppercase;vertical-align:middle;"/>
-          </td>
-          <td style="padding:3px;"><input class="dm-area-cell" type="text" list="dm-areasDatalist" value="${area}" style="width:66px;text-transform:uppercase;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;" placeholder="Area"/></td>
-          <td style="padding:3px;"><input type="number" min="0" step="1" value="${Number(data?.assignedSt??0)}" style="width:52px;font-size:11px;padding:3px 5px;border:1px solid #ddd;border-radius:4px;"/></td>
-          <td style="padding:3px;"><select style="width:76px;font-size:11px;">${DAYS.map(d=>`<option value="${d}">${d}</option>`).join("")}</select></td>
-          <td style="padding:3px;"><select style="width:76px;font-size:11px;"><option value="Any">Any</option>${buildTOpts()}</select></td>
-          <td class="dm-et" style="padding:3px;font-size:11px;text-align:center;">Any</td>
-          <td style="padding:3px;"><select style="width:76px;font-size:11px;"><option value="Any">Any</option>${buildDOpts()}</select></td>
-          <td style="padding:3px;text-align:center;"><button style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;">✕</button></td>`;
-        tr.cells[6].querySelector("select").value=(data?.startDay||"Any").toString();
-        tr.cells[7].querySelector("select").value=(data?.startTime||"Any").toString();
-        tr.cells[9].querySelector("select").value=(data?.defaultDays??"Any").toString();
-        const ci=tr.cells[3].querySelector('input[type="color"]'), sw=tr.cells[3].querySelector(".dm-sw"), hx=tr.cells[3].querySelector(".dm-hex");
-        const syncFromPicker=()=>{ sw.style.background=ci.value; hx.value=ci.value.toUpperCase(); };
-        const syncFromHex=()=>{ const v=hx.value.trim(); if(/^#[0-9a-fA-F]{6}$/.test(v)){ci.value=v;sw.style.background=v;} };
-        ci.addEventListener("input", syncFromPicker);
-        hx.addEventListener("input", syncFromHex);
-        hx.addEventListener("blur", ()=>{ hx.value=ci.value.toUpperCase(); });
-        tr.cells[4].querySelector(".dm-area-cell").addEventListener("change",function(){
-          const v=this.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
-          this.value=v; if(v){saveAreaToList(v);rebuildUI();} applyAreaFilter();
-        });
-        function re(){const h=Number(tr.cells[2].querySelector("input").value||0)||0;const s=tr.cells[7].querySelector("select").value;tr.querySelector(".dm-et").textContent=calcEnd(s,h);}
-        tr.cells[2].querySelector("input").addEventListener("input",re);
-        tr.cells[7].querySelector("select").addEventListener("change",re); re();
-        tr.querySelector("button").addEventListener("click",async()=>{
-          const code=(tr.cells[0].querySelector("input").value||"").trim().toUpperCase();
-          if(!code){tr.remove();return;}
-          const key=(window.BCOT_APP_KEY||"").trim();
-          if(!key){showStatusMessage("config.js not found.","error");return;}
-          // Build month doc ID using selected year/month
-          const yr=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
-          const mo=Number(document.getElementById('monthSelect')?.value||1);
-          const docId=`${yr}-${String(mo).padStart(2,'0')}`;
-          // Scan all areas for usage of this duty code in the current month rota
-          const areas=getAreasList();
-          const usedIn=[];
-          showStatusMessage("Checking rota assignments…","info");
-          for(const area of areas){
-            try{
-              const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId));
-              if(!snap.exists())continue;
-              const inUse=(snap.data()?.records||[]).some(rec=>Object.values(rec.daysData||{}).some(v=>{const bv=(v||"").toUpperCase().replace(/_O$/,"");return bv===code;}));
-              if(inUse)usedIn.push(area);
-            }catch{/*skip area*/}
-          }
-          // Confirm deletion
-          const warnTxt=usedIn.length?`\n\nWARNING: This duty is currently assigned in ${usedIn.length} area(s): ${usedIn.join(", ")}.\nAll assignments will be removed from the ${docId} rota.`:"";
-          const ok=await showConfirmModal({
-            title:usedIn.length?`Duty "${code}" is in use!`:`Delete duty "${code}"?`,
-            message:`Permanently delete duty "${code}"?${warnTxt}\n\nThis cannot be undone.`,
-            confirmLabel:"Delete",danger:true
-          });
-          if(!ok){showStatusMessage("Deletion cancelled.","info");return;}
-          showStatusMessage("Deleting duty…","info");
-          // 1. Remove from UI
-          tr.remove();
-          // 2. Save remaining duties to localStorage + Firestore DUTIES_POOL
-          const remaining=readTable();
-          localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(remaining));
-          try{
-            await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'duties_named',CLOUD_DOC),
-              {savedAt:new Date().toISOString(),duties:remaining},{merge:true});
-          }catch(e){console.error("Duties save failed:",e);}
-          // 3. Clear duty from all affected area month docs
-          for(const area of usedIn){
-            try{
-              const ref=window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId);
-              const snap=await window.FB.getDoc(ref);
-              if(!snap.exists())continue;
-              const data=snap.data();
-              const cleaned=(data.records||[]).map(rec=>{
-                const days={...(rec.daysData||{})};
-                for(const dk of Object.keys(days)){const bv=(days[dk]||"").toUpperCase().replace(/_O$/,"");if(bv===code)delete days[dk];}
-                return{...rec,daysData:days};
-              });
-              await window.FB.setDoc(ref,{...data,records:cleaned});
-            }catch(e){console.error("Failed to clean area rota",area,e);}
-          }
-          // 4. Log deletion to Firestore
-          const _sess=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};}catch{return{};}})();
-          const _who=[_sess.nameTitle,_sess.name].filter(Boolean).join(' ')||_sess.name||'Unknown';
-          try{
-            await window.FB.setDoc(
-              window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'duty_deletion_log',`${Date.now()}_${code}`),
-              {code,deletedAt:new Date().toISOString(),deletedBy:_who,affectedAreas:usedIn,monthDocId:docId}
-            );
-          }catch(e){console.error("Deletion log failed:",e);}
-          // 5. Reload DUTIES global so rota renders correctly
-          await reloadDutiesFromStorage();
-          showStatusMessage(`Duty "${code}" deleted${usedIn.length?` — cleared from ${usedIn.length} area(s) in ${docId}`:''}. ✅`);
-        });
-        tbody.appendChild(tr);
-        if(f!=="ALL"&&area&&area!==f)tr.classList.add("hidden-row");
+        if(!data?.code&&!data?.dutyCode){openAddModal();return;}
+        const code=(data.code||data.dutyCode||"").toString().trim().toUpperCase(); if(!code)return;
+        let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+        all[code]={label:(data.label||code).toString().trim(),hours:Number(data.hours||0)||0,color:data.color||nextColor(),area:(data.area||"").toString().toUpperCase(),assignedSt:Number(data.assignedSt||0)||0,startDay:(data.startDay||"Any").toString(),startTime:(data.startTime||"Any").toString(),defaultDays:(data.defaultDays||"Any").toString()};
+        localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));
       }
 
       function readTable() {
-        const out={};
-        for(const tr of Array.from(document.querySelectorAll("#dm-dutiesBody tr"))){
-          const code=(tr.cells[0].querySelector("input").value||"").toString().trim().toUpperCase();
-          if(!code)continue;
-          if(!/^[A-Z][A-Z0-9_]{0,5}$/.test(code))throw new Error(`Invalid code: "${code}"`);
-          out[code]={label:(tr.cells[1].querySelector("input").value||code).toString().trim(),hours:Number(tr.cells[2].querySelector("input").value||0)||0,color:(tr.cells[3].querySelector('input[type="color"]').value||"#111827").toString(),area:(tr.cells[4].querySelector(".dm-area-cell").value||"").toString().toUpperCase(),assignedSt:Number(tr.cells[5].querySelector("input").value||0)||0,startDay:(tr.cells[6].querySelector("select").value||"Any").toString(),startTime:(tr.cells[7].querySelector("select").value||"Any").toString(),defaultDays:(tr.cells[9].querySelector("select").value||"Any").toString()};
-        }
+        let out={};try{out=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
         return out;
       }
 
-      function loadLocal() {
-        const raw=localStorage.getItem(DUTIES_ALL_KEY);
-        document.getElementById("dm-dutiesBody").innerHTML="";
-        if(!raw)return;
-        let data=null; try{data=JSON.parse(raw);}catch{data=null;}
-        if(!data||!Object.keys(data).length)return;
-        for(const[code,meta]of Object.entries(data))addDutyRow({code,...meta});
-        applyAreaFilter();
-      }
+      function loadLocal() { renderDutyTable(); }
 
       async function saveToCloud() {
         try {
@@ -3827,10 +3880,8 @@
           const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,"bcot_overtime_secure",key,"duties_named",CLOUD_DOC));
           if(!snap.exists()||!Object.keys(snap.data()?.duties||{}).length){showStatusMessage("No duties in cloud yet.","info");return;}
           const duties=snap.data().duties;
-          document.getElementById("dm-dutiesBody").innerHTML="";
-          for(const[code,meta]of Object.entries(duties))addDutyRow({code,...meta});
           localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(duties));
-          rebuildUI(); applyAreaFilter();
+          rebuildUI(); renderDutyTable();
           showStatusMessage(`Loaded ${Object.keys(duties).length} duties from cloud ✅`);
         }catch(e){console.error(e);showStatusMessage("Load duties failed: "+(e?.message||e),"error");}
       }
@@ -3839,10 +3890,11 @@
         const f=getFilter();
         const ok=await showConfirmModal({title:"Clear duties?",message:f==="ALL"?"Clear ALL duties for all areas?": `Clear all duties tagged with area "${f}"?`,confirmLabel:"Clear",danger:true});
         if(!ok)return;
-        if(f==="ALL"){localStorage.removeItem(DUTIES_ALL_KEY);document.getElementById("dm-dutiesBody").innerHTML="";}
-        else{Array.from(document.querySelectorAll("#dm-dutiesBody tr")).forEach(tr=>{const ra=(tr.querySelector(".dm-area-cell")?.value||"").trim().toUpperCase();if(ra===f)tr.remove();});
-          try{localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(readTable()));}catch{localStorage.removeItem(DUTIES_ALL_KEY);}}
-        showStatusMessage("Duties cleared ✅");
+        if(f==="ALL"){localStorage.removeItem(DUTIES_ALL_KEY);}
+        else{let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+          Object.keys(all).forEach(code=>{const ar=(all[code].area||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean);if(!ar.length||ar.includes(f))delete all[code];});
+          localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));}
+        renderDutyTable(); showStatusMessage("Duties cleared ✅");
       }
 
       function previewImport() {
@@ -3871,9 +3923,7 @@
         sel.forEach(code=>{if(!all[code])return;const ex=(all[code].area||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean);if(!ex.includes(cur.toUpperCase())){ex.push(cur.toUpperCase());all[code].area=ex.join(",");imp++;}});
         if(!imp){showStatusMessage("All selected duties already in this area.","info");return;}
         localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));
-        document.getElementById("dm-dutiesBody").innerHTML="";
-        for(const[code,meta]of Object.entries(all))addDutyRow({code,...meta});
-        applyAreaFilter(); cancelImport();
+        renderDutyTable(); cancelImport();
         showStatusMessage(`Imported ${imp} duties into ${cur} ✅`);
       }
 
@@ -3980,7 +4030,7 @@
             if(appKey) await window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',appKey,'duties_named','DUTIES_POOL'),{savedAt:new Date().toISOString(),duties:allDuties},{merge:true});
           } catch(e){console.error(e);showStatusMessage('Duty cloud save failed: '+(e?.message||e),'error');}
           showStatusMessage(`Duty "${code}" updated ✅`);
-          dismiss();
+          dismiss(); renderDutyTable();
         });
       }
 
@@ -3993,7 +4043,7 @@
       }
       function close() { document.getElementById("dutiesModal").style.display="none"; }
 
-      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode};
+      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,applyDutySearchFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════
