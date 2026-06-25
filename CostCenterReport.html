@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cost Center Spending Report</title>
+  <style>
+    :root{
+      --primary:#1a4f8b; --secondary:#2e8b57;
+      --bg:#f5f5f5; --card:#fff; --border:#e2e8f0;
+    }
+    *{ box-sizing:border-box; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; }
+
+    .header{
+      display:flex; align-items:center;
+      background:linear-gradient(135deg,var(--primary),var(--secondary));
+      padding:10px 14px; border-radius:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,.12); margin-bottom:14px;
+    }
+    .header-text{ text-align:center; flex-grow:1; color:#fff; }
+    .header-text h1{ margin:3px 0; font-size:14px; }
+    .header-text h2{ margin:2px 0; font-size:12px; }
+    .logo{
+      width:70px; height:70px; background:#fff; border-radius:5px; padding:4px;
+      display:flex; justify-content:center; align-items:center; margin-right:12px; flex-shrink:0;
+    }
+    .logo img{ width:100%; height:100%; object-fit:contain; }
+
+    .card{
+      background:var(--card); border-radius:10px;
+      box-shadow:0 1px 3px rgba(0,0,0,.12); padding:14px; margin-bottom:14px;
+    }
+    .card-title{
+      font-size:13px; font-weight:800; color:#1a4f8b;
+      border-bottom:2px solid #e2e8f0; padding-bottom:7px; margin-bottom:12px;
+    }
+
+    input,select,button{ padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+    button{
+      background:var(--primary); color:#fff; border:none; cursor:pointer;
+      font-weight:700; transition:background .2s;
+    }
+    button:hover{ background:var(--secondary); }
+    .btn-green { background:#28a745; } .btn-green:hover { background:#218838; }
+    .btn-purple{ background:#6f42c1; } .btn-purple:hover{ background:#5a35a1; }
+    .btn-orange{ background:#d97706; } .btn-orange:hover{ background:#b45309; }
+    .btn-gray  { background:#6b7280; } .btn-gray:hover  { background:#4b5563; }
+    .btn-teal  { background:#0d9488; } .btn-teal:hover  { background:#0f766e; }
+    .btn-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    /* ── Filter grid ─────────────────────────────────────────────── */
+    .filter-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:10px; align-items:end;
+    }
+    .fg{ display:flex; flex-direction:column; gap:4px; }
+    .fg label{ font-weight:700; color:#374151; font-size:11px; }
+    .fg select,.fg input[type=number]{ padding:6px 8px; font-size:12px; }
+    .date-pair{ display:flex; gap:6px; }
+    .date-pair select{ flex:1; }
+    .date-pair input[type=number]{ width:80px; }
+    .opt-row{ display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; }
+    .opt-row label{ display:flex; gap:5px; align-items:center; cursor:pointer; font-size:11px; }
+    .area-filter-box{
+      margin-top:10px; padding:10px 12px;
+      background:#f8fafc; border:1px solid var(--border); border-radius:8px;
+      display:none;
+    }
+    .area-filter-box b{ font-size:11px; color:#374151; display:block; margin-bottom:6px; }
+    .area-chips{ display:flex; flex-wrap:wrap; gap:4px; }
+    .area-chip-check{
+      display:inline-flex; align-items:center; gap:4px; cursor:pointer;
+      background:#e0e7ff; color:#3730a3; border-radius:4px; padding:3px 8px;
+      font-size:10px; font-weight:700; user-select:none;
+    }
+    .area-chip-check input{ margin:0; accent-color:#3730a3; }
+    .area-chip-check.unchecked{ background:#f1f5f9; color:#94a3b8; }
+
+    /* ── Summary cards ───────────────────────────────────────────── */
+    .summary-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+      gap:10px; margin-bottom:14px;
+    }
+    .summary-card{
+      background:#f9fbfd; border:1px solid var(--border); border-radius:10px;
+      padding:12px 14px; text-align:center;
+    }
+    .summary-card .sc-icon{ font-size:20px; margin-bottom:4px; }
+    .summary-card .sc-label{ font-size:10px; color:#6b7280; font-weight:700; text-transform:uppercase; }
+    .summary-card .sc-value{ font-size:16px; font-weight:800; margin:4px 0 2px; }
+    .summary-card .sc-sub{ font-size:10px; color:#9ca3af; }
+    .sc-budget  { border-top:3px solid #1a4f8b; }
+    .sc-spent   { border-top:3px solid #dc2626; }
+    .sc-remain  { border-top:3px solid #16a34a; }
+    .sc-pct     { border-top:3px solid #d97706; }
+    .sc-comp    { border-top:3px solid #7c3aed; }
+
+    /* ── Budget bar ──────────────────────────────────────────────── */
+    .budget-bar-wrap{
+      margin-bottom:14px;
+      background:#f1f5f9; border-radius:8px; overflow:hidden; height:20px; position:relative;
+    }
+    .budget-bar-fill{
+      height:100%; border-radius:8px; transition:width .4s;
+      display:flex; align-items:center; justify-content:flex-end; padding-right:6px;
+    }
+    .budget-bar-fill span{
+      font-size:10px; font-weight:800; color:#fff;
+      text-shadow:0 1px 2px rgba(0,0,0,.3); white-space:nowrap;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────────── */
+    .rpt-table{ width:100%; border-collapse:collapse; font-size:11px; }
+    .rpt-table th{
+      background:#1a4f8b; color:#fff; padding:7px 8px;
+      text-align:left; font-size:10px; white-space:nowrap; font-weight:700;
+    }
+    .rpt-table td{ padding:6px 8px; border-bottom:1px solid #f1f5f9; }
+    .rpt-table tr:nth-child(even) td{ background:#f8fafc; }
+    .rpt-table tr:hover td{ background:#eff6ff; }
+    .rpt-table tfoot td{
+      font-weight:800; background:#f0f7ff !important;
+      border-top:2px solid #1a4f8b; color:#0f172a;
+    }
+    .rpt-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+    .rpt-table th.num{ text-align:right; }
+    .bar-cell{ min-width:80px; }
+    .mini-bar{
+      height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-top:2px;
+    }
+    .mini-bar-fill{ height:100%; border-radius:3px; }
+    .status-dot{ font-size:11px; }
+
+    /* ── Child CC section ────────────────────────────────────────── */
+    .child-section{
+      margin:10px 0 14px; border:1px solid #e0e7ff; border-radius:10px; overflow:hidden;
+    }
+    .child-section-header{
+      background:linear-gradient(135deg,#ede9fe,#f5f3ff);
+      padding:10px 14px; border-bottom:1px solid #e0e7ff;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .child-section-header .csh-name{
+      font-size:13px; font-weight:800; color:#3730a3;
+    }
+    .child-section-header .csh-meta{ font-size:11px; color:#6b7280; }
+    .child-section-body{ padding:12px 14px; }
+
+    /* ── Monthly trend ───────────────────────────────────────────── */
+    .trend-table{ overflow-x:auto; }
+    .trend-table table{ border-collapse:collapse; font-size:10px; min-width:400px; }
+    .trend-table th{
+      background:#475569; color:#fff; padding:5px 8px;
+      white-space:nowrap; text-align:right;
+    }
+    .trend-table th:first-child{ text-align:left; }
+    .trend-table td{ padding:4px 8px; border-bottom:1px solid #f1f5f9; text-align:right; }
+    .trend-table td:first-child{ text-align:left; font-weight:700; }
+    .trend-table tfoot td{ font-weight:800; background:#f0f7ff; border-top:2px solid #475569; }
+    .trend-table tr:nth-child(even) td{ background:#f8fafc; }
+
+    /* ── Report header ───────────────────────────────────────────── */
+    .rpt-header{
+      border-left:4px solid #1a4f8b; padding:8px 12px; margin-bottom:14px;
+      background:#f0f7ff; border-radius:0 8px 8px 0;
+    }
+    .rpt-header h2{ margin:0 0 4px; font-size:14px; color:#1a4f8b; }
+    .rpt-header-meta{ font-size:11px; color:#6b7280; }
+    .rpt-header-meta span{ margin-right:14px; }
+
+    /* ── Badges ──────────────────────────────────────────────────── */
+    .badge{
+      display:inline-block; padding:1px 7px; border-radius:10px;
+      font-size:9px; font-weight:700; vertical-align:middle;
+    }
+    .badge-sum  { background:#fef3c7; color:#92400e; }
+    .badge-dist { background:#ede9fe; color:#5b21b6; }
+    .badge-own  { background:#dcfce7; color:#166534; }
+
+    /* ── Toast ───────────────────────────────────────────────────── */
+    .status-message{
+      position:fixed; top:18px; right:18px; padding:10px 16px;
+      border-radius:6px; color:#fff; display:none; z-index:2000;
+      max-width:520px; word-break:break-word;
+      box-shadow:0 4px 12px rgba(0,0,0,.18); font-size:12px;
+    }
+    .status-success{ background:#28a745; }
+    .status-error  { background:#dc3545; }
+    .status-info   { background:#0369a1; }
+
+    /* ── Loading ─────────────────────────────────────────────────── */
+    .loading{
+      padding:32px; text-align:center; color:#6b7280; font-size:13px;
+    }
+    .spinner{
+      width:32px; height:32px; border:3px solid #e2e8f0;
+      border-top-color:#1a4f8b; border-radius:50%;
+      animation:spin .7s linear infinite; margin:0 auto 12px;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+
+    /* ── Print ───────────────────────────────────────────────────── */
+    @media print{
+      .no-print{ display:none !important; }
+      body{ background:#fff; padding:8px; }
+      .card{ box-shadow:none; border:1px solid #ddd; margin-bottom:10px; }
+      .rpt-table th{ background:#334155 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .budget-bar-fill{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .summary-card{ page-break-inside:avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="header">
+    <div class="logo">
+      <img src="MNGHA-Logo.png" alt="MNGHA Logo"
+        onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;70&quot; height=&quot;70&quot;><rect width=&quot;70&quot; height=&quot;70&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;11&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
+    </div>
+    <div class="header-text">
+      <h1>Ministry of National Guard Health Affairs</h1>
+      <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+      <h2>📊 Cost Center Spending Report</h2>
+    </div>
+  </div>
+
+  <!-- ── Filter Panel ───────────────────────────────────────────────── -->
+  <div class="card no-print">
+    <div class="card-title">📋 Report Filters</div>
+
+    <div class="filter-grid">
+      <div class="fg" style="grid-column:1/-1 span; min-width:220px;">
+        <label>Cost Center</label>
+        <select id="rptCC" onchange="onCCSelected()" style="font-size:12px;padding:7px 10px;">
+          <option value="">— Select Cost Center —</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>From</label>
+        <div class="date-pair">
+          <select id="rptFromMonth" style="font-size:11px;">
+            <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+            <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+            <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+            <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+          </select>
+          <input type="number" id="rptFromYear" min="2020" max="2050" style="font-size:11px;"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label>To</label>
+        <div class="date-pair">
+          <select id="rptToMonth" style="font-size:11px;">
+            <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+            <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+            <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+            <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+          </select>
+          <input type="number" id="rptToYear" min="2020" max="2050" style="font-size:11px;"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Level</label>
+        <select id="rptLevel" style="font-size:11px;">
+          <option value="all">This CC + all children</option>
+          <option value="own">This CC only (own areas)</option>
+          <option value="children">Children only</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="opt-row">
+      <label><input type="checkbox" id="rptShowComp" checked> Show COMP hours</label>
+      <label><input type="checkbox" id="rptShowTrend" checked> Monthly trend table</label>
+      <label><input type="checkbox" id="rptShowAlloc" checked> Show allocation comparison</label>
+    </div>
+
+    <!-- Area filter (populated on CC select) -->
+    <div class="area-filter-box" id="areaFilterBox">
+      <b>Filter Areas:</b>
+      <div style="margin-bottom:5px;display:flex;gap:6px;">
+        <button type="button" onclick="toggleAllAreas(true)"
+                style="font-size:10px;padding:2px 8px;background:#0369a1;">All</button>
+        <button type="button" onclick="toggleAllAreas(false)"
+                style="font-size:10px;padding:2px 8px;background:#6b7280;">None</button>
+      </div>
+      <div class="area-chips" id="areaChips"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top:12px;">
+      <button onclick="generateReport()" class="btn-green">📊 Generate Report</button>
+      <button onclick="exportPDF()"   class="btn-purple no-print" id="exportPdfBtn"   style="display:none;">📄 Export PDF</button>
+      <button onclick="exportExcel()" class="btn-teal   no-print" id="exportXlsxBtn"  style="display:none;">📊 Export Excel</button>
+      <a href="Areas.html" style="margin-left:auto;text-decoration:none;">
+        <button type="button" class="btn-gray">← Back to Cost Centers</button>
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Report Output ──────────────────────────────────────────────── -->
+  <div id="reportOutput">
+    <div class="loading" style="padding:40px;">
+      <div class="spinner"></div>
+      Loading cost center data…
+    </div>
+  </div>
+
+  <div class="status-message" id="statusBox"></div>
+
+  <!-- ── Firebase (module) ──────────────────────────────────────────── -->
+  <script src="config.js"></script>
+  <script src="js/auth.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    const cfg = {
+      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:"bcotrota.firebaseapp.com",
+      projectId:"bcotrota",
+      storageBucket:"bcotrota.firebasestorage.app",
+      messagingSenderId:"659421824894",
+      appId:"1:659421824894:web:f0546879df8808491ad52f"
+    };
+    window.FB = { db:getFirestore(initializeApp(cfg)), doc, setDoc, getDoc };
+    window._fbReady = true;
+  </script>
+
+  <!-- ── SheetJS for Excel export ───────────────────────────────────── -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- ── Report Logic ───────────────────────────────────────────────── -->
+  <script>
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────────
+  let _ccList      = [];
+  let _consRecords = [];
+  let _lastReport  = null;   // cached for export
+
+  const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // ── Utilities ──────────────────────────────────────────────────────
+  function _toast(msg, type='success') {
+    const el = document.getElementById('statusBox');
+    el.textContent = msg;
+    el.className = 'status-message status-' + type;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display='none'; }, 3600);
+  }
+  function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  const _fmt2 = v => Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const _fmt0 = v => Number(v||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0});
+  const _pct  = (n,d) => d > 0 ? (n/d*100).toFixed(1)+'%' : '—';
+
+  // ── Firebase ───────────────────────────────────────────────────────
+  async function _waitFB() {
+    let t=0; while(!window.FB && t++<80) await new Promise(r=>setTimeout(r,50));
+    return !!window.FB;
+  }
+  function _appKey() {
+    const k=(window.BCOT_APP_KEY||'').trim();
+    if(!k) _toast('config.js not found — cloud sync disabled.','error');
+    return k||null;
+  }
+
+  // ── Load data ──────────────────────────────────────────────────────
+  async function loadData() {
+    const key = _appKey(); if(!key) { document.getElementById('reportOutput').innerHTML='<div class="loading">config.js not found.</div>'; return; }
+    if(!await _waitFB()) { _toast('Firebase not ready.','error'); return; }
+    try {
+      const [ccSnap, cSnap] = await Promise.all([
+        window.FB.getDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'cost_centers','LIST')),
+        window.FB.getDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'area_consumption','RECORDS'))
+      ]);
+      _ccList      = Array.isArray(ccSnap.data()?.centers) ? ccSnap.data().centers : [];
+      _consRecords = Array.isArray(cSnap.data()?.records)  ? cSnap.data().records  : [];
+    } catch(e) { _toast('Load failed: '+(e?.message||e),'error'); }
+  }
+
+  function _populateCCDropdown() {
+    const sel = document.getElementById('rptCC');
+    sel.innerHTML = '<option value="">— Select Cost Center —</option>';
+    function addOpts(parentId, depth) {
+      _ccList.filter(c=>(c.parentId||null)===parentId).forEach(cc => {
+        const opt = document.createElement('option');
+        opt.value = cc.id;
+        const modeTag = cc.budgetMode==='sum' ? ' [Σ]' : cc.budgetMode==='distribute' ? ' [⇒]' : '';
+        opt.textContent = ' '.repeat(depth*3) + (depth?'└─ ':'') + cc.name + modeTag;
+        sel.appendChild(opt);
+        addOpts(cc.id, depth+1);
+      });
+    }
+    addOpts(null, 0);
+  }
+
+  function _getDescendants(id) {
+    const out = [];
+    _ccList.filter(c=>c.parentId===id).forEach(child => { out.push(child); out.push(..._getDescendants(child.id)); });
+    return out;
+  }
+
+  function _getAllAreas(id, includeChildren) {
+    const cc = _ccList.find(c=>c.id===id);
+    if(!cc) return [];
+    const areas = [...(cc.areas||[])];
+    if(includeChildren)
+      _ccList.filter(c=>c.parentId===id).forEach(ch => _getAllAreas(ch.id,true).forEach(a=>{ if(!areas.includes(a)) areas.push(a); }));
+    return areas;
+  }
+
+  function _effectiveBudget(cc) {
+    const mode = cc.budgetMode||'own';
+    if(mode==='sum') return _ccList.filter(c=>c.parentId===cc.id).reduce((s,c)=>s+_effectiveBudget(c),0);
+    if(cc.parentId) {
+      const par = _ccList.find(p=>p.id===cc.parentId);
+      if(par&&(par.budgetMode||'own')==='distribute') {
+        const al = (par.allocations||{})[cc.id];
+        if(al) return al.type==='pct' ? (Number(par.budget)||0)*al.value/100 : Number(al.value)||0;
+        return 0;
+      }
+    }
+    return Number(cc.budget)||0;
+  }
+
+  // ── CC selection ───────────────────────────────────────────────────
+  function onCCSelected() {
+    const id = document.getElementById('rptCC').value;
+    const box = document.getElementById('areaFilterBox');
+    if(!id) { box.style.display='none'; return; }
+    const level = document.getElementById('rptLevel').value;
+    const incChild = level !== 'own';
+    const areas = _getAllAreas(id, incChild);
+    const chips = document.getElementById('areaChips');
+    chips.innerHTML = areas.map(a => `
+      <label class="area-chip-check">
+        <input type="checkbox" value="${_esc(a)}" checked onchange="this.closest('label').className='area-chip-check'+(this.checked?'':' unchecked')">
+        ${_esc(a)}
+      </label>`).join('');
+    box.style.display = areas.length ? 'block' : 'none';
+  }
+
+  function toggleAllAreas(on) {
+    document.querySelectorAll('#areaChips input[type=checkbox]').forEach(cb => {
+      cb.checked = on;
+      cb.closest('label').className = 'area-chip-check' + (on?'':' unchecked');
+    });
+  }
+
+  // ── Consumption helpers ────────────────────────────────────────────
+  function _filterRecs(areas, fromY, fromM, toY, toM) {
+    return _consRecords.filter(r => {
+      if(!areas.includes(r.area)) return false;
+      const ry=Number(r.year), rm=Number(r.month);
+      return (ry>fromY||(ry===fromY&&rm>=fromM)) && (ry<toY||(ry===toY&&rm<=toM));
+    });
+  }
+
+  function _areaTotals(areas, recs) {
+    const map = {};
+    areas.forEach(a => { map[a]={otAmount:0,compHours:0}; });
+    recs.forEach(r => {
+      if(!map[r.area]) map[r.area]={otAmount:0,compHours:0};
+      map[r.area].otAmount  += Number(r.otAmount)||0;
+      map[r.area].compHours += Number(r.compHours)||0;
+    });
+    return map;
+  }
+
+  function _monthKeys(fromY, fromM, toY, toM) {
+    const keys=[];
+    let y=fromY, m=fromM;
+    while(y<toY||(y===toY&&m<=toM)) {
+      keys.push(`${y}-${String(m).padStart(2,'0')}`);
+      m++; if(m>12){m=1;y++;}
+    }
+    return keys;
+  }
+
+  function _monthlyByArea(areas, recs, monthKeys) {
+    const data={};
+    monthKeys.forEach(mk=>{ data[mk]={}; areas.forEach(a=>{ data[mk][a]={otAmount:0,compHours:0}; }); });
+    recs.forEach(r=>{
+      const mk=`${r.year}-${String(r.month).padStart(2,'0')}`;
+      if(!data[mk]) return;
+      if(!data[mk][r.area]) data[mk][r.area]={otAmount:0,compHours:0};
+      data[mk][r.area].otAmount  += Number(r.otAmount)||0;
+      data[mk][r.area].compHours += Number(r.compHours)||0;
+    });
+    return data;
+  }
+
+  // ── Generate ───────────────────────────────────────────────────────
+  function generateReport() {
+    const ccId = document.getElementById('rptCC').value;
+    if(!ccId) { _toast('Please select a cost center.','error'); return; }
+    const cc = _ccList.find(c=>c.id===ccId); if(!cc) return;
+
+    const fromM = Number(document.getElementById('rptFromMonth').value);
+    const fromY = Number(document.getElementById('rptFromYear').value);
+    const toM   = Number(document.getElementById('rptToMonth').value);
+    const toY   = Number(document.getElementById('rptToYear').value);
+
+    if(fromY>toY||(fromY===toY&&fromM>toM)) {
+      _toast('"From" must be before or equal to "To".','error'); return;
+    }
+
+    const level      = document.getElementById('rptLevel').value;
+    const showComp   = document.getElementById('rptShowComp').checked;
+    const showTrend  = document.getElementById('rptShowTrend').checked;
+    const showAlloc  = document.getElementById('rptShowAlloc').checked;
+
+    const selAreas = Array.from(document.querySelectorAll('#areaChips input:checked')).map(cb=>cb.value);
+    const monthKeys = _monthKeys(fromY, fromM, toY, toM);
+    const includeOwn      = level !== 'children';
+    const includeChildren = level !== 'own';
+
+    // Build child sections
+    const directChildren = _ccList.filter(c=>c.parentId===ccId);
+    const childSections  = includeChildren ? directChildren.map(child => {
+      const childAreas = (child.areas||[]).filter(a=>selAreas.includes(a));
+      const childRecs  = _filterRecs(childAreas, fromY, fromM, toY, toM);
+      const totals     = _areaTotals(childAreas, childRecs);
+      const spent      = Object.values(totals).reduce((s,r)=>s+r.otAmount,0);
+      const compH      = Object.values(totals).reduce((s,r)=>s+r.compHours,0);
+      const budget     = _effectiveBudget(child);
+      const alloc      = (cc.allocations||{})[child.id];
+      const monthly    = _monthlyByArea(childAreas, childRecs, monthKeys);
+      return { cc:child, budget, spent, compH, totals, areas:childAreas, alloc, monthly };
+    }) : [];
+
+    // Own areas
+    const ownAreas = includeOwn ? (cc.areas||[]).filter(a=>selAreas.includes(a)) : [];
+    const ownRecs  = _filterRecs(ownAreas, fromY, fromM, toY, toM);
+    const ownTotals = _areaTotals(ownAreas, ownRecs);
+    const ownMonthly = _monthlyByArea(ownAreas, ownRecs, monthKeys);
+
+    const totalBudget = _effectiveBudget(cc);
+    const ownSpent    = Object.values(ownTotals).reduce((s,r)=>s+r.otAmount,0);
+    const childSpent  = childSections.reduce((s,cs)=>s+cs.spent,0);
+    const totalSpent  = ownSpent + childSpent;
+    const totalComp   = Object.values(ownTotals).reduce((s,r)=>s+r.compHours,0)
+                      + childSections.reduce((s,cs)=>s+cs.compH,0);
+
+    _lastReport = {
+      cc, totalBudget, totalSpent, totalComp,
+      ownAreas, ownTotals, ownMonthly,
+      childSections, monthKeys,
+      fromY, fromM, toY, toM,
+      showComp, showTrend, showAlloc
+    };
+
+    renderReport(_lastReport);
+    document.getElementById('exportPdfBtn').style.display  = 'inline-block';
+    document.getElementById('exportXlsxBtn').style.display = 'inline-block';
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────
+  function renderReport(d) {
+    const pct     = d.totalBudget > 0 ? Math.min(d.totalSpent/d.totalBudget*100,100) : 0;
+    const isOver  = d.totalBudget > 0 && d.totalSpent > d.totalBudget;
+    const isWarn  = !isOver && pct >= 75;
+    const barClr  = isOver ? '#dc2626' : isWarn ? '#d97706' : '#16a34a';
+    const dot     = isOver ? '🔴' : isWarn ? '🟡' : '🟢';
+    const remain  = d.totalBudget - d.totalSpent;
+    const period  = d.fromY===d.toY && d.fromM===d.toM
+      ? `${MONTHS[d.fromM]} ${d.fromY}`
+      : `${MONTHS[d.fromM]} ${d.fromY} – ${MONTHS[d.toM]} ${d.toY}`;
+    const modeBadge = d.cc.budgetMode==='sum'
+      ? '<span class="badge badge-sum">Σ Sum</span>'
+      : d.cc.budgetMode==='distribute'
+        ? '<span class="badge badge-dist">⇒ Distribute</span>'
+        : '<span class="badge badge-own">Own</span>';
+
+    let html = `
+      <!-- Report header -->
+      <div class="card">
+        <div class="rpt-header">
+          <h2>${dot} ${_esc(d.cc.name)} ${modeBadge}</h2>
+          <div class="rpt-header-meta">
+            <span>📅 Period: <strong>${period}</strong></span>
+            <span>🗓 Generated: ${new Date().toLocaleString()}</span>
+            <span>💼 Budget Mode: ${d.cc.budgetMode||'own'}</span>
+          </div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="summary-grid">
+          <div class="summary-card sc-budget">
+            <div class="sc-icon">💰</div>
+            <div class="sc-label">Total Budget</div>
+            <div class="sc-value" style="color:#1a4f8b;">${_fmt2(d.totalBudget)}</div>
+            <div class="sc-sub">SAR</div>
+          </div>
+          <div class="summary-card sc-spent">
+            <div class="sc-icon">📊</div>
+            <div class="sc-label">Total Spent</div>
+            <div class="sc-value" style="color:${barClr};">${_fmt2(d.totalSpent)}</div>
+            <div class="sc-sub">SAR</div>
+          </div>
+          <div class="summary-card sc-remain">
+            <div class="sc-icon">${isOver?'⚠️':'✅'}</div>
+            <div class="sc-label">${isOver?'Over Budget':'Remaining'}</div>
+            <div class="sc-value" style="color:${isOver?'#dc2626':'#16a34a'};">${_fmt2(Math.abs(remain))}</div>
+            <div class="sc-sub">SAR ${isOver?'over':''}</div>
+          </div>
+          <div class="summary-card sc-pct">
+            <div class="sc-icon">📈</div>
+            <div class="sc-label">Budget Used</div>
+            <div class="sc-value" style="color:${barClr};">${d.totalBudget>0?(d.totalSpent/d.totalBudget*100).toFixed(1)+'%':'—'}</div>
+            <div class="sc-sub">${d.totalBudget>0?_fmt2(d.totalBudget)+' SAR total':''}</div>
+          </div>
+          ${d.showComp && d.totalComp > 0 ? `
+          <div class="summary-card sc-comp">
+            <div class="sc-icon">📅</div>
+            <div class="sc-label">COMP Hours</div>
+            <div class="sc-value" style="color:#7c3aed;">${d.totalComp.toFixed(1)}</div>
+            <div class="sc-sub">hours</div>
+          </div>` : ''}
+        </div>
+
+        <!-- Budget progress bar -->
+        <div style="margin-bottom:6px;display:flex;justify-content:space-between;font-size:10px;color:#6b7280;">
+          <span>0</span>
+          <span style="font-weight:700;color:${barClr};">
+            ${pct.toFixed(1)}% of ${_fmt2(d.totalBudget)} SAR budget
+          </span>
+          <span>${_fmt2(d.totalBudget)} SAR</span>
+        </div>
+        <div class="budget-bar-wrap">
+          <div class="budget-bar-fill"
+               style="width:${pct.toFixed(1)}%;background:${barClr};">
+            ${pct >= 20 ? `<span>${pct.toFixed(1)}%</span>` : ''}
+          </div>
+        </div>
+        ${isOver ? `<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:4px;">⚠️ Over budget by ${_fmt2(d.totalSpent-d.totalBudget)} SAR</div>` : ''}
+      </div>`;
+
+    // ── Child CC sections ──────────────────────────────────────────
+    if(d.childSections.length) {
+      html += `<div class="card">
+        <div class="card-title">👶 Child Cost Center Breakdown</div>`;
+
+      d.childSections.forEach(cs => {
+        const cp    = cs.budget > 0 ? Math.min(cs.spent/cs.budget*100,100) : 0;
+        const cOver = cs.budget > 0 && cs.spent > cs.budget;
+        const cWarn = !cOver && cp >= 75;
+        const cClr  = cOver ? '#dc2626' : cWarn ? '#d97706' : '#16a34a';
+        const cDot  = cOver ? '🔴' : cWarn ? '🟡' : '🟢';
+        const cRem  = cs.budget - cs.spent;
+
+        let allocInfo = '';
+        if(d.showAlloc && cs.alloc) {
+          const allocAmt = cs.alloc.type==='pct'
+            ? `${cs.alloc.value}% = ${_fmt2(cs.budget)} SAR`
+            : `fixed ${_fmt2(cs.budget)} SAR`;
+          allocInfo = `<span style="font-size:10px;color:#7c3aed;">🔗 Allocated: ${allocInfo = allocAmt}</span>`;
+        }
+
+        html += `
+          <div class="child-section">
+            <div class="child-section-header">
+              <div>
+                <div class="csh-name">${cDot} 📁 ${_esc(cs.cc.name)}</div>
+                ${allocInfo}
+              </div>
+              <div class="csh-meta" style="text-align:right;">
+                Budget: <strong>${_fmt2(cs.budget)} SAR</strong><br>
+                Spent: <strong style="color:${cClr};">${_fmt2(cs.spent)} SAR</strong>
+                (${_pct(cs.spent,cs.budget)})<br>
+                ${cOver ? `<span style="color:#dc2626;">⚠️ Over by ${_fmt2(cs.spent-cs.budget)} SAR</span>`
+                        : cs.budget>0 ? `<span style="color:#16a34a;">✅ ${_fmt2(Math.abs(cRem))} remaining</span>` : ''}
+              </div>
+            </div>
+            <div class="child-section-body">
+              <!-- mini bar -->
+              <div class="budget-bar-wrap" style="height:10px;margin-bottom:8px;">
+                <div class="budget-bar-fill" style="width:${cp.toFixed(1)}%;background:${cClr};"></div>
+              </div>
+              ${cs.areas.length ? _renderAreaTable(cs.areas, cs.totals, cs.budget, d.showComp, d.totalSpent) : '<p style="color:#9ca3af;font-size:11px;">No areas assigned.</p>'}
+              ${d.showTrend && cs.areas.length ? _renderMonthlyTrend(cs.areas, cs.monthly, d.monthKeys, d.showComp) : ''}
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+    }
+
+    // ── Own areas section ──────────────────────────────────────────
+    if(d.ownAreas.length) {
+      html += `<div class="card">
+        <div class="card-title">🗂️ Direct Areas — ${_esc(d.cc.name)}</div>
+        ${_renderAreaTable(d.ownAreas, d.ownTotals, d.totalBudget, d.showComp, d.totalSpent)}
+        ${d.showTrend ? _renderMonthlyTrend(d.ownAreas, d.ownMonthly, d.monthKeys, d.showComp) : ''}
+      </div>`;
+    } else if(!d.childSections.length) {
+      html += `<div class="card"><p style="color:#9ca3af;">No areas found for the selected filters.</p></div>`;
+    }
+
+    document.getElementById('reportOutput').innerHTML = html;
+  }
+
+  // ── Area table ─────────────────────────────────────────────────────
+  function _renderAreaTable(areas, totals, ccBudget, showComp, grandSpent) {
+    let totalOT = 0, totalComp = 0;
+    const rows = areas.map(a => {
+      const r = totals[a] || {otAmount:0,compHours:0};
+      totalOT   += r.otAmount;
+      totalComp += r.compHours;
+      const pctB = ccBudget > 0 ? (r.otAmount/ccBudget*100) : 0;
+      const pctS = grandSpent > 0 ? (r.otAmount/grandSpent*100) : 0;
+      const barW = Math.min(pctB, 100);
+      const dot  = pctB >= 100 ? '🔴' : pctB >= 75 ? '🟡' : '🟢';
+      const clr  = pctB >= 100 ? '#dc2626' : pctB >= 75 ? '#d97706' : '#16a34a';
+      return `<tr>
+        <td><strong>${_esc(a)}</strong></td>
+        <td class="num">${_fmt2(r.otAmount)}</td>
+        ${showComp ? `<td class="num">${r.compHours>0?r.compHours.toFixed(1):'—'}</td>` : ''}
+        <td class="num" style="color:${clr};">${ccBudget>0?pctB.toFixed(1)+'%':'—'}</td>
+        <td class="num">${grandSpent>0?pctS.toFixed(1)+'%':'—'}</td>
+        <td class="bar-cell">
+          <div style="font-size:9px;color:${clr};font-weight:700;">${dot}</div>
+          <div class="mini-bar">
+            <div class="mini-bar-fill" style="width:${barW.toFixed(1)}%;background:${clr};"></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    const totalPctB = ccBudget > 0 ? (totalOT/ccBudget*100) : 0;
+    return `
+      <div style="overflow-x:auto;">
+        <table class="rpt-table">
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th class="num">OT Spent (SAR)</th>
+              ${showComp ? '<th class="num">COMP (hrs)</th>' : ''}
+              <th class="num">% of Budget</th>
+              <th class="num">% of Spending</th>
+              <th>Utilization</th>
+            </tr>
+          </thead>
+          <tbody>${rows||'<tr><td colspan="6" style="color:#9ca3af;padding:12px;">No consumption data for this period.</td></tr>'}</tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td class="num">${_fmt2(totalOT)}</td>
+              ${showComp ? `<td class="num">${totalComp>0?totalComp.toFixed(1):'—'}</td>` : ''}
+              <td class="num">${ccBudget>0?totalPctB.toFixed(1)+'%':'—'}</td>
+              <td class="num">100%</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+  }
+
+  // ── Monthly trend ──────────────────────────────────────────────────
+  function _renderMonthlyTrend(areas, monthly, monthKeys, showComp) {
+    if(monthKeys.length < 2) return '';
+    const visAreas = areas.filter(a => monthKeys.some(mk => (monthly[mk]?.[a]?.otAmount||0) > 0));
+    if(!visAreas.length) return '';
+
+    const monthHdrs = monthKeys.map(mk => {
+      const [y,m] = mk.split('-');
+      return `<th class="num">${MONTHS[Number(m)]}<br>${y}</th>`;
+    }).join('');
+
+    const areaRows = visAreas.map(a => {
+      const cells = monthKeys.map(mk => {
+        const v = monthly[mk]?.[a]?.otAmount||0;
+        return `<td class="num">${v>0?_fmt0(v):'—'}</td>`;
+      }).join('');
+      const rowTotal = monthKeys.reduce((s,mk)=>s+(monthly[mk]?.[a]?.otAmount||0),0);
+      return `<tr><td>${_esc(a)}</td>${cells}<td class="num"><strong>${_fmt0(rowTotal)}</strong></td></tr>`;
+    }).join('');
+
+    const totCells = monthKeys.map(mk => {
+      const t = visAreas.reduce((s,a)=>s+(monthly[mk]?.[a]?.otAmount||0),0);
+      return `<td class="num"><strong>${t>0?_fmt0(t):'—'}</strong></td>`;
+    }).join('');
+    const grandT = monthKeys.reduce((s,mk)=>s+visAreas.reduce((s2,a)=>s2+(monthly[mk]?.[a]?.otAmount||0),0),0);
+
+    return `
+      <div style="margin-top:12px;">
+        <div style="font-size:11px;font-weight:700;color:#1a4f8b;margin-bottom:6px;">📅 Monthly Trend (SAR)</div>
+        <div class="trend-table">
+          <table>
+            <thead>
+              <tr><th>Area</th>${monthHdrs}<th class="num">Total</th></tr>
+            </thead>
+            <tbody>${areaRows}</tbody>
+            <tfoot>
+              <tr><td>Total</td>${totCells}<td class="num"><strong>${_fmt0(grandT)}</strong></td></tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  // ── Export PDF ─────────────────────────────────────────────────────
+  function exportPDF() {
+    window.print();
+  }
+
+  // ── Export Excel ───────────────────────────────────────────────────
+  function exportExcel() {
+    if(!_lastReport) { _toast('Generate a report first.','error'); return; }
+    if(typeof XLSX === 'undefined') { _toast('Excel library not loaded. Check internet connection.','error'); return; }
+    const d = _lastReport;
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Summary
+    const period = d.fromY===d.toY && d.fromM===d.toM
+      ? `${MONTHS[d.fromM]} ${d.fromY}`
+      : `${MONTHS[d.fromM]} ${d.fromY} - ${MONTHS[d.toM]} ${d.toY}`;
+    const sumData = [
+      ['Cost Center Spending Report'],
+      ['Cost Center', d.cc.name],
+      ['Budget Mode', d.cc.budgetMode || 'own'],
+      ['Period', period],
+      ['Generated', new Date().toLocaleString()],
+      [],
+      ['SUMMARY'],
+      ['Total Budget (SAR)', d.totalBudget],
+      ['Total Spent (SAR)', d.totalSpent],
+      ['Remaining (SAR)', d.totalBudget - d.totalSpent],
+      ['Budget Used (%)', d.totalBudget > 0 ? +(d.totalSpent/d.totalBudget*100).toFixed(2) : 0],
+      ['Total COMP Hours', d.totalComp],
+      ['Status', d.totalSpent > d.totalBudget ? 'OVER BUDGET' : d.totalSpent/d.totalBudget >= 0.75 ? 'WARNING' : 'OK'],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(sumData);
+    ws1['!cols'] = [{wch:28},{wch:22}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+    // Sheet 2: Area Breakdown (all areas combined)
+    const allAreas = [...d.ownAreas, ...d.childSections.flatMap(cs=>cs.areas)];
+    const allTotals = {...d.ownTotals};
+    d.childSections.forEach(cs => { Object.assign(allTotals, cs.totals); });
+
+    const areaHeader = ['Area','Cost Center','OT Spent (SAR)','COMP Hours','% of CC Budget','% of Total Spending'];
+    const areaRows = [];
+    d.ownAreas.forEach(a => {
+      const r = d.ownTotals[a]||{otAmount:0,compHours:0};
+      areaRows.push([a, d.cc.name, +r.otAmount.toFixed(2), +r.compHours.toFixed(2),
+        d.totalBudget>0 ? +(r.otAmount/d.totalBudget*100).toFixed(2):0,
+        d.totalSpent>0  ? +(r.otAmount/d.totalSpent*100).toFixed(2):0]);
+    });
+    d.childSections.forEach(cs => {
+      cs.areas.forEach(a => {
+        const r = cs.totals[a]||{otAmount:0,compHours:0};
+        areaRows.push([a, cs.cc.name, +r.otAmount.toFixed(2), +r.compHours.toFixed(2),
+          d.totalBudget>0 ? +(r.otAmount/d.totalBudget*100).toFixed(2):0,
+          d.totalSpent>0  ? +(r.otAmount/d.totalSpent*100).toFixed(2):0]);
+      });
+    });
+    const totalOT = areaRows.reduce((s,r)=>s+r[2],0);
+    areaRows.push(['TOTAL','', +totalOT.toFixed(2), +d.totalComp.toFixed(2),
+      d.totalBudget>0 ? +(totalOT/d.totalBudget*100).toFixed(2):0, 100]);
+
+    const ws2 = XLSX.utils.aoa_to_sheet([areaHeader,...areaRows]);
+    ws2['!cols'] = [{wch:16},{wch:24},{wch:18},{wch:14},{wch:18},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Area Breakdown');
+
+    // Sheet 3: Child CC summary (if hierarchical)
+    if(d.childSections.length) {
+      const ccHeader = ['Child Cost Center','Budget (SAR)','Spent (SAR)','Remaining (SAR)','% Budget Used','COMP Hours','Status'];
+      const ccRows   = d.childSections.map(cs => [
+        cs.cc.name,
+        +cs.budget.toFixed(2), +cs.spent.toFixed(2),
+        +(cs.budget-cs.spent).toFixed(2),
+        cs.budget>0 ? +(cs.spent/cs.budget*100).toFixed(2):0,
+        +cs.compH.toFixed(2),
+        cs.spent > cs.budget ? 'OVER BUDGET' : cs.spent/cs.budget>=0.75 ? 'WARNING':'OK'
+      ]);
+      const ws3 = XLSX.utils.aoa_to_sheet([ccHeader,...ccRows]);
+      ws3['!cols'] = [{wch:28},{wch:16},{wch:16},{wch:16},{wch:16},{wch:14},{wch:14}];
+      XLSX.utils.book_append_sheet(wb, ws3, 'Child CC Summary');
+    }
+
+    // Sheet 4: Monthly trend (all areas)
+    if(d.monthKeys.length >= 2) {
+      const trendHeader = ['Area','Cost Center',...d.monthKeys.map(mk=>{ const [y,m]=mk.split('-'); return `${MONTHS[Number(m)]} ${y}`; }),'Total'];
+      const allMonthly  = {...d.ownMonthly};
+      d.monthKeys.forEach(mk => {
+        if(!allMonthly[mk]) allMonthly[mk]={};
+        d.childSections.forEach(cs => { Object.assign(allMonthly[mk], cs.monthly[mk]||{}); });
+      });
+      const trendRows = allAreas.map(a => {
+        const ccName = d.ownAreas.includes(a)
+          ? d.cc.name
+          : (d.childSections.find(cs=>cs.areas.includes(a))?.cc.name||'');
+        const monthly = d.monthKeys.map(mk => +(allMonthly[mk]?.[a]?.otAmount||0).toFixed(2));
+        const total   = monthly.reduce((s,v)=>s+v,0);
+        return [a, ccName, ...monthly, +total.toFixed(2)];
+      });
+      const ws4 = XLSX.utils.aoa_to_sheet([trendHeader,...trendRows]);
+      ws4['!cols'] = [{wch:14},{wch:24},...d.monthKeys.map(()=>({wch:12})),{wch:14}];
+      XLSX.utils.book_append_sheet(wb, ws4, 'Monthly Trend');
+    }
+
+    const fname = `CC_Report_${d.cc.name.replace(/\s+/g,'_')}_${period.replace(/[–\s]+/g,'_')}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    _toast('Excel report downloaded ✅');
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────
+  (async function init() {
+    const now = new Date();
+    document.getElementById('rptFromMonth').value = String(now.getMonth()+1);
+    document.getElementById('rptFromYear').value  = String(now.getFullYear());
+    document.getElementById('rptToMonth').value   = String(now.getMonth()+1);
+    document.getElementById('rptToYear').value    = String(now.getFullYear());
+
+    document.getElementById('reportOutput').innerHTML =
+      '<div class="loading"><div class="spinner"></div>Loading cost center data…</div>';
+
+    await loadData();
+
+    if(!_ccList.length) {
+      document.getElementById('reportOutput').innerHTML =
+        '<div class="loading">No cost centers found. <a href="Areas.html">Set up cost centers first →</a></div>';
+      return;
+    }
+
+    _populateCCDropdown();
+    document.getElementById('reportOutput').innerHTML =
+      '<div class="loading" style="padding:40px;color:#9ca3af;">Select a cost center and click Generate Report.</div>';
+    _toast(`Loaded ${_ccList.length} cost center(s) — ready.`,'info');
+  })();
+  </script>
+</body>
+</html>
