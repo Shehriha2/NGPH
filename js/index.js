@@ -1054,6 +1054,7 @@
       H:   { label:'Public Holiday',  hours:0, color:'#4ade80', area:'', assignedSt:0, noLeaveCount:false },
       ND:  { label:'National Day',    hours:0, color:'#22c55e', area:'', assignedSt:0, noLeaveCount:false },
       FD:  { label:'Founding Day',    hours:0, color:'#16a34a', area:'', assignedSt:0, noLeaveCount:false },
+      MY:  { label:'Mid Year Leave',  hours:0, color:'#f59e0b', area:'', assignedSt:0, noLeaveCount:false, defaultDays:10 },
     };
 
     // ── Duties (unified pool, filtered by area) ───────────────────────────────
