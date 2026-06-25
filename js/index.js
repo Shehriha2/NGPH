@@ -1863,6 +1863,15 @@
       // Support CODE_O suffix: strip _O, validate base, reattach for display
       const isOT=raw.endsWith('_O');
       const baseRaw=isOT?raw.slice(0,-2):raw;
+      // Block non-zero-hour duties on cells locked by an Approved & Submitted vacation plan
+      if(cell.dataset.vacation==='approved_submitted'){
+        const bd=DUTIES[baseRaw];
+        if(bd&&Number(bd.hours)>0){
+          cell.textContent='';
+          showStatusMessage('🔒 Locked — Approved & Submitted vacation. Only zero-hour duties (OFF, leave) are allowed.','error');
+          updateHours(row); return;
+        }
+      }
       // 1. Full input is itself a duty code (handles T9, NC12, etc.)
       if (DUTIES[baseRaw]) {
         const dCode=isOT?baseRaw+'_O':baseRaw;
@@ -2279,6 +2288,82 @@
       return payload;
     }
 
+    // ── Vacation Plan overlays ────────────────────────────────────────────────
+    let _vpCache = null;
+
+    async function loadVPCache() {
+      const key=(window.BCOT_APP_KEY||"").trim(); if(!key) return [];
+      let t=0; while(!window.FB&&t++<40) await new Promise(r=>setTimeout(r,50));
+      try {
+        const snap=await window.FB.getDoc(window.FB.doc(window.FB.db,"bcot_overtime_secure",key,"vacation_plans","VP_POOL"));
+        return snap.exists()?(snap.data()?.plans||[]):[];
+      } catch { return []; }
+    }
+
+    async function applyVacationOverlays() {
+      if (!_vpCache) _vpCache = await loadVPCache();
+      const plans=_vpCache; if(!plans.length) return;
+      const year =Number(document.getElementById('yearInput')?.value) ||new Date().getFullYear();
+      const month=Number(document.getElementById('monthSelect')?.value)||new Date().getMonth()+1;
+      const daysInMonth=new Date(year,month,0).getDate();
+      const pad=n=>String(n).padStart(2,'0');
+      const mo=`${year}-${pad(month)}`;
+      const mStart=`${mo}-01`, mEnd=`${mo}-${pad(daysInMonth)}`;
+      // Build name→plans map (overlapping this month only)
+      const byName={};
+      for(const p of plans){
+        if(p.endDate<mStart||p.startDate>mEnd) continue;
+        const n=(p.staffName||"").trim().toLowerCase(); if(!n) continue;
+        if(!byName[n]) byName[n]=[];
+        byName[n].push(p);
+      }
+      if(!Object.keys(byName).length) return;
+      const VAC_PRIO=s=>s==='approved_submitted'?3:s==='approved'?2:1;
+      for(const row of document.querySelectorAll('#rotaTable tbody tr')){
+        const nm=(row.cells[0]?.querySelector('input')?.value||"").trim().toLowerCase(); if(!nm) continue;
+        const sp=byName[nm]; if(!sp?.length) continue;
+        const hCell=row.querySelector('.hours-cell');
+        const hIdx=hCell?Array.from(row.cells).indexOf(hCell):-1; if(hIdx<1) continue;
+        for(let d=1;d<hIdx;d++){
+          const cell=row.cells[d]; if(!cell) continue;
+          const ds=`${mo}-${pad(d)}`;
+          let best=null;
+          for(const p of sp){
+            if(p.startDate>ds||p.endDate<ds) continue;
+            if(!best||VAC_PRIO(p.status)>VAC_PRIO(best.status)) best=p;
+          }
+          if(!best){
+            cell.removeAttribute('data-vacation');
+            cell.style.removeProperty('background');
+            if(cell.contentEditable==='false') cell.contentEditable='true';
+            cell.querySelector('.vac-lock')?.remove();
+            continue;
+          }
+          cell.dataset.vacation=best.status;
+          if(best.status==='pending'){
+            cell.style.background='rgba(251,191,36,0.22)';
+            cell.contentEditable='true';
+            cell.querySelector('.vac-lock')?.remove();
+          } else if(best.status==='approved'){
+            cell.style.background='rgba(22,163,74,0.18)';
+            cell.contentEditable='true';
+            cell.querySelector('.vac-lock')?.remove();
+          } else if(best.status==='approved_submitted'){
+            cell.style.background='rgba(29,78,216,0.18)';
+            cell.contentEditable='false';
+            if(!cell.querySelector('.vac-lock')){
+              const lk=document.createElement('span');
+              lk.className='vac-lock';
+              lk.textContent='🔒';
+              lk.style.cssText='position:absolute;top:1px;right:1px;font-size:8px;pointer-events:none;line-height:1;';
+              cell.style.position='relative';
+              cell.appendChild(lk);
+            }
+          }
+        }
+      }
+    }
+
     function applyPayloadToTable(payload, fromDraft=false) {
       if (!fromDraft) clearDraft();  // loading from cloud/file clears the draft
       const records=Array.isArray(payload?.records)?payload.records:[];
@@ -2333,6 +2418,7 @@
       persistMonthlyTarget(); updateDashboard();
       sortStaffAlpha(true);
       updateNotesBtn();
+      applyVacationOverlays();
     }
 
     // ── Cloud Save / Load (primary workflow) ─────────────────────────────────

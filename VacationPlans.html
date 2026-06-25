@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vacation Plans</title>
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial,sans-serif;margin:0;padding:10px;background:#f5f5f5;font-size:12px;}
+
+    .header{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1a4f8b,#0f766e);padding:10px 16px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,.1);margin-bottom:14px;}
+    .header-text{text-align:center;flex-grow:1;color:#fff;}
+    .header-text h1{margin:3px 0;font-size:14px;}
+    .header-text h2{margin:2px 0;font-size:12px;}
+    .logo{width:70px;height:70px;background:#fff;border-radius:5px;padding:5px;display:flex;justify-content:center;align-items:center;}
+    .logo img{width:100%;height:100%;object-fit:contain;}
+
+    .tabs{display:flex;gap:4px;margin-bottom:0;}
+    .tab-btn{padding:8px 22px;border:none;border-radius:8px 8px 0 0;font-size:12px;font-weight:700;cursor:pointer;background:#e2e8f0;color:#64748b;transition:all .2s;}
+    .tab-btn.active{background:#1a4f8b;color:#fff;}
+    .tab-pane{display:none;background:#fff;border-radius:0 8px 8px 8px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.1);}
+    .tab-pane.active{display:block;}
+
+    .ctrl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+    label.ctrl-lbl{font-weight:700;color:#1a4f8b;white-space:nowrap;}
+
+    button{padding:6px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:Arial,sans-serif;font-weight:600;}
+    input,select{padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;}
+    .btn-navy{background:#1a4f8b;color:#fff;}
+    .btn-teal{background:#0f766e;color:#fff;}
+    .btn-green{background:#16a34a;color:#fff;}
+    .btn-red{background:#dc2626;color:#fff;}
+    .btn-gray{background:#6b7280;color:#fff;}
+
+    .table-wrap{overflow-x:auto;border-radius:8px;border:1px solid #e5e7eb;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th{background:#1a4f8b;color:#fff;padding:8px 10px;text-align:center;white-space:nowrap;position:sticky;top:0;}
+    td{padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:center;vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+
+    .status-badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+    .s-pending{background:#fef3c7;color:#d97706;border:1px solid #fcd34d;}
+    .s-approved{background:#dcfce7;color:#16a34a;border:1px solid #86efac;}
+    .s-submitted{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;}
+
+    .row-pending{background:#fffbeb!important;}
+    .row-approved{background:#f0fdf4!important;}
+    .row-submitted{background:#eff6ff!important;}
+
+    .card-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+    .card{background:#fff;border-radius:8px;padding:12px 18px;box-shadow:0 1px 3px rgba(0,0,0,.1);min-width:130px;text-align:center;border-top:3px solid #e5e7eb;}
+    .card-num{font-size:26px;font-weight:800;}
+    .card-lbl{font-size:11px;color:#6b7280;margin-top:2px;}
+
+    .overlap-2 td{background:#fef9c3!important;}
+    .overlap-4 td{background:#fee2e2!important;}
+
+    .empty-msg{text-align:center;padding:24px;color:#9ca3af;font-style:italic;}
+
+    #statusMsg{font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;transition:all .3s;}
+
+    /* Modal */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(500px,96%);overflow:hidden;max-height:94vh;overflow-y:auto;}
+    .modal-hdr{background:#1a4f8b;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+    .modal-hdr-title{font-size:15px;font-weight:700;color:#fff;}
+    .modal-body{padding:18px 20px;}
+    .modal-ftr{padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;}
+    .field-grid{display:grid;gap:12px;}
+    .field-lbl{font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;}
+    .field-input{width:100%;padding:7px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+    @media print{
+      .no-print,.tabs,button,.ctrl-bar{display:none!important;}
+      .tab-pane{display:block!important;box-shadow:none;padding:0;}
+      body{background:#fff;padding:0;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <img src="MNGHA-Logo.png" alt="Logo"
+      onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;70&quot; height=&quot;70&quot;><rect width=&quot;70&quot; height=&quot;70&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; font-size=&quot;10&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
+  </div>
+  <div class="header-text">
+    <h1>الشؤون الصحية – وزارة الحرس الوطني</h1>
+    <h1>Ministry of National Guard Health Affairs</h1>
+    <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+    <h2>Vacation Plans Management</h2>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;" class="no-print">
+    <a href="index.html" style="text-decoration:none;"><button class="btn-navy" style="font-size:11px;">Back to Rota</button></a>
+    <button onclick="window.print()" class="btn-gray" style="font-size:11px;">Print</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs no-print">
+  <button class="tab-btn active" onclick="switchTab('plans')">Plans</button>
+  <button class="tab-btn"        onclick="switchTab('reports')">Reports</button>
+</div>
+
+<!-- ══════════ PLANS TAB ══════════ -->
+<div id="tab-plans" class="tab-pane active">
+  <div class="ctrl-bar">
+    <label class="ctrl-lbl">Area:</label>
+    <select id="areaFilter" onchange="applyFilter()"></select>
+    <label class="ctrl-lbl">Status:</label>
+    <select id="statusFilter" onchange="applyFilter()">
+      <option value="ALL">All Statuses</option>
+      <option value="pending">Pending</option>
+      <option value="approved">Approved</option>
+      <option value="approved_submitted">Approved &amp; Submitted</option>
+    </select>
+    <input id="staffSearch" type="text" placeholder="🔍 Search staff…" style="min-width:160px;" oninput="applyFilter()"/>
+    <button class="btn-green" onclick="openAddModal()">+ Add Plan</button>
+    <button class="btn-navy" onclick="loadFromCloud()">☁ Load</button>
+    <button class="btn-teal" style="margin-left:auto;" onclick="saveToCloud()">💾 Save All</button>
+    <span id="statusMsg"></span>
+  </div>
+
+  <div class="table-wrap" style="max-height:65vh;overflow-y:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Staff Name</th>
+          <th>Badge</th>
+          <th>Area</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Duration</th>
+          <th>Status</th>
+          <th>Note</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="plansBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ REPORTS TAB ══════════ -->
+<div id="tab-reports" class="tab-pane">
+  <div class="ctrl-bar">
+    <label class="ctrl-lbl">From:</label>
+    <input id="rptFrom" type="date"/>
+    <label class="ctrl-lbl">To:</label>
+    <input id="rptTo" type="date"/>
+    <label class="ctrl-lbl">Area:</label>
+    <select id="rptArea"></select>
+    <button class="btn-navy" onclick="generateReport()">Generate Report</button>
+    <button onclick="window.print()" class="btn-gray no-print">Print Report</button>
+  </div>
+
+  <div id="reportEmpty" style="text-align:center;padding:32px;color:#9ca3af;">
+    Select a date range and click Generate.
+  </div>
+  <div id="reportOutput" style="display:none;">
+
+    <div class="card-row" id="summaryCards"></div>
+
+    <h3 style="font-size:13px;color:#1a4f8b;margin:0 0 6px;">Staff with Plans in Period</h3>
+    <div class="table-wrap" style="margin-bottom:16px;">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Staff Name</th><th>Badge</th><th>Area</th><th>Start</th><th>End</th><th>Duration</th><th>Status</th></tr>
+        </thead>
+        <tbody id="rptStaffBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:13px;color:#1a4f8b;margin:0 0 6px;">Daily Vacation Coverage</h3>
+    <p style="font-size:11px;color:#6b7280;margin:0 0 8px;">
+      <span style="background:#fef9c3;padding:2px 8px;border-radius:4px;">Yellow</span> = 2–3 staff overlap &nbsp;
+      <span style="background:#fee2e2;padding:2px 8px;border-radius:4px;">Red</span> = 4+ staff overlap
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Day</th><th>On Vacation</th><th>Staff Names</th><th>Flag</th></tr>
+        </thead>
+        <tbody id="rptDailyBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ADD / EDIT MODAL ══════════ -->
+<div id="planModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span id="modalTitle" class="modal-hdr-title">Add Vacation Plan</span>
+      <button onclick="closeModal()" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-grid">
+
+        <div>
+          <label class="field-lbl">Staff Member *</label>
+          <input id="m-staffSearch" type="text" class="field-input" placeholder="Type name or badge…" oninput="filterStaffDropdown()" autocomplete="off"/>
+          <div id="m-staffDropdown" style="border:1px solid #ddd;border-radius:6px;max-height:160px;overflow-y:auto;display:none;background:#fff;margin-top:2px;position:relative;z-index:10;"></div>
+          <input type="hidden" id="m-staffName"/>
+          <input type="hidden" id="m-staffBadge"/>
+          <input type="hidden" id="m-staffArea"/>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <label class="field-lbl">Start Date *</label>
+            <input id="m-startDate" type="date" class="field-input" onchange="calcDuration()"/>
+          </div>
+          <div>
+            <label class="field-lbl">End Date *</label>
+            <input id="m-endDate" type="date" class="field-input" onchange="calcDuration()"/>
+          </div>
+        </div>
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:11px;font-weight:700;color:#166534;">Duration:</span>
+          <span id="m-duration" style="font-size:18px;font-weight:800;color:#16a34a;">—</span>
+          <span style="font-size:11px;color:#6b7280;">calendar days</span>
+        </div>
+
+        <div>
+          <label class="field-lbl">Status</label>
+          <select id="m-status" class="field-input">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="approved_submitted">Approved &amp; Submitted</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="field-lbl">Note (optional)</label>
+          <input id="m-note" type="text" class="field-input" maxlength="120" placeholder="Any additional information…"/>
+        </div>
+
+        <div id="m-error" style="color:#dc2626;font-size:11px;display:none;padding:6px 10px;background:#fef2f2;border-radius:6px;"></div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button onclick="savePlan()" class="btn-green" style="padding:8px 24px;">Save</button>
+      <button onclick="closeModal()" class="btn-gray" style="padding:8px 16px;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="js/auth.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  const app = initializeApp({
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+    storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894",
+    appId:"1:659421824894:web:f0546879df8808491ad52f"
+  });
+  const db = getFirestore(app);
+  window.FB = { db, doc, setDoc, getDoc };
+</script>
+
+<script>
+const STAFF_KEY  = "BCOT_STAFF_RECORDS_V2";
+const AREAS_KEY  = "BCOT_AREAS_LIST_V1";
+const VP_DOC     = "VP_POOL";
+const DAYS_ABBR  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+let _plans       = [];
+let _editId      = null;
+let _staffRecords = [];
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  try { _staffRecords = JSON.parse(localStorage.getItem(STAFF_KEY)||"[]")||[]; } catch {}
+  buildAreaDropdowns();
+  // Default report range: current month
+  const now=new Date(), y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,"0");
+  const last=new Date(y,now.getMonth()+1,0).getDate();
+  document.getElementById("rptFrom").value=`${y}-${m}-01`;
+  document.getElementById("rptTo").value=`${y}-${m}-${String(last).padStart(2,"0")}`;
+  loadFromCloud();
+});
+
+function buildAreaDropdowns() {
+  let areas=[]; try{areas=JSON.parse(localStorage.getItem(AREAS_KEY)||"[]")||[];}catch{}
+  ["areaFilter","rptArea"].forEach(id=>{
+    const el=document.getElementById(id); if(!el)return;
+    el.innerHTML='<option value="ALL">All Areas</option>';
+    areas.forEach(a=>{const o=document.createElement("option");o.value=a;o.textContent=a;el.appendChild(o);});
+  });
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach((b,i)=>b.classList.toggle("active",["plans","reports"][i]===name));
+  document.querySelectorAll(".tab-pane").forEach(p=>p.classList.toggle("active",p.id==="tab-"+name));
+}
+
+// ── Status helpers ─────────────────────────────────────────────────────────────
+const S_LABEL={pending:"Pending",approved:"Approved",approved_submitted:"Approved & Submitted"};
+const S_CSS  ={pending:"s-pending",approved:"s-approved",approved_submitted:"s-submitted"};
+const S_ROW  ={pending:"row-pending",approved:"row-approved",approved_submitted:"row-submitted"};
+function sBadge(s){return`<span class="status-badge ${S_CSS[s]||"s-pending"}">${S_LABEL[s]||s}</span>`;}
+
+// ── Duration calc ─────────────────────────────────────────────────────────────
+function calcDuration() {
+  const s=document.getElementById("m-startDate").value, e=document.getElementById("m-endDate").value;
+  const el=document.getElementById("m-duration");
+  if(!s||!e){el.textContent="—";return 0;}
+  const d=Math.round((new Date(e)-new Date(s))/86400000)+1;
+  el.textContent=d>0?d:"—"; return d>0?d:0;
+}
+
+// ── Staff dropdown ────────────────────────────────────────────────────────────
+function filterStaffDropdown() {
+  const q=(document.getElementById("m-staffSearch").value||"").trim().toLowerCase();
+  const dd=document.getElementById("m-staffDropdown");
+  if(!q){dd.style.display="none";return;}
+  const f=_staffRecords.filter(s=>s.name.toLowerCase().includes(q)||(s.badge||"").toLowerCase().includes(q));
+  if(!f.length){dd.style.display="none";return;}
+  dd.innerHTML=f.slice(0,20).map(s=>`
+    <div style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:12px;"
+      onmousedown="selectStaff('${esc(s.name)}','${esc(s.badge||"")}','${esc(s.area||"")}')"
+      onmouseenter="this.style.background='#f0f9ff'" onmouseleave="this.style.background=''">
+      <b>${esc(s.name)}</b> <span style="color:#6b7280;font-size:11px;">${esc(s.badge||"")}${s.area?" — "+esc(s.area):""}</span>
+    </div>`).join("");
+  dd.style.display="block";
+}
+function selectStaff(name,badge,area) {
+  document.getElementById("m-staffSearch").value=name+(badge?` (${badge})`:"");
+  document.getElementById("m-staffName").value=name;
+  document.getElementById("m-staffBadge").value=badge;
+  document.getElementById("m-staffArea").value=area;
+  document.getElementById("m-staffDropdown").style.display="none";
+}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+
+// ── Render table ──────────────────────────────────────────────────────────────
+function renderTable(plans) {
+  const tbody=document.getElementById("plansBody");
+  if(!plans.length){
+    tbody.innerHTML=`<tr><td colspan="10" class="empty-msg">No vacation plans match the current filter.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML="";
+  plans.forEach((p,idx)=>{
+    const tr=document.createElement("tr");
+    tr.className=S_ROW[p.status]||"";
+    tr.innerHTML=`
+      <td>${idx+1}</td>
+      <td style="text-align:left;font-weight:700;">${esc(p.staffName)}</td>
+      <td>${esc(p.badge||"—")}</td>
+      <td>${esc(p.area||"—")}</td>
+      <td>${p.startDate||"—"}</td>
+      <td>${p.endDate||"—"}</td>
+      <td><b>${p.duration||"—"}</b> day${p.duration!==1?"s":""}</td>
+      <td>${sBadge(p.status)}</td>
+      <td style="text-align:left;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(p.note||"")}">${esc(p.note||"—")}</td>
+      <td style="white-space:nowrap;">
+        <button onclick="openEditModal('${p.id}')" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;">Edit</button>
+        <button onclick="deletePlan('${p.id}')" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;margin-left:3px;">Del</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Filter ────────────────────────────────────────────────────────────────────
+function applyFilter() {
+  const area  =(document.getElementById("areaFilter").value||"ALL").toUpperCase();
+  const status= document.getElementById("statusFilter").value||"ALL";
+  const q     =(document.getElementById("staffSearch").value||"").trim().toLowerCase();
+  renderTable(_plans.filter(p=>{
+    if(area!=="ALL"&&(p.area||"").toUpperCase()!==area)return false;
+    if(status!=="ALL"&&p.status!==status)return false;
+    if(q&&!p.staffName.toLowerCase().includes(q)&&!(p.badge||"").toLowerCase().includes(q))return false;
+    return true;
+  }));
+}
+
+// ── Cloud ─────────────────────────────────────────────────────────────────────
+async function waitFB(){let t=0;while(!window.FB&&t++<60)await new Promise(r=>setTimeout(r,50));}
+function vpRef(key){return window.FB.doc(window.FB.db,"bcot_overtime_secure",key,"vacation_plans",VP_DOC);}
+
+async function loadFromCloud() {
+  const key=(window.BCOT_APP_KEY||"").trim(); if(!key){showStatus("App key missing.","error");return;}
+  await waitFB();
+  try{
+    showStatus("Loading…","info");
+    const snap=await window.FB.getDoc(vpRef(key));
+    _plans=snap.exists()?(snap.data()?.plans||[]):[];
+    applyFilter();
+    showStatus(`${_plans.length} plans loaded ✅`);
+  }catch(e){console.error(e);showStatus("Load failed: "+(e?.message||e),"error");}
+}
+
+async function saveToCloud() {
+  const key=(window.BCOT_APP_KEY||"").trim(); if(!key){showStatus("App key missing.","error");return;}
+  await waitFB();
+  try{
+    await window.FB.setDoc(vpRef(key),{savedAt:new Date().toISOString(),plans:_plans},{merge:true});
+    showStatus("Saved ✅");
+  }catch(e){console.error(e);showStatus("Save failed: "+(e?.message||e),"error");}
+}
+
+// ── Session user ──────────────────────────────────────────────────────────────
+function getUser(){try{const s=JSON.parse(localStorage.getItem("BCOT_AUTH_SESSION_V1")||"null")||{};return[s.nameTitle,s.name].filter(Boolean).join(" ")||"Unknown";}catch{return"Unknown";}}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openAddModal() {
+  _editId=null;
+  document.getElementById("modalTitle").textContent="Add Vacation Plan";
+  ["m-staffSearch","m-staffName","m-staffBadge","m-staffArea","m-startDate","m-endDate","m-note"]
+    .forEach(id=>document.getElementById(id).value="");
+  document.getElementById("m-duration").textContent="—";
+  document.getElementById("m-status").value="pending";
+  document.getElementById("m-staffSearch").disabled=false;
+  document.getElementById("m-error").style.display="none";
+  document.getElementById("m-staffDropdown").style.display="none";
+  document.getElementById("planModal").classList.add("open");
+}
+
+function openEditModal(id) {
+  const p=_plans.find(x=>x.id===id); if(!p)return;
+  _editId=id;
+  document.getElementById("modalTitle").textContent="Edit Vacation Plan";
+  document.getElementById("m-staffSearch").value=p.staffName+(p.badge?` (${p.badge})`:"");
+  document.getElementById("m-staffName").value=p.staffName;
+  document.getElementById("m-staffBadge").value=p.badge||"";
+  document.getElementById("m-staffArea").value=p.area||"";
+  document.getElementById("m-startDate").value=p.startDate||"";
+  document.getElementById("m-endDate").value=p.endDate||"";
+  document.getElementById("m-status").value=p.status||"pending";
+  document.getElementById("m-note").value=p.note||"";
+  document.getElementById("m-staffSearch").disabled=true;
+  document.getElementById("m-error").style.display="none";
+  calcDuration();
+  document.getElementById("planModal").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("planModal").classList.remove("open");
+  document.getElementById("m-staffDropdown").style.display="none";
+}
+
+async function savePlan() {
+  const errEl=document.getElementById("m-error");
+  errEl.style.display="none";
+  const staffName=document.getElementById("m-staffName").value.trim();
+  if(!staffName){errEl.textContent="Please select a staff member.";errEl.style.display="block";return;}
+  const startDate=document.getElementById("m-startDate").value;
+  const endDate=document.getElementById("m-endDate").value;
+  if(!startDate||!endDate){errEl.textContent="Start and end dates are required.";errEl.style.display="block";return;}
+  const duration=calcDuration();
+  if(duration<=0){errEl.textContent="End date must be on or after start date.";errEl.style.display="block";return;}
+  const now=new Date().toISOString(), user=getUser();
+  const status=document.getElementById("m-status").value;
+  const note=document.getElementById("m-note").value.trim();
+  if(_editId){
+    const idx=_plans.findIndex(x=>x.id===_editId);
+    if(idx>=0) _plans[idx]={..._plans[idx],startDate,endDate,duration,status,note,updatedAt:now,updatedBy:user};
+  } else {
+    _plans.push({id:`vp_${Date.now()}`,staffName,badge:document.getElementById("m-staffBadge").value.trim(),area:document.getElementById("m-staffArea").value.trim().toUpperCase(),startDate,endDate,duration,status,note,createdAt:now,createdBy:user,updatedAt:now,updatedBy:user});
+  }
+  closeModal(); applyFilter(); await saveToCloud();
+}
+
+async function deletePlan(id) {
+  const p=_plans.find(x=>x.id===id); if(!p)return;
+  if(!confirm(`Delete plan for "${p.staffName}" (${p.startDate} → ${p.endDate})?`))return;
+  _plans=_plans.filter(x=>x.id!==id);
+  applyFilter(); await saveToCloud();
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+function generateReport() {
+  const from=document.getElementById("rptFrom").value;
+  const to  =document.getElementById("rptTo").value;
+  const area=(document.getElementById("rptArea").value||"ALL").toUpperCase();
+  if(!from||!to){alert("Please select a date range.");return;}
+  if(from>to){alert("From date must be before or equal to To date.");return;}
+
+  const filtered=_plans.filter(p=>{
+    if(area!=="ALL"&&(p.area||"").toUpperCase()!==area)return false;
+    return p.startDate<=to&&p.endDate>=from;
+  });
+
+  // Summary cards
+  const cnt={pending:0,approved:0,approved_submitted:0};
+  filtered.forEach(p=>{if(cnt[p.status]!==undefined)cnt[p.status]++;});
+  document.getElementById("summaryCards").innerHTML=`
+    <div class="card" style="border-top-color:#1a4f8b;"><div class="card-num" style="color:#1a4f8b;">${filtered.length}</div><div class="card-lbl">Total Plans</div></div>
+    <div class="card" style="border-top-color:#d97706;"><div class="card-num" style="color:#d97706;">${cnt.pending}</div><div class="card-lbl">Pending</div></div>
+    <div class="card" style="border-top-color:#16a34a;"><div class="card-num" style="color:#16a34a;">${cnt.approved}</div><div class="card-lbl">Approved</div></div>
+    <div class="card" style="border-top-color:#1d4ed8;"><div class="card-num" style="color:#1d4ed8;">${cnt.approved_submitted}</div><div class="card-lbl">Appr. &amp; Submitted</div></div>`;
+
+  // Staff table
+  const sb=document.getElementById("rptStaffBody");
+  sb.innerHTML=filtered.length
+    ? filtered.map((p,i)=>`<tr class="${S_ROW[p.status]||""}">
+        <td>${i+1}</td><td style="text-align:left;font-weight:700;">${esc(p.staffName)}</td>
+        <td>${esc(p.badge||"—")}</td><td>${esc(p.area||"—")}</td>
+        <td>${p.startDate}</td><td>${p.endDate}</td>
+        <td><b>${p.duration}</b> day${p.duration!==1?"s":""}</td><td>${sBadge(p.status)}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="8" class="empty-msg">No plans in this period.</td></tr>`;
+
+  // Daily coverage
+  const db=document.getElementById("rptDailyBody"); db.innerHTML="";
+  const start=new Date(from), end=new Date(to);
+  let maxOverlap=0;
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+    const ds=d.toISOString().slice(0,10);
+    const onVac=filtered.filter(p=>p.startDate<=ds&&p.endDate>=ds);
+    maxOverlap=Math.max(maxOverlap,onVac.length);
+    const tr=document.createElement("tr");
+    const c=onVac.length;
+    if(c>=4)tr.classList.add("overlap-4");
+    else if(c>=2)tr.classList.add("overlap-2");
+    const flag=c>=4?"⚠ High overlap":c>=2?"⚠ Overlap":"";
+    const names=onVac.map(p=>esc(p.staffName)).join(", ")||"—";
+    tr.innerHTML=`<td><b>${ds}</b></td><td>${DAYS_ABBR[d.getDay()]}</td><td><b style="color:${c>=4?"#dc2626":c>=2?"#d97706":"#16a34a"};">${c}</b></td><td style="text-align:left;">${names}</td><td>${flag}</td>`;
+    db.appendChild(tr);
+  }
+
+  document.getElementById("reportOutput").style.display="block";
+  document.getElementById("reportEmpty").style.display="none";
+}
+
+// ── Status message ─────────────────────────────────────────────────────────────
+function showStatus(msg,type="success") {
+  const el=document.getElementById("statusMsg");
+  el.textContent=msg;
+  el.style.background=type==="error"?"#fee2e2":type==="info"?"#eff6ff":"#dcfce7";
+  el.style.color=type==="error"?"#dc2626":type==="info"?"#1d4ed8":"#16a34a";
+  if(type!=="info")setTimeout(()=>{el.textContent="";el.style.background="transparent";},3000);
+}
+
+// Backdrop close
+document.getElementById("planModal").addEventListener("click",e=>{if(e.target===document.getElementById("planModal"))closeModal();});
+</script>
+</body>
+</html>
