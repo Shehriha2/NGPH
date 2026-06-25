@@ -3815,7 +3815,7 @@
         const entries=Object.entries(all);
         const ce=document.getElementById("dm-dutyCount");
         if(!entries.length){
-          tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No duties yet. Click "+ Add Duty" to create one.</td></tr>`;
+          tbody.innerHTML=`<tr><td colspan="15" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No duties yet. Click "+ Add Duty" to create one.</td></tr>`;
           if(ce)ce.textContent="0 duties"; return;
         }
         entries.forEach(([code,meta],idx)=>{
@@ -3835,7 +3835,10 @@
             <td style="padding:5px;text-align:center;font-size:11px;">${meta.startDay||"Any"}</td>
             <td style="padding:5px;text-align:center;font-size:11px;">${meta.startTime||"Any"}</td>
             <td style="padding:5px;text-align:center;font-size:11px;">${endTime}</td>
-            <td style="padding:5px;text-align:center;font-size:11px;">${meta.defaultDays||"Any"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${Number(meta.daysPerWeek)||"—"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;">${Number(meta.daysPerMonth)||"—"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;font-weight:700;color:${(Number(meta.daysPerWeek)>0&&Number(meta.hours)>0)?'#0369a1':'#9ca3af'};">${(Number(meta.daysPerWeek)>0&&Number(meta.hours)>0)?(Number(meta.hours)*Number(meta.daysPerWeek)).toFixed(2)+'h':"—"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;font-weight:700;color:${(Number(meta.daysPerMonth)>0&&Number(meta.hours)>0)?'#0369a1':'#9ca3af'};">${(Number(meta.daysPerMonth)>0&&Number(meta.hours)>0)?(Number(meta.hours)*Number(meta.daysPerMonth)).toFixed(2)+'h':"—"}</td>
             <td style="padding:5px;text-align:center;font-size:11px;">${meta.assignedSt||0}</td>
             <td style="padding:5px;white-space:nowrap;">
               <button type="button" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;">Edit</button>
@@ -3912,8 +3915,20 @@
                       <select id="_dan_st2" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildTOpts()}</select>
                       <span id="_dan_et" style="color:#6b7280;font-size:12px;"></span>
                     </td></tr>
-                <tr><td style="padding:5px 6px;color:#6b7280;">Default Days</td>
-                    <td style="padding:5px 6px;"><select id="_dan_dd" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildDOpts()}</select></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Days / Week</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <input id="_dan_dpw" type="number" min="1" max="7" step="1" placeholder="1–7" style="width:70px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/>
+                      <span style="color:#9ca3af;font-size:11px;">1 – 7</span>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Days / Month</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <input id="_dan_dpm" type="number" min="1" max="31" step="1" placeholder="1–31" style="width:70px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/>
+                      <span style="color:#9ca3af;font-size:11px;">1 – 31</span>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;white-space:nowrap;">Hrs / Week</td>
+                    <td style="padding:5px 6px;"><b id="_dan_hpw" style="font-size:13px;color:#0369a1;">—</b></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;white-space:nowrap;">Hrs / Month</td>
+                    <td style="padding:5px 6px;"><b id="_dan_hpm" style="font-size:13px;color:#0369a1;">—</b></td></tr>
               </table>
             </div>
             <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
@@ -3929,7 +3944,10 @@
         const syncHex=()=>{const v=hx.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v)){cp.value=v;sw.style.background=v;}};
         cp.addEventListener('input',syncPicker); hx.addEventListener('input',syncHex);
         hx.addEventListener('blur',()=>{hx.value=cp.value.toUpperCase();});
-        st2.addEventListener('change',updEnd); hrs.addEventListener('input',updEnd); updEnd();
+        const dpw=$('#_dan_dpw'),dpm=$('#_dan_dpm'),hpw=$('#_dan_hpw'),hpm=$('#_dan_hpm');
+        const updCalc=()=>{const h=Number(hrs.value)||0,w=Number(dpw.value)||0,m=Number(dpm.value)||0;hpw.textContent=w>0&&h>0?(h*w).toFixed(2)+' hrs':'—';hpm.textContent=m>0&&h>0?(h*m).toFixed(2)+' hrs':'—';};
+        st2.addEventListener('change',updEnd); hrs.addEventListener('input',()=>{updEnd();updCalc();}); updEnd();
+        dpw.addEventListener('input',updCalc); dpm.addEventListener('input',updCalc); updCalc();
         const codeInput=$('#_dan_code');
         codeInput.addEventListener('input',()=>{codeInput.value=codeInput.value.toUpperCase().replace(/[^A-Z0-9_]/g,'');});
         const dismiss=()=>overlay.remove();
@@ -3942,7 +3960,7 @@
           if(!/^[A-Z][A-Z0-9_]{0,5}$/.test(code)){errEl.textContent="Code must start with a letter, 1–6 chars (A-Z, 0-9, _).";return;}
           let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
           if(all[code]){errEl.textContent=`Code "${code}" already exists.`;return;}
-          const newDuty={label:($('#_dan_lbl').value||code).trim(),hours:Number(hrs.value)||0,color:cp.value||'#1a4f8b',area:($('#_dan_ar').value||'').trim().toUpperCase(),assignedSt:Number($('#_dan_st').value)||0,startDay:$('#_dan_sd').value||'Any',startTime:st2.value||'Any',defaultDays:$('#_dan_dd').value||'Any'};
+          const newDuty={label:($('#_dan_lbl').value||code).trim(),hours:Number(hrs.value)||0,color:cp.value||'#1a4f8b',area:($('#_dan_ar').value||'').trim().toUpperCase(),assignedSt:Number($('#_dan_st').value)||0,startDay:$('#_dan_sd').value||'Any',startTime:st2.value||'Any',daysPerWeek:Number(dpw.value)||0,daysPerMonth:Number(dpm.value)||0};
           all[code]=newDuty; DUTIES[code]=newDuty;
           localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all)); injectDutyStyles();
           try{
@@ -3959,7 +3977,7 @@
         if(!data?.code&&!data?.dutyCode){openAddModal();return;}
         const code=(data.code||data.dutyCode||"").toString().trim().toUpperCase(); if(!code)return;
         let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
-        all[code]={label:(data.label||code).toString().trim(),hours:Number(data.hours||0)||0,color:data.color||nextColor(),area:(data.area||"").toString().toUpperCase(),assignedSt:Number(data.assignedSt||0)||0,startDay:(data.startDay||"Any").toString(),startTime:(data.startTime||"Any").toString(),defaultDays:(data.defaultDays||"Any").toString()};
+        all[code]={label:(data.label||code).toString().trim(),hours:Number(data.hours||0)||0,color:data.color||nextColor(),area:(data.area||"").toString().toUpperCase(),assignedSt:Number(data.assignedSt||0)||0,startDay:(data.startDay||"Any").toString(),startTime:(data.startTime||"Any").toString(),daysPerWeek:Number(data.daysPerWeek)||0,daysPerMonth:Number(data.daysPerMonth)||0};
         localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));
       }
 
@@ -4074,8 +4092,20 @@
                       <select id="_dep_st2" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildTOpts()}</select>
                       <span id="_dep_et" style="color:#6b7280;font-size:12px;"></span>
                     </td></tr>
-                <tr><td style="padding:5px 6px;color:#6b7280;">Default Days</td>
-                    <td style="padding:5px 6px;"><select id="_dep_dd" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"><option value="Any">Any</option>${buildDOpts()}</select></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Days / Week</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <input id="_dep_dpw" type="number" min="1" max="7" step="1" placeholder="1–7" style="width:70px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/>
+                      <span style="color:#9ca3af;font-size:11px;">1 – 7</span>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Days / Month</td>
+                    <td style="padding:5px 6px;display:flex;align-items:center;gap:8px;">
+                      <input id="_dep_dpm" type="number" min="1" max="31" step="1" placeholder="1–31" style="width:70px;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;"/>
+                      <span style="color:#9ca3af;font-size:11px;">1 – 31</span>
+                    </td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;white-space:nowrap;">Hrs / Week</td>
+                    <td style="padding:5px 6px;"><b id="_dep_hpw" style="font-size:13px;color:#0369a1;">—</b></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;white-space:nowrap;">Hrs / Month</td>
+                    <td style="padding:5px 6px;"><b id="_dep_hpm" style="font-size:13px;color:#0369a1;">—</b></td></tr>
               </table>
             </div>
             <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
@@ -4098,17 +4128,21 @@
         $('#_dep_st').value  = Number(duty.assignedSt) || 0;
         $('#_dep_sd').value  = duty.startDay || 'Any';
         st2.value  = duty.startTime || 'Any';
-        $('#_dep_dd').value  = (duty.defaultDays ?? 'Any').toString();
+        const dpwE=$('#_dep_dpw'),dpmE=$('#_dep_dpm'),hpwE=$('#_dep_hpw'),hpmE=$('#_dep_hpm');
+        dpwE.value = Number(duty.daysPerWeek)  || '';
+        dpmE.value = Number(duty.daysPerMonth) || '';
 
         const updEnd = () => { const e=calcEnd(st2.value,hrs.value); et.textContent=e!=='Any'?`→ ${e}`:''; };
+        const updCalcE = () => { const h=Number(hrs.value)||0,w=Number(dpwE.value)||0,m=Number(dpmE.value)||0; hpwE.textContent=w>0&&h>0?(h*w).toFixed(2)+' hrs':'—'; hpmE.textContent=m>0&&h>0?(h*m).toFixed(2)+' hrs':'—'; };
         const syncPicker = () => { sw.style.background=cp.value; hx.value=cp.value.toUpperCase(); };
         const syncHex    = () => { const v=hx.value.trim(); if(/^#[0-9a-fA-F]{6}$/.test(v)){cp.value=v;sw.style.background=v;} };
         cp.addEventListener('input', syncPicker);
         hx.addEventListener('input', syncHex);
         hx.addEventListener('blur',  ()=>{ hx.value=cp.value.toUpperCase(); });
         st2.addEventListener('change', updEnd);
-        hrs.addEventListener('input',  updEnd);
-        updEnd();
+        hrs.addEventListener('input', ()=>{updEnd();updCalcE();});
+        dpwE.addEventListener('input', updCalcE); dpmE.addEventListener('input', updCalcE);
+        updEnd(); updCalcE();
 
         const dismiss = () => overlay.remove();
         $('#_dep_x').addEventListener('click', dismiss);
@@ -4117,14 +4151,15 @@
 
         $('#_dep_sv').addEventListener('click', async () => {
           const updated = {
-            label:       ($('#_dep_lbl').value||code).trim(),
-            hours:       Number(hrs.value)||0,
-            color:       cp.value||'#1a4f8b',
-            area:        ($('#_dep_ar').value||'').trim().toUpperCase(),
-            assignedSt:  Number($('#_dep_st').value)||0,
-            startDay:    $('#_dep_sd').value||'Any',
-            startTime:   st2.value||'Any',
-            defaultDays: $('#_dep_dd').value||'Any',
+            label:        ($('#_dep_lbl').value||code).trim(),
+            hours:        Number(hrs.value)||0,
+            color:        cp.value||'#1a4f8b',
+            area:         ($('#_dep_ar').value||'').trim().toUpperCase(),
+            assignedSt:   Number($('#_dep_st').value)||0,
+            startDay:     $('#_dep_sd').value||'Any',
+            startTime:    st2.value||'Any',
+            daysPerWeek:  Number(dpwE.value)||0,
+            daysPerMonth: Number(dpmE.value)||0,
           };
           DUTIES[code] = updated;
           let allDuties={};
