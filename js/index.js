@@ -1864,7 +1864,16 @@
       const baseRaw=isOT?raw.slice(0,-2):raw;
       // 1. Full input is itself a duty code (handles T9, NC12, etc.)
       if (DUTIES[baseRaw]) {
-        applyDutyToCell(cell, isOT?baseRaw+'_O':baseRaw);
+        const dCode=isOT?baseRaw+'_O':baseRaw;
+        const defDays=Number(DUTIES[baseRaw].defaultDays);
+        if(Number.isFinite(defDays)&&defDays>1){
+          // Auto-fill defaultDays cells starting from this cell (inclusive)
+          const hCellRef=row.querySelector('.hours-cell');
+          let cur=cell;
+          for(let i=0;i<defDays&&cur&&cur!==hCellRef;i++){applyDutyToCell(cur,dCode);cur=cur.nextElementSibling;}
+        } else {
+          applyDutyToCell(cell,dCode);
+        }
         updateHours(row); return;
       }
       // 2. Leading digits + code: count before code (e.g. 3T9 → T9 × 3)
