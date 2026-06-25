@@ -3735,7 +3735,7 @@
             <td style="padding:5px;font-size:12px;">${(meta.label||"—").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</td>
             <td style="padding:5px;text-align:center;font-size:12px;">${meta.hours||0}</td>
             <td style="padding:5px;text-align:center;"><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${color};border:1px solid rgba(0,0,0,.15);vertical-align:middle;"></span></td>
-            <td style="padding:5px;text-align:center;font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${area}">${area||"—"}</td>
+            <td style="padding:5px;text-align:center;font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:#0369a1;border-bottom:1px dashed #93c5fd;" title="${area||'—'} — double-click to change">${area||"—"}</td>
             <td style="padding:5px;text-align:center;font-size:11px;">${meta.startDay||"Any"}</td>
             <td style="padding:5px;text-align:center;font-size:11px;">${meta.startTime||"Any"}</td>
             <td style="padding:5px;text-align:center;font-size:11px;">${endTime}</td>
@@ -3747,6 +3747,17 @@
             </td>`;
           tr.querySelectorAll("button")[0].addEventListener("click",()=>openEditByCode(code));
           tr.querySelectorAll("button")[1].addEventListener("click",()=>deleteDuty(code));
+          tr.cells[5].addEventListener("dblclick",()=>{
+            let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+            SM.openAreaPicker("dm-area-"+code,null,`Area — ${code}`,(all[code]?.area||""),newAreas=>{
+              if(!all[code])return;
+              all[code].area=newAreas; if(DUTIES[code])DUTIES[code].area=newAreas;
+              localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));
+              const appKey=(window.BCOT_APP_KEY||'').trim();
+              if(appKey)window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',appKey,'duties_named',CLOUD_DOC),{savedAt:new Date().toISOString(),duties:all},{merge:true}).catch(e=>console.error(e));
+              renderDutyTable(); showStatusMessage(`Area updated for "${code}" ✅`);
+            });
+          });
           tr.addEventListener("mouseenter",()=>tr.style.background="#f0f9ff");
           tr.addEventListener("mouseleave",()=>tr.style.background="");
           tbody.appendChild(tr);
