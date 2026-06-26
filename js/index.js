@@ -4904,7 +4904,6 @@
     // ══════════════════════════════════════════════════════════════════════════
     const DP = (() => {
       let _anchor = null;
-      let _timer  = null;
       const $ = id => document.getElementById(id);
 
       function _areaLbl() {
@@ -5007,17 +5006,17 @@
       }
 
       function _onClick(e) {
+        if (!e.ctrlKey) return;                      // Ctrl+click opens the palette
         const td = e.target.closest('td');
         if (!_shouldOpen(td)) return;
-        clearTimeout(_timer);
-        _timer = setTimeout(() => open(td), 200);   // 200 ms debounce guards against dblclick
+        e.preventDefault();
+        open(td);
       }
 
       function init() {
         const tbl = document.getElementById('rotaTable');
         if (tbl) {
-          tbl.addEventListener('click',    _onClick);
-          tbl.addEventListener('dblclick', () => clearTimeout(_timer));
+          tbl.addEventListener('click', _onClick);
         }
         // Escape closes palette
         document.addEventListener('keydown', e => {
