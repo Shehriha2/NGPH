@@ -181,8 +181,8 @@
       KAMC-WR — Pharmaceutical Care Department
     </p>
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
-                  color:#374151;margin-bottom:6px;">BADGE NUMBER</label>
-    <input id="bcot-login-badge" type="text" placeholder="Enter badge number"
+                  color:#374151;margin-bottom:6px;">USERNAME</label>
+    <input id="bcot-login-badge" type="text" placeholder="Enter username"
       style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
              font-size:13px;margin-bottom:18px;background:#fff;box-sizing:border-box;"
       onkeydown="if(event.key==='Enter') BCOT_AUTH.doLogin();" />
@@ -235,8 +235,8 @@
       Default password will be <strong>12345</strong> — you will be asked to change it.
     </p>
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
-                  color:#374151;margin-bottom:6px;">BADGE NUMBER</label>
-    <input id="bcot-setup-badge" type="text" placeholder="Badge number"
+                  color:#374151;margin-bottom:6px;">USERNAME</label>
+    <input id="bcot-setup-badge" type="text" placeholder="Username"
       style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
              font-size:13px;box-sizing:border-box;margin-bottom:14px;" />
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
@@ -274,10 +274,10 @@
     const pwd   = $id('bcot-login-pwd')?.value;
     const errEl = $id('bcot-login-err');
     if (errEl) errEl.textContent = '';
-    if (!badge) { if (errEl) errEl.textContent = 'Please enter your badge number.'; return; }
+    if (!badge) { if (errEl) errEl.textContent = 'Please enter your username.'; return; }
     const user = _users.find(u => u.badge === badge);
     if (!user || user.password !== pwd) {
-      if (errEl) errEl.textContent = 'Invalid badge number or password.';
+      if (errEl) errEl.textContent = 'Invalid username or password.';
       return;
     }
     _pendingUser = user;
@@ -310,7 +310,7 @@
     const name  = ($id('bcot-setup-name')?.value  || '').trim();
     const errEl = $id('bcot-setup-err');
     if (errEl) errEl.textContent = '';
-    if (!badge) { if (errEl) errEl.textContent = 'Badge number is required.'; return; }
+    if (!badge) { if (errEl) errEl.textContent = 'Username is required.'; return; }
     if (!name)  { if (errEl) errEl.textContent = 'Name is required.'; return; }
     const user = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
                    badge, name, password: '12345', firstLogin: true };
