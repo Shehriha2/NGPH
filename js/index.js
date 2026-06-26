@@ -729,7 +729,7 @@
       const valid = (prev === "ALL" || list.includes(prev)) ? prev : "ALL";
       if (inp) inp.value = valid;
       const lbl = document.getElementById("areaPickerLabel");
-      if (lbl) lbl.textContent = valid === "ALL" ? "All Areas" : valid;
+      if (lbl) lbl.textContent = valid === "ALL" ? "Select" : valid;
     }
 
     // ── Custom confirmation modal ─────────────────────────────────────────────
@@ -938,7 +938,7 @@
       // Reset filter to ALL
       document.getElementById("areaFilter").value = "ALL";
       const lbl = document.getElementById("areaPickerLabel");
-      if (lbl) lbl.textContent = "All Areas";
+      if (lbl) lbl.textContent = "Select";
       rebuildAreaSelect();
       setArea();
       showStatusMessage(`Area "${area}" and its staff records deleted ✅`);
@@ -961,7 +961,7 @@
           const prev = localStorage.getItem(AREA_KEY) || "ALL";
           document.getElementById("areaFilter").value = prev;
           const lbl2 = document.getElementById("areaPickerLabel");
-          if (lbl2) lbl2.textContent = prev === "ALL" ? "All Areas" : prev;
+          if (lbl2) lbl2.textContent = prev === "ALL" ? "Select" : prev;
           return;
         }
       }
@@ -5070,7 +5070,7 @@
       const inp=document.getElementById("areaFilter");
       const validLast = (lastArea==="ALL"||getAreasList().includes(lastArea)) ? lastArea : "ALL";
       if (inp) inp.value = validLast;
-      const areaLabel = validLast==="ALL" ? "All Areas" : validLast;
+      const areaLabel = validLast==="ALL" ? "Select" : validLast;
       const lbl = document.getElementById("areaPickerLabel");
       if (lbl) lbl.textContent = areaLabel;
       rebuildAreaSelect();
