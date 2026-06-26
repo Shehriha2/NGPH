@@ -172,11 +172,11 @@
       KAMC-WR — Pharmaceutical Care Department
     </p>
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
-                  color:#374151;margin-bottom:6px;">USER</label>
-    <select id="bcot-login-user"
+                  color:#374151;margin-bottom:6px;">BADGE NUMBER</label>
+    <input id="bcot-login-badge" type="text" placeholder="Enter badge number"
       style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
-             font-size:13px;margin-bottom:18px;background:#fff;box-sizing:border-box;">
-    </select>
+             font-size:13px;margin-bottom:18px;background:#fff;box-sizing:border-box;"
+      onkeydown="if(event.key==='Enter') BCOT_AUTH.doLogin();" />
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
                   color:#374151;margin-bottom:6px;">PASSWORD</label>
     <input id="bcot-login-pwd" type="password" placeholder="Enter password"
@@ -226,6 +226,11 @@
       Default password will be <strong>12345</strong> — you will be asked to change it.
     </p>
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
+                  color:#374151;margin-bottom:6px;">BADGE NUMBER</label>
+    <input id="bcot-setup-badge" type="text" placeholder="Badge number"
+      style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
+             font-size:13px;box-sizing:border-box;margin-bottom:14px;" />
+    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
                   color:#374151;margin-bottom:6px;">YOUR NAME</label>
     <input id="bcot-setup-name" type="text" placeholder="Full name"
       style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
@@ -251,24 +256,19 @@
     document.body.appendChild(wrap);
   }
 
-  /* ── User dropdown ─────────────────────────────────────────────────────── */
-  function buildUserDropdown() {
-    const sel = $id('bcot-login-user');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">— Select user —</option>' +
-      _users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
-  }
+  /* ── (dropdown removed — login now uses badge number text input) ────────── */
+  function buildUserDropdown() { /* no-op: select replaced by text input */ }
 
   /* ── Login actions ─────────────────────────────────────────────────────── */
   function doLogin() {
-    const id    = $id('bcot-login-user')?.value;
+    const badge = ($id('bcot-login-badge')?.value || '').trim();
     const pwd   = $id('bcot-login-pwd')?.value;
     const errEl = $id('bcot-login-err');
     if (errEl) errEl.textContent = '';
-    if (!id)  { if (errEl) errEl.textContent = 'Please select a user.'; return; }
-    const user = _users.find(u => u.id === id);
+    if (!badge) { if (errEl) errEl.textContent = 'Please enter your badge number.'; return; }
+    const user = _users.find(u => u.badge === badge);
     if (!user || user.password !== pwd) {
-      if (errEl) errEl.textContent = 'Incorrect password.';
+      if (errEl) errEl.textContent = 'Invalid badge number or password.';
       return;
     }
     _pendingUser = user;
@@ -297,12 +297,14 @@
   }
 
   async function doSetup() {
-    const name  = ($id('bcot-setup-name')?.value || '').trim();
+    const badge = ($id('bcot-setup-badge')?.value || '').trim();
+    const name  = ($id('bcot-setup-name')?.value  || '').trim();
     const errEl = $id('bcot-setup-err');
     if (errEl) errEl.textContent = '';
-    if (!name) { if (errEl) errEl.textContent = 'Name is required.'; return; }
+    if (!badge) { if (errEl) errEl.textContent = 'Badge number is required.'; return; }
+    if (!name)  { if (errEl) errEl.textContent = 'Name is required.'; return; }
     const user = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-                   name, password: '12345', firstLogin: true };
+                   badge, name, password: '12345', firstLogin: true };
     _users = [user];
     try {
       await saveUsers();
@@ -355,7 +357,7 @@
   }
 
   function _bcotPrompt(msg, { title = 'Enter Value', placeholder = '', type = 'text',
-                               confirmLabel = 'Submit' } = {}) {
+                               confirmLabel = 'Submit', defaultValue = '' } = {}) {
     return new Promise(resolve => {
       const ov = _dialogBase(`
         <h3 style="margin:0 0 10px;font-size:16px;color:#1a4f8b;">${title}</h3>
@@ -370,6 +372,7 @@
             border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">${confirmLabel}</button>
         </div>`);
       const inp = ov.querySelector('#_bp_inp');
+      if (defaultValue) inp.value = defaultValue;
       const submit = () => { const v = inp.value; ov.remove(); resolve(v); };
       inp.onkeydown = e => { if (e.key === 'Enter') submit(); };
       setTimeout(() => inp.focus(), 50);
@@ -587,7 +590,9 @@
 
   <div style="border-top:1px solid #e5e7eb;padding-top:16px;">
     <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">ADD USER</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <input id="bcot-um-newbadge" type="text" placeholder="Badge no. *"
+        style="width:90px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;" />
       <select id="bcot-um-nametitle"
         style="padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;background:#fff;min-width:90px;">
         <option value="">Title *</option>
@@ -644,7 +649,8 @@
         ${u.firstLogin ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:10px;">First login pending</span>' : ''}
       </div>
       <div style="font-size:11px;color:#6b7280;margin-top:3px;">
-        ${pos ? `<span style="color:#1a4f8b;font-weight:600;">📋 ${pos}</span>` : '<span style="color:#d1d5db;font-style:italic;">No position set</span>'}
+        <span style="background:#e0e7ff;color:#3730a3;padding:1px 7px;border-radius:8px;font-weight:700;font-size:10px;">🪪 ${u.badge || '<em>no badge</em>'}</span>
+        ${pos ? `&nbsp;·&nbsp;<span style="color:#1a4f8b;font-weight:600;">📋 ${pos}</span>` : ''}
         ${extRole ? `&nbsp;·&nbsp;<span style="color:#0f766e;font-weight:600;">🔧 ${extRoleLabel[extRole]||extRole}</span>` : ''}
       </div>
     </div>
@@ -655,6 +661,8 @@
         <option value="charge" ${appRole==='charge'?'selected':''}>Charge Person</option>
         <option value="admin"  ${appRole==='admin' ?'selected':''}>Admin</option>
       </select>
+      <button onclick="BCOT_AUTH.umSetBadge('${u.id}');"
+        style="padding:5px 10px;background:#4f46e5;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">🪪 Badge</button>
       <button onclick="BCOT_AUTH.umSetPosition('${u.id}');"
         style="padding:5px 10px;background:#0284c7;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">✏ Position</button>
       <button onclick="BCOT_AUTH.umResetPwd('${u.id}');"
@@ -668,19 +676,22 @@
   }
 
   async function umAddUser() {
-    const nameTitle = ($id('bcot-um-nametitle')?.value || '').trim();
-    const name      = ($id('bcot-um-newname')?.value || '').trim();
+    const badge     = ($id('bcot-um-newbadge')?.value   || '').trim();
+    const nameTitle = ($id('bcot-um-nametitle')?.value  || '').trim();
+    const name      = ($id('bcot-um-newname')?.value    || '').trim();
     const errEl     = $id('bcot-um-err');
     if (errEl) errEl.textContent = '';
+    if (!badge)     { if (errEl) errEl.textContent = 'Badge number is required.'; return; }
     if (!nameTitle) { if (errEl) errEl.textContent = 'Title is required.'; return; }
     if (!name)      { if (errEl) errEl.textContent = 'Name is required.';  return; }
-    if (_users.find(u => u.name.toLowerCase() === name.toLowerCase())) {
-      if (errEl) errEl.textContent = 'A user with that name already exists.'; return;
+    if (_users.find(u => u.badge === badge)) {
+      if (errEl) errEl.textContent = 'A user with that badge number already exists.'; return;
     }
-    _users.push({ id: _uid(), nameTitle, name, position: '', password: '12345', firstLogin: true });
+    _users.push({ id: _uid(), badge, nameTitle, name, position: '', password: '12345', firstLogin: true });
     try {
       await saveUsers();
-      if ($id('bcot-um-newname')) $id('bcot-um-newname').value = '';
+      if ($id('bcot-um-newbadge')) $id('bcot-um-newbadge').value = '';
+      if ($id('bcot-um-newname'))  $id('bcot-um-newname').value  = '';
       _renderUserList();
     } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
   }
@@ -696,6 +707,28 @@
     if (newPos === null) return;
     u.position = newPos.trim();
     delete u.title;
+    try {
+      await saveUsers();
+      _renderUserList();
+    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+  }
+
+  async function umSetBadge(id) {
+    const u = _users.find(u => u.id === id);
+    if (!u) return;
+    const newBadge = await _bcotPrompt(
+      `Set the badge number for <strong>${[u.nameTitle, u.name].filter(Boolean).join(' ')}</strong>.<br>
+       This is what the user types at login.`,
+      { title: '🪪 Badge Number', placeholder: 'e.g. 12345', confirmLabel: 'Save',
+        defaultValue: u.badge || '' }
+    );
+    if (newBadge === null) return;
+    const b = newBadge.trim();
+    if (!b) { await _bcotAlert('Badge number cannot be empty.', 'Validation'); return; }
+    if (_users.find(u2 => u2.badge === b && u2.id !== id)) {
+      await _bcotAlert('That badge number is already assigned to another user.', 'Duplicate'); return;
+    }
+    u.badge = b;
     try {
       await saveUsers();
       _renderUserList();
@@ -765,6 +798,7 @@
     }
     return _users.map(u => ({
       id:              u.id,
+      badge:           u.badge          || '',
       name:            [u.nameTitle, u.name].filter(Boolean).join(' '),
       app_role:        u.app_role       || 'user',
       role:            u.ext_role       || '',
@@ -1540,6 +1574,7 @@
     // User manager
     openUserManager,
     umAddUser,
+    umSetBadge,
     umSetPosition,
     umResetPwd,
     umRemoveUser,
