@@ -296,8 +296,8 @@
       <button onclick="generateReport()" class="btn-green">📊 Generate Report</button>
       <button onclick="exportPDF()"   class="btn-purple no-print" id="exportPdfBtn"   style="display:none;">📄 Export PDF</button>
       <button onclick="exportExcel()" class="btn-teal   no-print" id="exportXlsxBtn"  style="display:none;">📊 Export Excel</button>
-      <a href="Areas.html" style="margin-left:auto;text-decoration:none;">
-        <button type="button" class="btn-gray">← Back to Cost Centers</button>
+      <a href="index.html" style="margin-left:auto;text-decoration:none;">
+        <button type="button" class="btn-gray">← Back to Main</button>
       </a>
     </div>
   </div>
@@ -928,7 +928,7 @@
 
     if(!_ccList.length) {
       document.getElementById('reportOutput').innerHTML =
-        '<div class="loading">No cost centers found. <a href="Areas.html">Set up cost centers first →</a></div>';
+        '<div class="loading">No cost centers found. Return to the main page and add areas via the Cost Centers button.</div>';
       return;
     }
 

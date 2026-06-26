@@ -692,19 +692,21 @@
 
     function getAreasList() {
       try {
-        const all     = JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || [];
+        const all  = JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || [];
+        const meta = (()=>{try{return JSON.parse(localStorage.getItem(AREAS_META_KEY)||'{}')||{};}catch{return{};}})();
+        const active = all.filter(a => meta[a]?.enabled !== false);
         const allowed = window.BCOT_AUTH_ALLOWED_AREAS;
-        if (!allowed || allowed === 'ALL') return all;
-        if (Array.isArray(allowed)) return all.filter(a => allowed.includes(a));
-        return all;
+        if (!allowed || allowed === 'ALL') return active;
+        if (Array.isArray(allowed)) return active.filter(a => allowed.includes(a));
+        return active;
       } catch { return []; }
     }
 
     function saveAreaToList(area) {
-      const list = getAreasList();
-      if (area && area !== "ALL" && !list.includes(area)) {
-        list.push(area); list.sort();
-        localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(list));
+      const rawList = JSON.parse(localStorage.getItem(AREAS_LIST_KEY) || "[]") || [];
+      if (area && area !== "ALL" && !rawList.includes(area)) {
+        rawList.push(area); rawList.sort();
+        localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(rawList));
       }
       if (area && area !== "ALL") {
         try {
