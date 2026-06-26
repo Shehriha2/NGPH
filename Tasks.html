@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Management — BCOT Rota</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial,sans-serif;margin:0;padding:10px;background:#f5f5f5;font-size:12px;color:#1f2937;}
+
+    /* Header */
+    .header{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#1a4f8b,#0f766e);padding:10px 16px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);margin-bottom:14px;}
+    .header-text{flex:1;text-align:center;color:#fff;}
+    .header-text h1{margin:2px 0;font-size:14px;}
+    .header-text h2{margin:1px 0;font-size:11px;opacity:.85;}
+    .logo{width:64px;height:64px;background:#fff;border-radius:6px;padding:4px;flex-shrink:0;}
+    .logo img{width:100%;height:100%;object-fit:contain;}
+
+    /* Tabs */
+    .tabs{display:flex;gap:3px;margin-bottom:0;}
+    .tab-btn{padding:7px 18px;border:none;border-radius:8px 8px 0 0;font-size:12px;font-weight:700;cursor:pointer;background:#dde3ec;color:#64748b;transition:all .2s;}
+    .tab-btn.active{background:#1a4f8b;color:#fff;}
+    .tab-pane{display:none;background:#fff;border-radius:0 8px 8px 8px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);min-height:200px;}
+    .tab-pane.active{display:block;}
+
+    /* Controls */
+    .ctrl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+    select,input[type="text"],input[type="date"]{padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;background:#fff;}
+    button{padding:6px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:Arial,sans-serif;font-weight:600;transition:opacity .15s;}
+    button:hover{opacity:.85;}
+    .btn-navy  {background:#1a4f8b;color:#fff;}
+    .btn-teal  {background:#0f766e;color:#fff;}
+    .btn-green {background:#16a34a;color:#fff;}
+    .btn-red   {background:#dc2626;color:#fff;}
+    .btn-orange{background:#d97706;color:#fff;}
+    .btn-gray  {background:#6b7280;color:#fff;}
+    .btn-blue  {background:#2563eb;color:#fff;}
+    .btn-sm    {padding:3px 8px;font-size:11px;}
+
+    /* View toggle */
+    .view-toggle{display:flex;border:1px solid #ddd;border-radius:6px;overflow:hidden;}
+    .view-btn{padding:5px 11px;border:none;background:#f9fafb;color:#64748b;font-size:12px;cursor:pointer;transition:all .15s;}
+    .view-btn.active{background:#1a4f8b;color:#fff;}
+
+    /* Priority colours */
+    .p-urgent{color:#dc2626;} .bg-urgent{background:#dc2626;color:#fff;}
+    .p-high  {color:#d97706;} .bg-high  {background:#d97706;color:#fff;}
+    .p-medium{color:#2563eb;} .bg-medium{background:#2563eb;color:#fff;}
+    .p-low   {color:#16a34a;} .bg-low   {background:#16a34a;color:#fff;}
+
+    /* Task card */
+    .task-list{display:flex;flex-direction:column;gap:7px;}
+    .task-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;display:flex;transition:box-shadow .2s;}
+    .task-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1);}
+    .task-card.completed{opacity:.58;}
+    .priority-bar{width:4px;flex-shrink:0;}
+    .task-body{flex:1;padding:9px 12px;min-width:0;}
+    .task-title-row{font-size:13px;font-weight:700;color:#111827;margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+    .task-title-row.done{text-decoration:line-through;color:#9ca3af;}
+    .task-desc{font-size:11px;color:#6b7280;margin-bottom:6px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .task-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+    .chip{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;}
+    .chip-overdue  {background:#fee2e2;color:#dc2626;}
+    .chip-today    {background:#fef3c7;color:#d97706;}
+    .chip-soon     {background:#dbeafe;color:#1d4ed8;}
+    .chip-future   {background:#f1f5f9;color:#64748b;}
+    .chip-nodate   {background:#f1f5f9;color:#9ca3af;}
+    .cs-pending    {background:#fef3c7;color:#d97706;}
+    .cs-in_progress{background:#dbeafe;color:#2563eb;}
+    .cs-completed  {background:#dcfce7;color:#16a34a;}
+    .badge-recur   {background:#e0e7ff;color:#4338ca;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;}
+    .badge-shared  {background:#fce7f3;color:#be185d;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;}
+    .badge-owner   {background:#f0fdf4;color:#15803d;padding:2px 7px;border-radius:12px;font-size:10px;}
+    .task-actions  {display:flex;gap:4px;align-items:center;padding:0 10px 0 4px;flex-shrink:0;}
+
+    /* Empty state */
+    .empty-msg{text-align:center;padding:40px 20px;color:#9ca3af;}
+    .empty-msg i{font-size:38px;display:block;margin-bottom:10px;opacity:.35;}
+
+    /* Calendar */
+    .cal-nav{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:10px;}
+    .cal-nav h3{margin:0;font-size:14px;font-weight:700;color:#1a4f8b;min-width:170px;text-align:center;}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:10px;}
+    .cal-dow{text-align:center;font-size:10px;font-weight:700;color:#6b7280;padding:4px 0;}
+    .cal-cell{min-height:68px;border:1px solid #f1f5f9;border-radius:6px;padding:4px;background:#fafafa;cursor:pointer;transition:background .15s;}
+    .cal-cell:hover{background:#eff6ff;}
+    .cal-cell.today{border-color:#2563eb;}
+    .cal-cell.selected{border-color:#1a4f8b;background:#dbeafe;}
+    .cal-cell.other-month{background:#f8f8f8;opacity:.45;pointer-events:none;}
+    .cal-day-num{font-size:10px;font-weight:700;color:#374151;margin-bottom:3px;}
+    .cal-cell.today .cal-day-num{background:#2563eb;color:#fff;border-radius:50%;width:17px;height:17px;display:inline-flex;align-items:center;justify-content:center;}
+    .cal-dots{display:flex;flex-wrap:wrap;gap:2px;}
+    .cal-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+    .cal-day-panel{background:#f8faff;border-radius:8px;padding:12px;border:1px solid #dbeafe;margin-top:6px;}
+    .cal-day-panel h4{margin:0 0 8px;font-size:12px;color:#1a4f8b;font-weight:700;}
+
+    /* Modal */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:9000;align-items:center;justify-content:center;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(580px,96%);overflow:hidden;max-height:92vh;overflow-y:auto;}
+    .modal-hdr{background:linear-gradient(135deg,#1a4f8b,#0f766e);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+    .modal-hdr-title{font-size:15px;font-weight:700;color:#fff;}
+    .modal-body{padding:18px 20px;}
+    .modal-ftr{padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;}
+    .fg{display:flex;flex-direction:column;gap:12px;}
+    .fl{font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;}
+    .fi{width:100%;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;}
+    .fi:focus{outline:none;border-color:#1a4f8b;box-shadow:0 0 0 2px rgba(26,79,139,.1);}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .section-box{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#f9fafb;}
+    .section-hdr{font-weight:700;color:#374151;font-size:12px;}
+    .section-sub{margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9;}
+    .radio-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;font-size:12px;cursor:pointer;}
+    .user-list-scroll{max-height:110px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:6px;background:#fff;margin-top:6px;}
+    .user-check-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;}
+
+    /* History */
+    .hist-table{width:100%;border-collapse:collapse;font-size:11px;}
+    .hist-table th{background:#1a4f8b;color:#fff;padding:7px 10px;text-align:left;white-space:nowrap;}
+    .hist-table td{padding:6px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+    .hist-table tr:hover td{background:#f8faff;}
+    .ha{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap;}
+    .ha-created  {background:#dcfce7;color:#15803d;}
+    .ha-updated  {background:#dbeafe;color:#1d4ed8;}
+    .ha-completed{background:#f0fdf4;color:#16a34a;}
+    .ha-reopened {background:#fef3c7;color:#d97706;}
+    .ha-deleted  {background:#fee2e2;color:#dc2626;}
+    .ha-shared   {background:#fce7f3;color:#be185d;}
+    .ha-priority {background:#f5f3ff;color:#7c3aed;}
+
+    /* Toast */
+    #toast{position:fixed;top:18px;right:18px;padding:9px 18px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;z-index:99999;display:none;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:360px;}
+    .t-ok  {background:#16a34a;} .t-err{background:#dc2626;} .t-info{background:#2563eb;}
+
+    @media print{
+      .no-print,button,.ctrl-bar,.tabs,.task-actions{display:none!important;}
+      .tab-pane{display:block!important;box-shadow:none;padding:0;}
+      body{background:#fff;padding:0;}
+    }
+    @media(max-width:600px){.two-col{grid-template-columns:1fr;}.cal-cell{min-height:46px;}}
+  </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<div class="header">
+  <div class="logo">
+    <img src="MNGHA-Logo.png" alt="Logo"
+      onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;64&quot; height=&quot;64&quot;><rect width=&quot;64&quot; height=&quot;64&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;10&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>'">
+  </div>
+  <div class="header-text">
+    <h1>الشؤون الصحية – وزارة الحرس الوطني</h1>
+    <h1>Ministry of National Guard Health Affairs</h1>
+    <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+    <h2>Task Management</h2>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;" class="no-print">
+    <a href="index.html" style="text-decoration:none;"><button class="btn-navy" style="font-size:11px;"><i class="bi bi-arrow-left"></i> Back to Rota</button></a>
+    <button onclick="window.print()" class="btn-gray" style="font-size:11px;"><i class="bi bi-printer"></i> Print</button>
+  </div>
+</div>
+
+<!-- ── Tabs ────────────────────────────────────────────────────────────── -->
+<div class="tabs no-print">
+  <button class="tab-btn active" onclick="switchTab('tasks')"><i class="bi bi-list-check"></i> Tasks</button>
+  <button class="tab-btn"        onclick="switchTab('history')"><i class="bi bi-clock-history"></i> History</button>
+</div>
+
+<!-- ══════════ TASKS TAB ══════════════════════════════════════════════════ -->
+<div id="tab-tasks" class="tab-pane active">
+
+  <div class="ctrl-bar no-print">
+    <label style="font-weight:700;color:#1a4f8b;">Priority:</label>
+    <select id="fPriority" onchange="applyFilters()">
+      <option value="ALL">All Priorities</option>
+      <option value="urgent">🔴 Urgent</option>
+      <option value="high">🟠 High</option>
+      <option value="medium">🔵 Medium</option>
+      <option value="low">🟢 Low</option>
+    </select>
+
+    <label style="font-weight:700;color:#1a4f8b;">Status:</label>
+    <select id="fStatus" onchange="applyFilters()">
+      <option value="ALL">All Statuses</option>
+      <option value="pending">Pending</option>
+      <option value="in_progress">In Progress</option>
+      <option value="completed">Completed</option>
+    </select>
+
+    <label style="font-weight:700;color:#1a4f8b;">Due:</label>
+    <select id="fDue" onchange="applyFilters()">
+      <option value="ALL">All Dates</option>
+      <option value="overdue">Overdue</option>
+      <option value="today">Today</option>
+      <option value="week">This Week</option>
+      <option value="nodate">No Date Set</option>
+    </select>
+
+    <div class="view-toggle">
+      <button class="view-btn active" id="vBtnList" onclick="setView('list')"><i class="bi bi-list-ul"></i> List</button>
+      <button class="view-btn"        id="vBtnCal"  onclick="setView('calendar')"><i class="bi bi-calendar3"></i> Calendar</button>
+    </div>
+
+    <button class="btn-green" onclick="openAddModal()" style="margin-left:auto;"><i class="bi bi-plus-lg"></i> New Task</button>
+    <button class="btn-teal"  onclick="syncCloud()"><i class="bi bi-cloud-arrow-down"></i> Sync</button>
+  </div>
+
+  <!-- List view -->
+  <div id="listView">
+    <div class="task-list" id="taskList"></div>
+  </div>
+
+  <!-- Calendar view -->
+  <div id="calendarView" style="display:none;">
+    <div class="cal-nav no-print">
+      <button class="btn-gray btn-sm" onclick="calNav(-1)"><i class="bi bi-chevron-left"></i></button>
+      <h3 id="calTitle"></h3>
+      <button class="btn-gray btn-sm" onclick="calNav(1)"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="calDayPanel"></div>
+  </div>
+
+</div>
+
+<!-- ══════════ HISTORY TAB ════════════════════════════════════════════════ -->
+<div id="tab-history" class="tab-pane">
+  <div class="ctrl-bar no-print">
+    <label style="font-weight:700;color:#1a4f8b;">Action:</label>
+    <select id="hAction" onchange="renderHistory()">
+      <option value="ALL">All Actions</option>
+      <option value="created">Created</option>
+      <option value="updated">Updated</option>
+      <option value="completed">Completed</option>
+      <option value="reopened">Reopened</option>
+      <option value="priority_changed">Priority Changed</option>
+      <option value="shared">Shared</option>
+      <option value="deleted">Deleted</option>
+    </select>
+    <label style="font-weight:700;color:#1a4f8b;">By:</label>
+    <input id="hUser" type="text" placeholder="Filter by user…" oninput="renderHistory()" style="width:150px;"/>
+    <span style="margin-left:auto;font-size:11px;color:#9ca3af;" id="histCount"></span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="hist-table">
+      <thead><tr>
+        <th>Date &amp; Time</th>
+        <th>Task</th>
+        <th>Action</th>
+        <th>By</th>
+        <th>Details</th>
+      </tr></thead>
+      <tbody id="histBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ TASK MODAL ════════════════════════════════════════════════ -->
+<div id="taskModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-hdr-title" id="modalTitle"><i class="bi bi-check2-square"></i> New Task</span>
+      <button onclick="closeModal()" style="background:rgba(255,255,255,.2);color:#fff;border-radius:4px;border:none;cursor:pointer;padding:3px 8px;font-size:14px;">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+
+        <!-- Title -->
+        <div>
+          <label class="fl">Title <span style="color:#dc2626;">*</span></label>
+          <input id="mTitle" class="fi" type="text" placeholder="Enter task title…" maxlength="120"/>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="fl">Description</label>
+          <textarea id="mDesc" class="fi" rows="3" placeholder="Optional details or notes…" style="resize:vertical;"></textarea>
+        </div>
+
+        <!-- Due date + Priority -->
+        <div class="two-col">
+          <div>
+            <label class="fl">Due Date</label>
+            <input id="mDue" class="fi" type="date"/>
+          </div>
+          <div>
+            <label class="fl">Priority</label>
+            <select id="mPriority" class="fi">
+              <option value="low">🟢 Low</option>
+              <option value="medium" selected>🔵 Medium</option>
+              <option value="high">🟠 High</option>
+              <option value="urgent">🔴 Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Status (edit mode only) -->
+        <div id="mStatusRow" style="display:none;">
+          <label class="fl">Status</label>
+          <select id="mStatus" class="fi">
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+
+        <!-- Recurrence -->
+        <div class="section-box">
+          <div class="section-hdr">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;">
+              <input type="checkbox" id="mRecurEnabled" onchange="toggleRecur()"/>
+              <i class="bi bi-arrow-repeat" style="color:#4338ca;"></i> This task repeats
+            </label>
+          </div>
+          <div id="recurFields" style="display:none;" class="section-sub">
+            <div class="two-col" style="margin-bottom:8px;">
+              <div>
+                <label class="fl">Frequency</label>
+                <select id="mRecurFreq" class="fi">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div>
+                <label class="fl">Ends</label>
+                <select id="mRecurEndType" class="fi" onchange="toggleRecurEnd()">
+                  <option value="never">Never (repeat indefinitely)</option>
+                  <option value="date">On a specific date</option>
+                </select>
+              </div>
+            </div>
+            <div id="recurEndDateRow" style="display:none;">
+              <label class="fl">End Date</label>
+              <input id="mRecurEndDate" class="fi" type="date"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sharing -->
+        <div class="section-box">
+          <div class="section-hdr">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;">
+              <input type="checkbox" id="mShareEnabled" onchange="toggleShare()"/>
+              <i class="bi bi-share" style="color:#be185d;"></i> Share this task
+            </label>
+            <div style="font-size:10px;color:#9ca3af;margin-top:3px;padding-left:20px;">Tasks are private by default — only you can see them.</div>
+          </div>
+          <div id="shareFields" style="display:none;" class="section-sub">
+            <label class="radio-row">
+              <input type="radio" name="shareWith" id="swAll" value="all" checked onchange="toggleShareWith()"/>
+              <i class="bi bi-people-fill" style="color:#0f766e;"></i> Share with all users
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="shareWith" id="swSpecific" value="specific" onchange="toggleShareWith()"/>
+              <i class="bi bi-person-check" style="color:#2563eb;"></i> Select specific users
+            </label>
+            <div id="userListDiv" style="display:none;">
+              <div class="user-list-scroll" id="userChecks"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button onclick="closeModal()" class="btn-gray"><i class="bi bi-x-lg"></i> Cancel</button>
+      <button onclick="saveTask()" class="btn-navy"><i class="bi bi-check-lg"></i> <span id="saveBtnLabel">Save Task</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCRIPTS ════════════════════════════════════════════════════ -->
+<script src="config.js"></script>
+<script src="js/auth.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  const app = initializeApp({
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+    storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894",
+    appId:"1:659421824894:web:f0546879df8808491ad52f"
+  });
+  window.FB = { db: getFirestore(app), doc, setDoc, getDoc };
+  window._fbReady = true;
+</script>
+
+<script>
+'use strict';
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const TASKS_LS   = 'BCOT_TASKS_V1';
+const TASKS_DOC  = 'TASKS_POOL';
+const MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW        = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const P_COLOR    = { urgent:'#dc2626', high:'#d97706', medium:'#2563eb', low:'#16a34a' };
+const P_LABEL    = { urgent:'Urgent',  high:'High',    medium:'Medium',   low:'Low'   };
+const S_LABEL    = { pending:'Pending', in_progress:'In Progress', completed:'Completed' };
+
+// ── State ──────────────────────────────────────────────────────────────────
+let TASKS        = [];
+let currentUser  = '';
+let currentView  = 'list';
+let calYear      = new Date().getFullYear();
+let calMonth     = new Date().getMonth();
+let calSelected  = null;
+let editingId    = null;
+let filters      = { priority:'ALL', status:'ALL', due:'ALL' };
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function uid() { return 'tk_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 't-'+type; el.style.display='block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.display='none'; }, 3200);
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function fmtDT(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} `
+       + `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function dueDateChip(dueDate, status) {
+  if (!dueDate) return `<span class="chip chip-nodate"><i class="bi bi-dash-circle"></i> No Date</span>`;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due   = new Date(dueDate);
+  const diff  = Math.round((due - today) / 86400000);
+  if (status === 'completed') return `<span class="chip chip-future"><i class="bi bi-calendar-check"></i> ${fmtDate(dueDate)}</span>`;
+  if (diff < 0)   return `<span class="chip chip-overdue"><i class="bi bi-exclamation-circle-fill"></i> Overdue · ${fmtDate(dueDate)}</span>`;
+  if (diff === 0) return `<span class="chip chip-today"><i class="bi bi-clock-fill"></i> Today</span>`;
+  if (diff <= 3)  return `<span class="chip chip-soon"><i class="bi bi-calendar-event"></i> In ${diff}d</span>`;
+  return `<span class="chip chip-future"><i class="bi bi-calendar"></i> ${fmtDate(dueDate)}</span>`;
+}
+
+function recurLabel(r) {
+  if (!r?.enabled) return '';
+  const freq = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', yearly:'Yearly' }[r.frequency] || r.frequency;
+  const end  = r.endType==='date' && r.endDate ? ` until ${fmtDate(r.endDate)}` : '';
+  return freq + end;
+}
+
+function addHistory(task, action, details='') {
+  if (!Array.isArray(task.history)) task.history = [];
+  task.history.unshift({ action, by: currentUser, at: new Date().toISOString(), details });
+}
+
+function getSession() {
+  try { return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'{}') || {}; } catch { return {}; }
+}
+
+function getStaffNames() {
+  try {
+    const r = JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]') || [];
+    return r.map(x=>(x.name||x.staffName||'').trim()).filter(Boolean).sort();
+  } catch { return []; }
+}
+
+// ── Firebase ────────────────────────────────────────────────────────────────
+async function waitFB() { let t=0; while(!window.FB && t++<80) await new Promise(r=>setTimeout(r,50)); }
+
+function tasksRef(key) {
+  return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'tasks',TASKS_DOC);
+}
+
+async function syncCloud() {
+  const key = (window.BCOT_APP_KEY||'').trim();
+  if (!key) { showToast('config.js not loaded — offline only.','err'); return; }
+  await waitFB();
+  try {
+    const snap = await window.FB.getDoc(tasksRef(key));
+    if (snap.exists()) {
+      const remote = snap.data();
+      if (Array.isArray(remote.tasks)) {
+        // Merge strategy: cloud wins if it has more tasks, otherwise keep local
+        if (remote.tasks.length >= TASKS.length) {
+          TASKS = remote.tasks;
+          localStorage.setItem(TASKS_LS, JSON.stringify(TASKS));
+          showToast('Synced from cloud ✓');
+        } else {
+          showToast('Local data is newer — no cloud changes applied.','info');
+        }
+      }
+    } else {
+      showToast('No cloud data yet — local only.','info');
+    }
+  } catch(e) { showToast('Sync failed: '+(e?.message||e),'err'); }
+  renderAll();
+}
+
+async function saveToCloud() {
+  localStorage.setItem(TASKS_LS, JSON.stringify(TASKS));
+  const key = (window.BCOT_APP_KEY||'').trim(); if (!key) return;
+  await waitFB();
+  try {
+    await window.FB.setDoc(tasksRef(key),
+      { tasks: TASKS, savedAt: new Date().toISOString() },
+      { merge: true });
+  } catch(e) { console.error('Cloud save error:', e); showToast('Cloud save failed','err'); }
+}
+
+// ── Data access ──────────────────────────────────────────────────────────────
+function getVisibleTasks() {
+  return TASKS.filter(t => {
+    if (t._deleted) return false;
+    if (t.createdBy === currentUser) return true;
+    if (!t.shared?.enabled) return false;
+    if (t.shared.sharedWith === 'all') return true;
+    return Array.isArray(t.shared.sharedWith) && t.shared.sharedWith.includes(currentUser);
+  });
+}
+
+function getAuditTasks() {
+  // Same as visible but includes soft-deleted tasks for history audit
+  return TASKS.filter(t => {
+    if (t.createdBy === currentUser) return true;
+    if (!t.shared?.enabled) return false;
+    if (t.shared.sharedWith === 'all') return true;
+    return Array.isArray(t.shared.sharedWith) && t.shared.sharedWith.includes(currentUser);
+  });
+}
+
+function getFilteredTasks() {
+  let tasks = getVisibleTasks();
+  if (filters.priority !== 'ALL') tasks = tasks.filter(t => t.priority === filters.priority);
+  if (filters.status   !== 'ALL') tasks = tasks.filter(t => t.status   === filters.status);
+  if (filters.due !== 'ALL') {
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (filters.due === 'overdue') {
+      tasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < today && t.status !== 'completed');
+    } else if (filters.due === 'today') {
+      tasks = tasks.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === today.toDateString());
+    } else if (filters.due === 'week') {
+      const wk = new Date(today); wk.setDate(wk.getDate()+7);
+      tasks = tasks.filter(t => t.dueDate && new Date(t.dueDate)>=today && new Date(t.dueDate)<=wk);
+    } else if (filters.due === 'nodate') {
+      tasks = tasks.filter(t => !t.dueDate);
+    }
+  }
+  // Sort: urgent first, then by due date (no-date last), then alphabetical
+  const po = { urgent:0, high:1, medium:2, low:3 };
+  return tasks.sort((a,b) => {
+    if (po[a.priority] !== po[b.priority]) return po[a.priority]-po[b.priority];
+    if (!a.dueDate && !b.dueDate) return a.title.localeCompare(b.title);
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────
+function renderAll() {
+  if (currentView === 'list') renderList();
+  else renderCalendar();
+}
+
+function renderList() {
+  const tasks = getFilteredTasks();
+  const el = document.getElementById('taskList');
+  if (!tasks.length) {
+    el.innerHTML = `<div class="empty-msg"><i class="bi bi-check2-all"></i>No tasks match your filters.<br><small style="margin-top:6px;display:block;">Click <b>+ New Task</b> to create one.</small></div>`;
+    return;
+  }
+  el.innerHTML = tasks.map(t => taskCardHTML(t)).join('');
+}
+
+function taskCardHTML(t) {
+  const isOwner = t.createdBy === currentUser;
+  const rl = recurLabel(t.recurrence);
+  const sc = { pending:'cs-pending', in_progress:'cs-in_progress', completed:'cs-completed' }[t.status] || '';
+  return `
+<div class="task-card${t.status==='completed'?' completed':''}" id="tc_${t.id}">
+  <div class="priority-bar" style="background:${P_COLOR[t.priority]||'#9ca3af'};"></div>
+  <div class="task-body">
+    <div class="task-title-row${t.status==='completed'?' done':''}">
+      <span>${esc(t.title)}</span>
+      ${rl ? `<span class="badge-recur"><i class="bi bi-arrow-repeat"></i> ${esc(rl)}</span>` : ''}
+      ${t.shared?.enabled ? `<span class="badge-shared"><i class="bi bi-share-fill"></i> ${t.shared.sharedWith==='all'?'All':Array.isArray(t.shared.sharedWith)?t.shared.sharedWith.length+' users':'Shared'}</span>` : ''}
+      ${!isOwner ? `<span class="badge-owner"><i class="bi bi-person"></i> ${esc(t.createdBy)}</span>` : ''}
+    </div>
+    ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+    <div class="task-meta">
+      ${dueDateChip(t.dueDate, t.status)}
+      <span class="chip ${sc}">${S_LABEL[t.status]||t.status}</span>
+      <span class="chip" style="background:${P_COLOR[t.priority]||'#9ca3af'};color:#fff;">${P_LABEL[t.priority]||t.priority}</span>
+    </div>
+  </div>
+  <div class="task-actions no-print">
+    ${t.status !== 'completed'
+      ? `<button class="btn-green btn-sm" title="Mark complete" onclick="completeTask('${t.id}')"><i class="bi bi-check-lg"></i></button>`
+      : `<button class="btn-gray  btn-sm" title="Reopen" onclick="reopenTask('${t.id}')"><i class="bi bi-arrow-counterclockwise"></i></button>`}
+    ${isOwner ? `<button class="btn-blue btn-sm" title="Edit" onclick="openEditModal('${t.id}')"><i class="bi bi-pencil"></i></button>` : ''}
+    ${isOwner ? `<button class="btn-red  btn-sm" title="Delete" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>` : ''}
+  </div>
+</div>`;
+}
+
+// ── Calendar ────────────────────────────────────────────────────────────────
+function renderCalendar() {
+  document.getElementById('calTitle').textContent = `${MONTHS[calMonth]} ${calYear}`;
+  const grid = document.getElementById('calGrid');
+  let html = DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+
+  const firstDow  = new Date(calYear, calMonth, 1).getDay();
+  const daysInMon = new Date(calYear, calMonth+1, 0).getDate();
+  const prevTotal = new Date(calYear, calMonth, 0).getDate();
+  const today     = new Date(); today.setHours(0,0,0,0);
+
+  // Build task-by-date index
+  const byDate = {};
+  getVisibleTasks().forEach(t => {
+    if (!t.dueDate) return;
+    (byDate[t.dueDate] = byDate[t.dueDate] || []).push(t);
+  });
+
+  // Prev-month padding
+  for (let i = firstDow - 1; i >= 0; i--)
+    html += `<div class="cal-cell other-month"><div class="cal-day-num">${prevTotal - i}</div></div>`;
+
+  // Current month
+  for (let d = 1; d <= daysInMon; d++) {
+    const ds    = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dt    = byDate[ds] || [];
+    const isT   = new Date(calYear, calMonth, d).toDateString() === today.toDateString();
+    const isSel = calSelected === ds;
+    const dots  = dt.slice(0,8).map(t=>`<div class="cal-dot" style="background:${P_COLOR[t.priority]||'#9ca3af'};"></div>`).join('');
+    const more  = dt.length > 8 ? `<span style="font-size:9px;color:#9ca3af;">+${dt.length-8}</span>` : '';
+    html += `<div class="cal-cell${isT?' today':''}${isSel?' selected':''}" onclick="calSelectDay('${ds}')">
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-dots">${dots}${more}</div>
+    </div>`;
+  }
+
+  // Next-month padding
+  const total = firstDow + daysInMon;
+  const pad   = total % 7 ? 7 - (total % 7) : 0;
+  for (let i = 1; i <= pad; i++)
+    html += `<div class="cal-cell other-month"><div class="cal-day-num">${i}</div></div>`;
+
+  grid.innerHTML = html;
+
+  // Day panel
+  const panel = document.getElementById('calDayPanel');
+  if (!calSelected) { panel.innerHTML = ''; return; }
+  const sel = byDate[calSelected] || [];
+  panel.innerHTML = `<div class="cal-day-panel">
+    <h4><i class="bi bi-calendar-event"></i> ${fmtDate(calSelected)} — ${sel.length||'No'} task${sel.length!==1?'s':''}</h4>
+    ${sel.length ? sel.map(t=>taskCardHTML(t)).join('') : '<div style="color:#9ca3af;text-align:center;padding:10px;"><i class="bi bi-calendar-x"></i> No tasks due on this date.</div>'}
+  </div>`;
+}
+
+function calSelectDay(ds) {
+  calSelected = calSelected === ds ? null : ds;
+  renderCalendar();
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth=0; calYear++; }
+  if (calMonth < 0)  { calMonth=11; calYear--; }
+  calSelected = null;
+  renderCalendar();
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+function renderHistory() {
+  const af = document.getElementById('hAction')?.value || 'ALL';
+  const uf = (document.getElementById('hUser')?.value || '').toLowerCase().trim();
+
+  let entries = [];
+  getAuditTasks().forEach(t =>
+    (t.history||[]).forEach(h => entries.push({ ...h, taskTitle: t.title }))
+  );
+
+  if (af !== 'ALL') entries = entries.filter(h => h.action === af);
+  if (uf)           entries = entries.filter(h => (h.by||'').toLowerCase().includes(uf));
+  entries.sort((a,b) => b.at.localeCompare(a.at));
+
+  document.getElementById('histCount').textContent = `${entries.length} entr${entries.length===1?'y':'ies'}`;
+
+  const cls = { created:'ha-created', updated:'ha-updated', completed:'ha-completed',
+                reopened:'ha-reopened', deleted:'ha-deleted', shared:'ha-shared', priority_changed:'ha-priority' };
+  const ico = { created:'bi-plus-circle', updated:'bi-pencil', completed:'bi-check-circle-fill',
+                reopened:'bi-arrow-counterclockwise', deleted:'bi-trash', shared:'bi-share-fill', priority_changed:'bi-flag-fill' };
+
+  document.getElementById('histBody').innerHTML = entries.length
+    ? entries.map(h=>`<tr>
+        <td style="white-space:nowrap;">${fmtDT(h.at)}</td>
+        <td style="font-weight:700;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(h.taskTitle)}">${esc(h.taskTitle)}</td>
+        <td><span class="ha ${cls[h.action]||''}"><i class="bi ${ico[h.action]||'bi-dot'}"></i> ${h.action}</span></td>
+        <td>${esc(h.by)}</td>
+        <td style="color:#6b7280;">${esc(h.details)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af;">No history entries match your filters.</td></tr>`;
+}
+
+// ── Task actions ───────────────────────────────────────────────────────────
+function completeTask(id) {
+  const t = TASKS.find(x=>x.id===id); if(!t) return;
+  const prev = t.status;
+  t.status='completed'; t.completedAt=new Date().toISOString(); t.updatedAt=new Date().toISOString();
+  addHistory(t,'completed',`Status changed from ${S_LABEL[prev]||prev} to Completed`);
+  saveToCloud(); renderAll();
+  showToast('Task marked as complete ✓');
+}
+
+function reopenTask(id) {
+  const t = TASKS.find(x=>x.id===id); if(!t) return;
+  t.status='pending'; t.completedAt=''; t.updatedAt=new Date().toISOString();
+  addHistory(t,'reopened','Task reopened — status set back to Pending');
+  saveToCloud(); renderAll();
+  showToast('Task reopened');
+}
+
+function deleteTask(id) {
+  const t = TASKS.find(x=>x.id===id); if(!t) return;
+  if (!confirm(`Delete "${t.title}"?\nThis action cannot be undone.`)) return;
+  addHistory(t,'deleted',`Task permanently deleted by ${currentUser}`);
+  t._deleted = true; t.updatedAt = new Date().toISOString(); // soft-delete (keeps audit)
+  saveToCloud(); renderAll();
+  showToast('Task deleted','info');
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').innerHTML = '<i class="bi bi-check2-square"></i> New Task';
+  document.getElementById('saveBtnLabel').textContent = 'Save Task';
+  document.getElementById('mStatusRow').style.display = 'none';
+
+  document.getElementById('mTitle').value     = '';
+  document.getElementById('mDesc').value      = '';
+  document.getElementById('mDue').value       = '';
+  document.getElementById('mPriority').value  = 'medium';
+  document.getElementById('mStatus').value    = 'pending';
+  document.getElementById('mRecurEnabled').checked = false;
+  document.getElementById('mRecurFreq').value       = 'weekly';
+  document.getElementById('mRecurEndType').value    = 'never';
+  document.getElementById('mRecurEndDate').value    = '';
+  document.getElementById('mShareEnabled').checked  = false;
+  document.getElementById('swAll').checked          = true;
+  buildUserChecks([]);
+  toggleRecur(); toggleShare(); toggleShareWith();
+
+  document.getElementById('taskModal').classList.add('open');
+  setTimeout(() => document.getElementById('mTitle').focus(), 60);
+}
+
+function openEditModal(id) {
+  const t = TASKS.find(x=>x.id===id); if(!t) return;
+  editingId = id;
+  document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil-square"></i> Edit Task';
+  document.getElementById('saveBtnLabel').textContent = 'Save Changes';
+  document.getElementById('mStatusRow').style.display = '';
+
+  document.getElementById('mTitle').value    = t.title || '';
+  document.getElementById('mDesc').value     = t.description || '';
+  document.getElementById('mDue').value      = t.dueDate || '';
+  document.getElementById('mPriority').value = t.priority || 'medium';
+  document.getElementById('mStatus').value   = t.status || 'pending';
+
+  const r = t.recurrence || {};
+  document.getElementById('mRecurEnabled').checked = !!r.enabled;
+  document.getElementById('mRecurFreq').value      = r.frequency || 'weekly';
+  document.getElementById('mRecurEndType').value   = r.endType   || 'never';
+  document.getElementById('mRecurEndDate').value   = r.endDate   || '';
+
+  const s = t.shared || {};
+  document.getElementById('mShareEnabled').checked = !!s.enabled;
+  if (s.sharedWith === 'all' || !Array.isArray(s.sharedWith)) {
+    document.getElementById('swAll').checked = true;
+  } else {
+    document.getElementById('swSpecific').checked = true;
+  }
+  const checkedUsers = Array.isArray(s.sharedWith) ? s.sharedWith : [];
+  buildUserChecks(checkedUsers);
+  toggleRecur(); toggleRecurEnd(); toggleShare(); toggleShareWith();
+
+  document.getElementById('taskModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('taskModal').classList.remove('open');
+  editingId = null;
+}
+
+function saveTask() {
+  const title = document.getElementById('mTitle').value.trim();
+  if (!title) { showToast('Title is required.','err'); document.getElementById('mTitle').focus(); return; }
+
+  const recurEnabled = document.getElementById('mRecurEnabled').checked;
+  const shareEnabled = document.getElementById('mShareEnabled').checked;
+  const shareMode    = document.querySelector('input[name="shareWith"]:checked')?.value || 'all';
+  let sharedWith = 'all';
+  if (shareEnabled && shareMode === 'specific') {
+    sharedWith = Array.from(document.querySelectorAll('#userChecks input[type=checkbox]:checked')).map(cb=>cb.value);
+    if (!sharedWith.length) { showToast('Select at least one user to share with.','err'); return; }
+  }
+
+  const now = new Date().toISOString();
+  const recurrence = {
+    enabled:   recurEnabled,
+    frequency: document.getElementById('mRecurFreq').value,
+    endType:   document.getElementById('mRecurEndType').value,
+    endDate:   document.getElementById('mRecurEndDate').value || '',
+  };
+  const shared = {
+    enabled:    shareEnabled,
+    sharedWith: shareEnabled ? sharedWith : [],
+  };
+
+  if (editingId) {
+    const t = TASKS.find(x=>x.id===editingId); if(!t) return;
+    const oldP = t.priority, oldS = t.status, oldShared = JSON.stringify(t.shared);
+
+    t.title       = title;
+    t.description = document.getElementById('mDesc').value.trim();
+    t.dueDate     = document.getElementById('mDue').value;
+    t.priority    = document.getElementById('mPriority').value;
+    t.status      = document.getElementById('mStatus').value;
+    t.updatedAt   = now;
+    t.recurrence  = recurrence;
+    t.shared      = shared;
+
+    if (oldP !== t.priority)
+      addHistory(t,'priority_changed',`Priority: ${P_LABEL[oldP]||oldP} → ${P_LABEL[t.priority]||t.priority}`);
+    if (oldS !== t.status && t.status==='completed') { t.completedAt=now; addHistory(t,'completed','Marked completed via edit'); }
+    else if (oldS==='completed' && t.status!=='completed') { t.completedAt=''; addHistory(t,'reopened','Reopened via edit'); }
+    if (oldShared !== JSON.stringify(t.shared))
+      addHistory(t,'shared', shareEnabled ? `Shared with ${sharedWith==='all'?'all users':sharedWith.length+' users'}` : 'Sharing disabled');
+    addHistory(t,'updated',`Title: "${title}", Due: ${t.dueDate||'none'}, Priority: ${P_LABEL[t.priority]||t.priority}`);
+    showToast('Task updated ✓');
+  } else {
+    const t = {
+      id: uid(), title,
+      description: document.getElementById('mDesc').value.trim(),
+      dueDate:     document.getElementById('mDue').value,
+      priority:    document.getElementById('mPriority').value,
+      status:      'pending',
+      createdBy:   currentUser,
+      createdAt:   now,
+      updatedAt:   now,
+      completedAt: '',
+      recurrence,
+      shared,
+      history: [],
+      _deleted: false,
+    };
+    addHistory(t,'created',
+      `Created with priority "${P_LABEL[t.priority]||t.priority}"` +
+      (t.dueDate ? `, due ${fmtDate(t.dueDate)}` : '') +
+      (recurEnabled ? `, repeats ${recurrence.frequency}` : '') +
+      (shareEnabled ? ', shared' : ' (private)')
+    );
+    TASKS.push(t);
+    showToast('Task created ✓');
+  }
+
+  closeModal();
+  saveToCloud();
+  renderAll();
+}
+
+// ── Modal toggles ─────────────────────────────────────────────────────────
+function toggleRecur() {
+  document.getElementById('recurFields').style.display = document.getElementById('mRecurEnabled').checked ? '' : 'none';
+}
+function toggleRecurEnd() {
+  document.getElementById('recurEndDateRow').style.display = document.getElementById('mRecurEndType').value==='date' ? '' : 'none';
+}
+function toggleShare() {
+  document.getElementById('shareFields').style.display = document.getElementById('mShareEnabled').checked ? '' : 'none';
+}
+function toggleShareWith() {
+  const specific = document.getElementById('swSpecific')?.checked;
+  document.getElementById('userListDiv').style.display = specific ? '' : 'none';
+}
+function buildUserChecks(selected) {
+  const names = getStaffNames().filter(n => n !== currentUser);
+  document.getElementById('userChecks').innerHTML = names.length
+    ? names.map(n => `<div class="user-check-row">
+        <input type="checkbox" id="uc_${esc(n)}" value="${esc(n)}" ${selected.includes(n)?'checked':''}/>
+        <label for="uc_${esc(n)}">${esc(n)}</label>
+      </div>`).join('')
+    : '<div style="color:#9ca3af;font-size:11px;padding:4px;"><i class="bi bi-info-circle"></i> No other staff found in this device\'s records.</div>';
+}
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', ['tasks','history'][i] === name));
+  document.querySelectorAll('.tab-pane').forEach(p =>
+    p.classList.toggle('active', p.id === 'tab-'+name));
+  if (name==='history') renderHistory();
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('listView').style.display     = v==='list'     ? '' : 'none';
+  document.getElementById('calendarView').style.display = v==='calendar' ? '' : 'none';
+  document.getElementById('vBtnList').classList.toggle('active', v==='list');
+  document.getElementById('vBtnCal').classList.toggle('active',  v==='calendar');
+  renderAll();
+}
+
+function applyFilters() {
+  filters.priority = document.getElementById('fPriority').value;
+  filters.status   = document.getElementById('fStatus').value;
+  filters.due      = document.getElementById('fDue').value;
+  renderAll();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  const session = getSession();
+  currentUser = session.name || session.id || 'Unknown';
+
+  // Instant render from localStorage
+  try { TASKS = JSON.parse(localStorage.getItem(TASKS_LS)||'[]') || []; } catch { TASKS=[]; }
+  renderAll();
+
+  // Then pull from cloud
+  await syncCloud();
+});
+
+// Close modal on overlay click
+document.getElementById('taskModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('taskModal')) closeModal();
+});
+</script>
+</body>
+</html>
