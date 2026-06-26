@@ -1,57 +1,26 @@
+    // ── Role helper ───────────────────────────────────────────────────────────
+    function _getAppRole() {
+      try { return (BCOT_AUTH.getSession() || {}).app_role || 'user'; } catch (e) { return 'user'; }
+    }
+
     // ── Auth Admin ────────────────────────────────────────────────────────────
-    async function openAuthAdmin() {
-      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-      if (!pwd || typeof BCOT_AUTH === 'undefined') {
-        showStatusMessage('Authentication module is not available.', 'error');
-        return;
-      }
-      const entered = await BCOT_AUTH.prompt(
-        'Enter the OT override password to access user management.',
-        { title: '🔒 Admin Access', placeholder: 'Password', type: 'password', confirmLabel: 'Unlock' }
-      );
-      if (entered === null) return;
-      if (entered.trim() !== pwd) {
-        showStatusMessage('Incorrect password — access denied.', 'error');
-        return;
-      }
+    function openAuthAdmin() {
+      if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
+      if (_getAppRole() !== 'admin') { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
       closeSettingsModal();
       BCOT_AUTH.openUserManager();
     }
 
-    async function openAreaAdmin() {
-      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-      if (!pwd || typeof BCOT_AUTH === 'undefined') {
-        showStatusMessage('Authentication module is not available.', 'error');
-        return;
-      }
-      const entered = await BCOT_AUTH.prompt(
-        'Enter the OT override password to access area management.',
-        { title: '🔒 Admin Access', placeholder: 'Password', type: 'password', confirmLabel: 'Unlock' }
-      );
-      if (entered === null) return;
-      if (entered.trim() !== pwd) {
-        showStatusMessage('Incorrect password — access denied.', 'error');
-        return;
-      }
+    function openAreaAdmin() {
+      if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
+      if (_getAppRole() !== 'admin') { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
       closeSettingsModal();
       BCOT_AUTH.openAreaManager();
     }
 
-    async function openIPAdmin() {
-      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-      if (!pwd || typeof BCOT_AUTH === 'undefined') {
-        showStatusMessage('Authentication module is not available.', 'error');
-        return;
-      }
-      const entered = await BCOT_AUTH.prompt(
-        'Enter the OT override password to access IP access control.',
-        { title: '🔒 Admin Access', placeholder: 'Password', type: 'password', confirmLabel: 'Unlock' }
-      );
-      if (entered === null) return;
-      if (entered.trim() !== pwd) {
-        showStatusMessage('Incorrect password — access denied.', 'error');
-        return;
-      }
+    function openIPAdmin() {
+      if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
+      if (_getAppRole() !== 'admin') { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
       closeSettingsModal();
       BCOT_AUTH.openIPManager();
     }
@@ -895,6 +864,7 @@
     }
 
     function addNewArea() {
+      if (_getAppRole() !== 'admin') { showStatusMessage('Area creation requires Administrator access.', 'error'); return; }
       const raw = (document.getElementById("newAreaInput").value || "")
         .trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
       if (!raw) { showStatusMessage("Enter a valid area name.", 'error'); return; }
@@ -1315,6 +1285,8 @@
     function openSettingsModal()      { document.getElementById('settingsModal').classList.add('show'); try{ updateDashboard(); }catch(e){ console.warn('dashboard update:',e); } }
     function closeSettingsModal()     { document.getElementById('settingsModal').classList.remove('show'); }
     function openSettingsWithAuth() {
+      // Admins go straight in — no password prompt needed
+      if (_getAppRole() === 'admin') { openSettingsModal(); return; }
       const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
       if (!pwd) { openSettingsModal(); return; }
       BCOT_AUTH.prompt('Enter the administrator password to access Settings & Tools.',
@@ -3752,6 +3724,7 @@
       function applyAreaFilter() { applyDutySearchFilter(); }
 
       function addNewArea() {
+        if(_getAppRole()!=='admin'){showStatusMessage('Area creation requires Administrator access.','error');return;}
         const raw=(document.getElementById("dm-newAreaInput").value||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
         if(!raw){showStatusMessage("Enter a valid area name.","error");return;}
         saveAreaToList(raw); rebuildUI();
@@ -4412,6 +4385,7 @@
       }
 
       function addNewArea() {
+        if(_getAppRole()!=='admin'){showStatusMessage('Area creation requires Administrator access.','error');return;}
         const raw=(document.getElementById("sm-newAreaInput").value||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,20);
         if(!raw){showStatusMessage("Enter a valid area name.","error");return;}
         saveAreaToList(raw); rebuildUI();
