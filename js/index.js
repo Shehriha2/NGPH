@@ -852,7 +852,7 @@
       const modal   = document.createElement("div");
       modal.id = "areaSelectorModal";
       modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:5000;";
-      const options = [{ value:"ALL", label:"All Areas" }, ...areas.map(a => ({ value:a, label:a }))];
+      const options = [...areas.map(a => ({ value:a, label:a }))];
       modal.innerHTML = `
         <div style="background:#fff;border-radius:14px;padding:22px 26px;min-width:260px;max-width:340px;
           width:90%;box-shadow:0 10px 40px rgba(0,0,0,.3);">
@@ -881,7 +881,7 @@
         if (picked === current) return;  // no change
         document.getElementById("areaFilter").value = picked;
         const lbl = document.getElementById("areaPickerLabel");
-        if (lbl) lbl.textContent = picked === "ALL" ? "All Areas" : picked;
+        if (lbl) lbl.textContent = picked === "ALL" ? "Select" : picked;
         setArea();
       };
     }
