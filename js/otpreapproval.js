@@ -636,15 +636,21 @@
   // ── Master summary page (across all areas) ────────────────────────────────
   function masterSummaryHtml(items, month, year) {
     const monthName  = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
+    let _ameta = {};
+    try { _ameta = JSON.parse(localStorage.getItem('BCOT_AREAS_META_V1') || '{}') || {}; } catch {}
     const grandStaff = items.reduce((s,i) => s + i.staffCount, 0);
     const grandHours = items.reduce((s,i) => s + i.totalHours, 0);
     const grandCost  = items.reduce((s,i) => s + i.totalCost,  0);
-    const rowsHtml   = items.map(it => `<tr>
-      <td style="padding:6px 8px;border:1px solid #333;">${esc(it.area)}</td>
-      <td class="num" style="padding:6px 8px;border:1px solid #333;">${it.staffCount}</td>
-      <td class="num" style="padding:6px 8px;border:1px solid #333;">${it.totalHours}</td>
-      <td class="num" style="padding:6px 8px;border:1px solid #333;">${fmt(it.totalCost)}</td>
-    </tr>`).join('');
+    const rowsHtml   = items.map(it => {
+      const lbl = _ameta[it.area]?.label || '';
+      const areaCell = lbl ? `${esc(it.area)} <span style="font-size:9px;color:#555;font-weight:400;">(${esc(lbl)})</span>` : esc(it.area);
+      return `<tr>
+        <td style="padding:6px 8px;border:1px solid #333;">${areaCell}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${it.staffCount}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${it.totalHours}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${fmt(it.totalCost)}</td>
+      </tr>`;
+    }).join('');
     return `<div class="print-page page-break-after">
       <div class="form-title">
         <div class="main-title">Monthly Overtime Pre-Approval — Grand Summary</div>
@@ -655,10 +661,10 @@
       </div>
       <table class="ot-table">
         <thead><tr>
-          <th style="text-align:left;padding:8px;width:40%;">Area</th>
-          <th style="text-align:center;padding:8px;width:20%;">Staff Count</th>
-          <th style="text-align:center;padding:8px;width:20%;">Total Hours</th>
-          <th style="text-align:center;padding:8px;width:20%;">Total Cost (﷼)</th>
+          <th style="text-align:left;padding:8px;width:55%;">Area</th>
+          <th style="text-align:center;padding:8px;width:15%;">Staff Count</th>
+          <th style="text-align:center;padding:8px;width:15%;">Total Hours</th>
+          <th style="text-align:center;padding:8px;width:15%;">Total Cost (﷼)</th>
         </tr></thead>
         <tbody>
           ${rowsHtml}
