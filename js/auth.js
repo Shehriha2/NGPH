@@ -1646,6 +1646,7 @@
     areaRemove,
     areaAccess,
     _arCheckAll,
+    syncAreasList: async () => { try { await _saveAreasToCloud(_getLocalAreas()); } catch(e) { console.warn('[syncAreasList]', e); } },
     // Dialogs
     alert  : _bcotAlert,
     confirm: _bcotConfirm,

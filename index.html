@@ -696,7 +696,7 @@
             <div class="btn-row">
               <button type="button" onclick="openAuthAdmin();" style="background:#1a4f8b;"><i class="bi bi-shield-lock"></i> Manage Login Users</button>
               <button type="button" onclick="openIPAdmin();" style="background:#065f46;"><i class="bi bi-globe"></i> Manage IP Access</button>
-              <button type="button" onclick="openAreaAdmin();" style="background:#6b21a8;"><i class="bi bi-folder2-open"></i> Manage Areas</button>
+              <button type="button" onclick="AM.open();" style="background:#6b21a8;"><i class="bi bi-folder2-open"></i> Manage Areas</button>
             </div>
             <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">Manage login users, device access, and areas (including per-area user permissions). All require the OT override password.</p>
           </div>
@@ -1036,7 +1036,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="js/auth.js?v=4"></script>
+  <script src="js/auth.js?v=5"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
@@ -1053,7 +1053,7 @@
     window.FB = { db, doc, setDoc, getDoc, onSnapshot };
   </script>
 
-  <script src="js/index.js?v=15"></script>
+  <script src="js/index.js?v=16"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL

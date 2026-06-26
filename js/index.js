@@ -4816,8 +4816,11 @@
             <td style="padding:6px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${esc(m.remarks)}">
               ${m.remarks?esc(m.remarks):'<span style="color:#d1d5db;">—</span>'}
             </td>
-            <td style="padding:6px;white-space:nowrap;">
+            <td style="padding:6px;white-space:nowrap;display:flex;gap:4px;flex-wrap:wrap;">
               ${isAdmin?`<button type="button" onclick="AM.editArea('${code}')" style="background:#0891b2;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">Edit</button>`:''}
+              ${isAdmin?`<button type="button" onclick="BCOT_AUTH.areaAccess('${code}')" style="background:#1a4f8b;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">🔒 Access</button>`:''}
+              ${isAdmin?`<button type="button" onclick="BCOT_AUTH.areaRename('${code}')" style="background:#d97706;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">Rename</button>`:''}
+              ${isAdmin?`<button type="button" onclick="BCOT_AUTH.areaRemove('${code}')" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">Remove</button>`:''}
             </td>
           </tr>`;
         }).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#9ca3af;font-style:italic;">No areas yet. Add a new area above.</td></tr>';
@@ -4886,6 +4889,7 @@
         saveMeta(meta);
         if(codeEl)codeEl.value=''; if(labelEl)labelEl.value='';
         try{DM.rebuildUI();}catch{}
+        try{BCOT_AUTH.syncAreasList();}catch{}
         render();
         showStatusMessage(`Area "${code}" added ✅`);
       }
