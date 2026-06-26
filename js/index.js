@@ -2361,7 +2361,23 @@
 
     function applyPayloadToTable(payload, fromDraft=false) {
       if (!fromDraft) clearDraft();  // loading from cloud/file clears the draft
-      const records=Array.isArray(payload?.records)?payload.records:[];
+      let records=Array.isArray(payload?.records)?payload.records:[];
+      // Filter to current area — saved rotas may include staff from other areas
+      const _loadArea=getCurrentArea();
+      if (_loadArea&&_loadArea!=='ALL') {
+        try {
+          const _pool=JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY)||'[]')||[];
+          if (_pool.length) {
+            const _areaMap=new Map(_pool.map(s=>[(s.name||'').trim(),
+              (s.area||'').toUpperCase().split(',').map(x=>x.trim()).filter(Boolean)]));
+            records=records.filter(rec=>{
+              const _a=_areaMap.get((rec.staffName||'').trim());
+              if(!_a) return true; // not in local pool — keep to be safe
+              return _a.includes(_loadArea);
+            });
+          }
+        } catch {}
+      }
       if (payload?.month) document.getElementById('monthSelect').value=String(payload.month);
       if (payload?.year) { const yi=document.getElementById('yearInput'); if(yi) yi.value=String(payload.year); }
       document.getElementById('rotaTitleInput').value=(payload?.rotaTitle||'').trim();
