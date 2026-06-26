@@ -4,26 +4,29 @@
     }
 
     // ── Auth Admin ────────────────────────────────────────────────────────────
-    function openAuthAdmin() {
+    async function _openAdminGated(openFn) {
       if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
-      if (_getAppRole() !== 'admin') { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
+      if (_getAppRole() === 'admin') { closeSettingsModal(); openFn(); return; }
+      // Check whether any admin has been assigned yet
+      let users = [];
+      try { users = await BCOT_AUTH.fetchExtUsers(); } catch (e) {}
+      const hasAdmin = users.some(u => (u.app_role || 'user') === 'admin');
+      if (hasAdmin) { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
+      // No admin assigned yet — bootstrap mode
+      const bpwd = (window.BCOT_ADMIN_BOOTSTRAP_PWD || '').trim();
+      if (!bpwd) { showStatusMessage('No bootstrap password configured.', 'error'); return; }
+      const entered = await BCOT_AUTH.prompt(
+        'No administrator has been assigned yet.\nEnter the setup password to manage users.',
+        { title: '🔑 First-Time Setup', placeholder: 'Setup password', type: 'password', confirmLabel: 'Open' });
+      if (entered === null) return;
+      if (entered.trim() !== bpwd) { showStatusMessage('Incorrect password — access denied.', 'error'); return; }
       closeSettingsModal();
-      BCOT_AUTH.openUserManager();
+      openFn();
     }
 
-    function openAreaAdmin() {
-      if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
-      if (_getAppRole() !== 'admin') { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
-      closeSettingsModal();
-      BCOT_AUTH.openAreaManager();
-    }
-
-    function openIPAdmin() {
-      if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
-      if (_getAppRole() !== 'admin') { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
-      closeSettingsModal();
-      BCOT_AUTH.openIPManager();
-    }
+    function openAuthAdmin() { _openAdminGated(() => BCOT_AUTH.openUserManager()); }
+    function openAreaAdmin() { _openAdminGated(() => BCOT_AUTH.openAreaManager()); }
+    function openIPAdmin()   { _openAdminGated(() => BCOT_AUTH.openIPManager());  }
 
     // ── Storage keys ──────────────────────────────────────────────────────────
     const AREA_KEY           = "BCOT_CURRENT_AREA_V1";
