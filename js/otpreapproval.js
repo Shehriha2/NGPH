@@ -438,6 +438,33 @@
     });
   }
 
+  // ── Recalculate costs after justification change ─────────────────────────
+  // ON-CALL DUTY → hours × HRR × 0.1 ; everything else → hours × HRR × 1.5
+  function _recalcAfterJust(targetRow, newJust) {
+    if (!_cachedRows) return;  // only 'full' mode has cached rows
+    const dataRows = [...document.querySelectorAll('#formWrapper .ot-table tbody tr:not(.total-row)')];
+    dataRows.forEach(tr => {
+      if (targetRow && tr !== targetRow) return;
+      const idx = parseInt(tr.cells[0]?.textContent || '0') - 1;
+      if (idx < 0 || idx >= _cachedRows.length) return;
+      const cr   = _cachedRows[idx];
+      const mult = newJust === 'ON-CALL DUTY' ? 0.1 : 1.5;
+      const cost = Math.round(cr.otHours * cr.hrr * mult);
+      cr.totalCost = cost;
+      if (tr.cells[4]) tr.cells[4].textContent = fmt(cost);
+    });
+    // Update each page's total-row cost cell (cells[2] in full mode)
+    document.querySelectorAll('#formWrapper .ot-table tbody').forEach(tbody => {
+      const totalRow = tbody.querySelector('.total-row');
+      if (!totalRow) return;
+      const pageSum = [...tbody.querySelectorAll('tr:not(.total-row)')].reduce((s, tr) => {
+        const idx = parseInt(tr.cells[0]?.textContent || '0') - 1;
+        return s + ((_cachedRows[idx]?.totalCost) || 0);
+      }, 0);
+      if (totalRow.cells[2]) totalRow.cells[2].textContent = fmt(pageSum);
+    });
+  }
+
   // ── Shared helper: snapshot current meta field values ─────────────────────
   function _snapMeta() {
     return {
@@ -795,6 +822,8 @@
             if (locInp)  locInp.value  = loc;
             if (justInp) justInp.value = just;
           }
+          // Recalculate Total Cost: ON-CALL DUTY → ×0.1, otherwise ×1.5
+          _recalcAfterJust(applyAll ? null : row, just);
         }
       });
     });
