@@ -453,15 +453,40 @@
       cr.totalCost = cost;
       if (tr.cells[4]) tr.cells[4].textContent = fmt(cost);
     });
-    // Update each page's total-row cost cell (cells[2] in full mode)
+    // Update each FORM page's total-row, collecting per-page sums (skip summary table)
+    const _pageSums = [];
     document.querySelectorAll('#formWrapper .ot-table tbody').forEach(tbody => {
-      const totalRow = tbody.querySelector('.total-row');
-      if (!totalRow) return;
-      const pageSum = [...tbody.querySelectorAll('tr:not(.total-row)')].reduce((s, tr) => {
+      const firstRow = tbody.querySelector('tr:not(.total-row)');
+      if (!firstRow) return;
+      if ((firstRow.cells[0]?.textContent || '').trim().startsWith('Page')) return; // skip summary
+      let ph = 0, pc = 0, pn = 0;
+      tbody.querySelectorAll('tr:not(.total-row)').forEach(tr => {
         const idx = parseInt(tr.cells[0]?.textContent || '0') - 1;
-        return s + ((_cachedRows[idx]?.totalCost) || 0);
-      }, 0);
-      if (totalRow.cells[2]) totalRow.cells[2].textContent = fmt(pageSum);
+        if (idx < 0 || idx >= _cachedRows.length) return;
+        ph += _cachedRows[idx].otHours;
+        pc += _cachedRows[idx].totalCost;
+        pn++;
+      });
+      _pageSums.push({ ph, pc, pn });
+      const totalRow = tbody.querySelector('.total-row');
+      if (totalRow && totalRow.cells[2]) totalRow.cells[2].textContent = fmt(pc);
+    });
+    // Update the summary table (identified by first data row starting with "Page")
+    document.querySelectorAll('#formWrapper .ot-table tbody').forEach(tbody => {
+      const firstRow = tbody.querySelector('tr:not(.total-row)');
+      if (!firstRow || !(firstRow.cells[0]?.textContent || '').trim().startsWith('Page')) return;
+      [...tbody.querySelectorAll('tr:not(.total-row)')].forEach((tr, i) => {
+        if (i >= _pageSums.length) return;
+        if (tr.cells[2]) tr.cells[2].textContent = String(_pageSums[i].ph);
+        if (tr.cells[3]) tr.cells[3].textContent = fmt(_pageSums[i].pc);
+      });
+      const totalRow = tbody.querySelector('.total-row');
+      if (totalRow) {
+        const gh = _pageSums.reduce((s,p) => s + p.ph, 0);
+        const gc = _pageSums.reduce((s,p) => s + p.pc, 0);
+        if (totalRow.cells[2]) totalRow.cells[2].textContent = String(gh);
+        if (totalRow.cells[3]) totalRow.cells[3].textContent = `${fmt(gc)} ﷼`;
+      }
     });
   }
 
