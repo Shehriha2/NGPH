@@ -99,6 +99,7 @@
   </div>
 </div>
 
+<div id="pageMain">
 <!-- Tabs -->
 <div class="tabs no-print">
   <button class="tab-btn active" onclick="switchTab('plans')">Plans</button>
@@ -250,6 +251,8 @@
     </div>
   </div>
 </div>
+
+</div><!-- #pageMain -->
 
 <script src="config.js"></script>
 <script src="js/auth.js"></script>
@@ -545,6 +548,52 @@ function showStatus(msg,type="success") {
 
 // Backdrop close
 document.getElementById("planModal").addEventListener("click",e=>{if(e.target===document.getElementById("planModal"))closeModal();});
+</script>
+
+<script>
+var _DENIED_HTML = '<div style="text-align:center;padding:80px 20px;font-family:Arial,sans-serif;">'
+  + '<div style="font-size:56px;margin-bottom:16px;">&#128274;</div>'
+  + '<h2 style="color:#1f2937;margin:0 0 8px;">Access Restricted</h2>'
+  + '<p style="color:#6b7280;margin:0 0 24px;">You don\'t have permission to view this page.</p>'
+  + '<a href="index.html" style="text-decoration:none;">'
+  + '<button style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;">← Back to Rota</button>'
+  + '</a></div>';
+
+window.addEventListener('bcotAuth', function (e) {
+  var role  = (e.detail && e.detail.app_role)  || 'user';
+  var areas = (e.detail && e.detail.ext_areas) || [];
+  var main  = document.getElementById('pageMain');
+  if (!main) return;
+
+  if (role === 'user') { main.innerHTML = _DENIED_HTML; return; }
+
+  if (role === 'charge' && areas.length) {
+    var sel = document.getElementById('areaFilter');
+    if (sel) {
+      Array.from(sel.options).forEach(function (o) {
+        if (o.value && o.value !== 'ALL' && !areas.some(function (a) {
+          return a.toUpperCase() === o.value.toUpperCase();
+        })) { o.remove(); }
+      });
+      if (areas.length === 1) {
+        sel.value = areas[0].toUpperCase();
+        sel.disabled = true;
+        if (typeof applyFilter === 'function') applyFilter();
+      }
+    }
+    // Charge persons can view but not add plans for other areas
+    window.openAddModal = (function (_orig) {
+      return function () {
+        var areaEl = document.getElementById('areaFilter');
+        var cur = areaEl ? areaEl.value : '';
+        if (cur && cur !== 'ALL' && !areas.some(function (a) {
+          return a.toUpperCase() === cur.toUpperCase();
+        })) { alert('You can only add plans for your assigned area.'); return; }
+        _orig && _orig();
+      };
+    }(window.openAddModal));
+  }
+});
 </script>
 </body>
 </html>

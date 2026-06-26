@@ -228,6 +228,7 @@
     </div>
   </div>
 
+<div id="pageMain">
   <!-- ── Filter Panel ───────────────────────────────────────────────── -->
   <div class="card no-print">
     <div class="card-title">📋 Report Filters</div>
@@ -310,6 +311,8 @@
   </div>
 
   <div class="status-message" id="statusBox"></div>
+
+</div><!-- #pageMain -->
 
   <!-- ── Firebase (module) ──────────────────────────────────────────── -->
   <script src="config.js"></script>
@@ -934,6 +937,33 @@
       '<div class="loading" style="padding:40px;color:#9ca3af;">Select a cost center and click Generate Report.</div>';
     _toast(`Loaded ${_ccList.length} cost center(s) — ready.`,'info');
   })();
+  </script>
+
+  <script>
+  var _DENIED_HTML = '<div style="text-align:center;padding:80px 20px;font-family:Arial,sans-serif;">'
+    + '<div style="font-size:56px;margin-bottom:16px;">&#128274;</div>'
+    + '<h2 style="color:#1f2937;margin:0 0 8px;">Access Restricted</h2>'
+    + '<p style="color:#6b7280;margin:0 0 24px;">You don\'t have permission to view this page.</p>'
+    + '<a href="index.html" style="text-decoration:none;">'
+    + '<button style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;">← Back to Rota</button>'
+    + '</a></div>';
+
+  window.addEventListener('bcotAuth', function (e) {
+    var role  = (e.detail && e.detail.app_role)  || 'user';
+    var areas = (e.detail && e.detail.ext_areas) || [];
+    var main  = document.getElementById('pageMain');
+    if (!main) return;
+
+    if (role === 'user') { main.innerHTML = _DENIED_HTML; return; }
+
+    if (role === 'charge' && areas.length) {
+      // Show a banner reminding charge persons of their area scope
+      var banner = document.createElement('div');
+      banner.style.cssText = 'background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#92400e;font-weight:600;';
+      banner.innerHTML = '&#128274; You have access to your assigned area(s) only: <strong>' + areas.join(', ') + '</strong>';
+      main.insertAdjacentElement('afterbegin', banner);
+    }
+  });
   </script>
 </body>
 </html>

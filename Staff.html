@@ -94,6 +94,7 @@
     </div>
   </div>
 
+<div id="pageMain">
   <!-- Area filter bar -->
   <div class="area-bar">
     <label>Area filter:</label>
@@ -233,6 +234,8 @@
     </table>
   </div>
 
+</div><!-- #pageMain -->
+
   <script src="config.js"></script>
   <script src="js/auth.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -252,5 +255,48 @@
   </script>
 
   <script src="js/staff.js?v=2"></script>
+
+  <script>
+  var _DENIED_HTML = '<div style="text-align:center;padding:80px 20px;font-family:Arial,sans-serif;">'
+    + '<div style="font-size:56px;margin-bottom:16px;">&#128274;</div>'
+    + '<h2 style="color:#1f2937;margin:0 0 8px;">Access Restricted</h2>'
+    + '<p style="color:#6b7280;margin:0 0 24px;">You don\'t have permission to view this page.</p>'
+    + '<a href="index.html" style="text-decoration:none;">'
+    + '<button style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;">← Back to Rota</button>'
+    + '</a></div>';
+
+  window.addEventListener('bcotAuth', function (e) {
+    var role  = (e.detail && e.detail.app_role)  || 'user';
+    var areas = (e.detail && e.detail.ext_areas) || [];
+    var main  = document.getElementById('pageMain');
+    if (!main) return;
+
+    if (role === 'user') { main.innerHTML = _DENIED_HTML; return; }
+
+    if (role === 'charge' && areas.length) {
+      // Lock area filter to assigned areas only
+      var sel = document.getElementById('areaFilter');
+      if (sel) {
+        Array.from(sel.options).forEach(function (o) {
+          if (o.value && o.value !== 'ALL' && !areas.some(function (a) {
+            return a.toUpperCase() === o.value.toUpperCase();
+          })) { o.remove(); }
+        });
+        if (areas.length === 1) {
+          sel.value = areas[0].toUpperCase();
+          sel.disabled = true;
+          if (typeof applyAreaFilter === 'function') applyAreaFilter();
+        }
+      }
+      // Hide "Add Area" controls — only admins create areas
+      var addInput = document.getElementById('newAreaInput');
+      var addBtn   = document.querySelector('button[onclick="addNewArea()"]');
+      if (addInput) addInput.style.display = 'none';
+      if (addBtn)   addBtn.style.display   = 'none';
+      // Prevent programmatic area creation
+      window.addNewArea = function () {};
+    }
+  });
+  </script>
 </body>
 </html>

@@ -479,8 +479,8 @@
           <button onclick="populateStaff()" title="Load staff assigned to the current area filter into the rota" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-people-fill"></i> Load Staff</button>
           <button onclick="saveToCloud()" style="background:#16a34a;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-cloud-upload-fill"></i> Save</button>
           <button onclick="openLoadPicker()" style="background:#d97706;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-folder2-open"></i> Load</button>
-          <button onclick="SM.open()" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-person-lines-fill"></i> Staff</button>
-          <button onclick="DM.open()" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard-check"></i> Duties</button>
+          <button id="btn-staff"  onclick="SM.open()" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-person-lines-fill"></i> Staff</button>
+          <button id="btn-duties" onclick="DM.open()" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard-check"></i> Duties</button>
           <button onclick="clearAllTable()" style="background:#dc2626;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-printer-fill"></i> Print</button>
         </div>
@@ -645,15 +645,17 @@
               <a href="OTAdjustment.html" class="ghost-link"><button type="button" style="background:#b45309;"><i class="bi bi-pencil-square"></i> OT Adjustments</button></a>
               <a href="Training.html"     class="ghost-link"><button type="button" style="background:#7c3aed;"><i class="bi bi-mortarboard"></i> Training</button></a>
               <a href="LieuDays.html"     class="ghost-link"><button type="button" style="background:#0f766e;"><i class="bi bi-calendar2-check"></i> Lieu Days</button></a>
+              <span id="nav-restricted-pages">
               <a href="VacationPlans.html"    class="ghost-link"><button type="button" style="background:#0369a1;"><i class="bi bi-umbrella"></i> Vacation Plans</button></a>
               <a href="CostCenterReport.html" class="ghost-link"><button type="button" style="background:#b45309;"><i class="bi bi-pie-chart"></i> CC Report</button></a>
+              </span>
               <a href="Tasks.html"            class="ghost-link"><button type="button" style="background:#059669;"><i class="bi bi-check2-square"></i> Tasks</button></a>
             </div>
           </div>
         </div>
 
         <!-- ── Admin / Security ───────────────────────────────────────── -->
-        <div class="button-groups" style="margin-bottom:14px;">
+        <div id="settings-security" class="button-groups" style="margin-bottom:14px;">
           <div class="button-card">
             <h3>🔒 Security</h3>
             <div class="btn-row">
@@ -1036,7 +1038,7 @@
         <label style="font-weight:700;color:#3730a3;white-space:nowrap;">Area filter:</label>
         <select id="dm-areaFilter" onchange="DM.applyAreaFilter()" style="min-width:120px;"></select>
         <input id="dm-newAreaInput" type="text" placeholder="New area…" style="width:110px;text-transform:uppercase"/>
-        <button type="button" onclick="DM.addNewArea()" style="background:#3730a3;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">+ Add</button>
+        <button id="dm-addAreaBtn" type="button" onclick="DM.addNewArea()" style="background:#3730a3;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">+ Add</button>
         <input id="dm-search" type="text" placeholder="🔍 Search code or label…" oninput="DM.applyDutySearchFilter()" style="min-width:180px;font-size:12px;padding:5px 8px;border:1px solid #c7d2fe;border-radius:6px;background:#fff;"/>
         <span id="dm-dutyCount" style="font-size:11px;color:#6b7280;font-weight:700;"></span>
         <a href="https://color.adobe.com/create/color-wheel" target="_blank" style="background:#e8422f;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px;margin-left:auto;">🎨 Adobe Color</a>
@@ -1173,5 +1175,63 @@
       </div>
     </div>
   </div>
+
+<script>
+/* ── Role-based UI enforcement ─────────────────────────────────────────────
+   Fires on every page load (fresh login OR valid cached session).
+   Hides/restricts UI elements based on the logged-in user's app_role.       */
+window.addEventListener('bcotAuth', function (e) {
+  var role  = (e.detail && e.detail.app_role)  || 'user';
+  var areas = (e.detail && e.detail.ext_areas) || [];
+
+  function hide(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  }
+
+  // ── Admin-only: Security section + area creation in DM ─────────────────
+  if (role !== 'admin') {
+    hide('settings-security');
+    hide('dm-addAreaBtn');
+    hide('dm-newAreaInput');
+  }
+
+  // ── User: no access to Duties, Staff, or restricted report pages ────────
+  if (role === 'user') {
+    hide('btn-duties');
+    hide('btn-staff');
+    hide('nav-restricted-pages');
+  }
+
+  // ── Charge person: lock DM area filter to their assigned areas ──────────
+  if (role === 'charge' && areas.length) {
+    var _dmOpenOrig = (typeof DM !== 'undefined') ? DM.open : null;
+    if (_dmOpenOrig) {
+      DM.open = function () {
+        _dmOpenOrig.call(DM);
+        setTimeout(function () {
+          var sel = document.getElementById('dm-areaFilter');
+          if (!sel) return;
+          Array.from(sel.options).forEach(function (o) {
+            if (o.value && !areas.some(function (a) {
+              return a.toUpperCase() === o.value.toUpperCase();
+            })) {
+              o.disabled = true;
+              o.style.display = 'none';
+            }
+          });
+          var first = Array.from(sel.options).find(function (o) {
+            return areas.some(function (a) {
+              return a.toUpperCase() === o.value.toUpperCase();
+            });
+          });
+          if (first) { sel.value = first.value; sel.dispatchEvent(new Event('change')); }
+          sel.disabled = (areas.length <= 1);
+        }, 60);
+      };
+    }
+  }
+});
+</script>
 </body>
 </html>
