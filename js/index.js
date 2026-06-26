@@ -4,6 +4,13 @@
     }
 
     // ── Auth Admin ────────────────────────────────────────────────────────────
+    async function _sha256(s) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    // SHA-256 of the bootstrap password — original never appears in source
+    const _BOOTSTRAP_HASH = '6bd2dc1ad119f669a2c755c0d45c7008d9c3fefd0b8d8271dd47bd69ee3037fa';
+
     async function _openAdminGated(openFn) {
       if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
       if (_getAppRole() === 'admin') { closeSettingsModal(); openFn(); return; }
@@ -13,13 +20,12 @@
       const hasAdmin = users.some(u => (u.app_role || 'user') === 'admin');
       if (hasAdmin) { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
       // No admin assigned yet — bootstrap mode
-      const bpwd = (window.BCOT_ADMIN_BOOTSTRAP_PWD || '').trim();
-      if (!bpwd) { showStatusMessage('No bootstrap password configured.', 'error'); return; }
       const entered = await BCOT_AUTH.prompt(
         'No administrator has been assigned yet.\nEnter the setup password to manage users.',
         { title: '🔑 First-Time Setup', placeholder: 'Setup password', type: 'password', confirmLabel: 'Open' });
       if (entered === null) return;
-      if (entered.trim() !== bpwd) { showStatusMessage('Incorrect password — access denied.', 'error'); return; }
+      const h = await _sha256(entered.trim());
+      if (h !== _BOOTSTRAP_HASH) { showStatusMessage('Incorrect password — access denied.', 'error'); return; }
       closeSettingsModal();
       openFn();
     }
