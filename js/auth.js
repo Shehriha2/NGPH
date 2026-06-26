@@ -62,6 +62,15 @@
     const snap = await window.FB.getDoc(authDoc());
     _users = snap.exists() ? (snap.data().users || []) : [];
   }
+  async function _ensureUsers() {
+    if (_users.length) return;
+    if (!_key) return;
+    try {
+      let t = 0;
+      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+      await loadUsers();
+    } catch (e) { console.warn('[BCOT_AUTH] _ensureUsers:', e); }
+  }
   async function saveUsers() {
     await window.FB.setDoc(authDoc(), { users: _users });
   }
@@ -1384,6 +1393,7 @@
   }
 
   async function areaRename(oldName) {
+    await _ensureUsers();
     const input = await _bcotPrompt(
       `Enter a new code for area <strong>${oldName}</strong>:`,
       { title: '✏️ Rename Area', placeholder: 'New area code', confirmLabel: 'Rename' }
@@ -1429,6 +1439,7 @@
   }
 
   async function areaRemove(name) {
+    await _ensureUsers();
     let staffCount = 0;
     try {
       const staff = JSON.parse(localStorage.getItem(_STAFF_LS) || '[]');
@@ -1465,6 +1476,7 @@
   }
 
   async function areaAccess(areaName) {
+    await _ensureUsers();
     if (!_users.length) { await _bcotAlert('No users configured yet.', 'Notice'); return; }
     const allAreas = _getLocalAreas();
 
