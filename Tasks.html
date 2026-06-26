@@ -404,9 +404,10 @@ const P_LABEL    = { urgent:'Urgent',  high:'High',    medium:'Medium',   low:'L
 const S_LABEL    = { pending:'Pending', in_progress:'In Progress', completed:'Completed' };
 
 // ── State ──────────────────────────────────────────────────────────────────
-let TASKS        = [];
-let currentUser  = '';
-let currentView  = 'list';
+let TASKS          = [];
+let currentUser    = '';
+let currentUserId  = '';
+let currentView    = 'list';
 let calYear      = new Date().getFullYear();
 let calMonth     = new Date().getMonth();
 let calSelected  = null;
@@ -468,6 +469,29 @@ function getSession() {
   try { return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'{}') || {}; } catch { return {}; }
 }
 
+// Returns true if the current user is in the task's sharedWith (handles both formats)
+function _isSharedWith(sw) {
+  if (!sw) return false;
+  if (sw === 'all') return true;
+  // New format: { userIds: [...], staffNames: [...] }
+  if (typeof sw === 'object' && !Array.isArray(sw)) {
+    if (currentUserId && Array.isArray(sw.userIds) && sw.userIds.includes(currentUserId)) return true;
+    if (Array.isArray(sw.staffNames) && sw.staffNames.includes(currentUser)) return true;
+    return false;
+  }
+  // Legacy format: plain array of names (staff-only sharing)
+  return Array.isArray(sw) && sw.includes(currentUser);
+}
+
+function sharedBadgeLabel(sw) {
+  if (!sw || sw === 'all') return 'All';
+  if (typeof sw === 'object' && !Array.isArray(sw)) {
+    const cnt = (sw.userIds?.length||0) + (sw.staffNames?.length||0);
+    return cnt + (cnt===1?' recipient':' recipients');
+  }
+  return Array.isArray(sw) ? sw.length+(sw.length===1?' user':' users') : 'Shared';
+}
+
 function getStaffNames() {
   try {
     const r = JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]') || [];
@@ -524,18 +548,15 @@ function getVisibleTasks() {
     if (t._deleted) return false;
     if (t.createdBy === currentUser) return true;
     if (!t.shared?.enabled) return false;
-    if (t.shared.sharedWith === 'all') return true;
-    return Array.isArray(t.shared.sharedWith) && t.shared.sharedWith.includes(currentUser);
+    return _isSharedWith(t.shared.sharedWith);
   });
 }
 
 function getAuditTasks() {
-  // Same as visible but includes soft-deleted tasks for history audit
   return TASKS.filter(t => {
     if (t.createdBy === currentUser) return true;
     if (!t.shared?.enabled) return false;
-    if (t.shared.sharedWith === 'all') return true;
-    return Array.isArray(t.shared.sharedWith) && t.shared.sharedWith.includes(currentUser);
+    return _isSharedWith(t.shared.sharedWith);
   });
 }
 
@@ -594,7 +615,7 @@ function taskCardHTML(t) {
     <div class="task-title-row${t.status==='completed'?' done':''}">
       <span>${esc(t.title)}</span>
       ${rl ? `<span class="badge-recur"><i class="bi bi-arrow-repeat"></i> ${esc(rl)}</span>` : ''}
-      ${t.shared?.enabled ? `<span class="badge-shared"><i class="bi bi-share-fill"></i> ${t.shared.sharedWith==='all'?'All':Array.isArray(t.shared.sharedWith)?t.shared.sharedWith.length+' users':'Shared'}</span>` : ''}
+      ${t.shared?.enabled ? `<span class="badge-shared"><i class="bi bi-share-fill"></i> ${sharedBadgeLabel(t.shared.sharedWith)}</span>` : ''}
       ${!isOwner ? `<span class="badge-owner"><i class="bi bi-person"></i> ${esc(t.createdBy)}</span>` : ''}
     </div>
     ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
@@ -741,7 +762,7 @@ function deleteTask(id) {
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────
-function openAddModal() {
+async function openAddModal() {
   editingId = null;
   document.getElementById('modalTitle').innerHTML = '<i class="bi bi-check2-square"></i> New Task';
   document.getElementById('saveBtnLabel').textContent = 'Save Task';
@@ -758,14 +779,14 @@ function openAddModal() {
   document.getElementById('mRecurEndDate').value    = '';
   document.getElementById('mShareEnabled').checked  = false;
   document.getElementById('swAll').checked          = true;
-  buildUserChecks([]);
+  await buildUserChecks({});
   toggleRecur(); toggleShare(); toggleShareWith();
 
   document.getElementById('taskModal').classList.add('open');
   setTimeout(() => document.getElementById('mTitle').focus(), 60);
 }
 
-function openEditModal(id) {
+async function openEditModal(id) {
   const t = TASKS.find(x=>x.id===id); if(!t) return;
   editingId = id;
   document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil-square"></i> Edit Task';
@@ -786,13 +807,14 @@ function openEditModal(id) {
 
   const s = t.shared || {};
   document.getElementById('mShareEnabled').checked = !!s.enabled;
-  if (s.sharedWith === 'all' || !Array.isArray(s.sharedWith)) {
-    document.getElementById('swAll').checked = true;
-  } else {
-    document.getElementById('swSpecific').checked = true;
-  }
-  const checkedUsers = Array.isArray(s.sharedWith) ? s.sharedWith : [];
-  buildUserChecks(checkedUsers);
+  const sw = s.sharedWith;
+  const hasSpecific = sw && sw !== 'all' &&
+    (Array.isArray(sw) ? sw.length : (sw.userIds?.length || sw.staffNames?.length));
+  document.getElementById(hasSpecific ? 'swSpecific' : 'swAll').checked = true;
+  const checkState = (typeof sw === 'object' && !Array.isArray(sw) && sw)
+    ? sw
+    : { userIds: [], staffNames: Array.isArray(sw) ? sw : [] };
+  await buildUserChecks(checkState);
   toggleRecur(); toggleRecurEnd(); toggleShare(); toggleShareWith();
 
   document.getElementById('taskModal').classList.add('open');
@@ -812,8 +834,10 @@ function saveTask() {
   const shareMode    = document.querySelector('input[name="shareWith"]:checked')?.value || 'all';
   let sharedWith = 'all';
   if (shareEnabled && shareMode === 'specific') {
-    sharedWith = Array.from(document.querySelectorAll('#userChecks input[type=checkbox]:checked')).map(cb=>cb.value);
-    if (!sharedWith.length) { showToast('Select at least one user to share with.','err'); return; }
+    const userIds    = Array.from(document.querySelectorAll('#userChecks input[name="shareUserIds"]:checked')).map(cb=>cb.value);
+    const staffNames = Array.from(document.querySelectorAll('#userChecks input[name="shareStaffNames"]:checked')).map(cb=>cb.value);
+    if (!userIds.length && !staffNames.length) { showToast('Select at least one recipient.','err'); return; }
+    sharedWith = { userIds, staffNames };
   }
 
   const now = new Date().toISOString();
@@ -846,7 +870,9 @@ function saveTask() {
     if (oldS !== t.status && t.status==='completed') { t.completedAt=now; addHistory(t,'completed','Marked completed via edit'); }
     else if (oldS==='completed' && t.status!=='completed') { t.completedAt=''; addHistory(t,'reopened','Reopened via edit'); }
     if (oldShared !== JSON.stringify(t.shared))
-      addHistory(t,'shared', shareEnabled ? `Shared with ${sharedWith==='all'?'all users':sharedWith.length+' users'}` : 'Sharing disabled');
+      addHistory(t,'shared', shareEnabled
+        ? `Shared with ${sharedWith==='all'?'all users':`${sharedWith.userIds?.length||0} login user(s) + ${sharedWith.staffNames?.length||0} staff`}`
+        : 'Sharing disabled');
     addHistory(t,'updated',`Title: "${title}", Due: ${t.dueDate||'none'}, Priority: ${P_LABEL[t.priority]||t.priority}`);
     showToast('Task updated ✓');
   } else {
@@ -894,14 +920,45 @@ function toggleShareWith() {
   const specific = document.getElementById('swSpecific')?.checked;
   document.getElementById('userListDiv').style.display = specific ? '' : 'none';
 }
-function buildUserChecks(selected) {
-  const names = getStaffNames().filter(n => n !== currentUser);
-  document.getElementById('userChecks').innerHTML = names.length
-    ? names.map(n => `<div class="user-check-row">
-        <input type="checkbox" id="uc_${esc(n)}" value="${esc(n)}" ${selected.includes(n)?'checked':''}/>
-        <label for="uc_${esc(n)}">${esc(n)}</label>
+async function buildUserChecks(selected) {
+  const selIds   = Array.isArray(selected?.userIds)    ? selected.userIds    : [];
+  const selStaff = Array.isArray(selected?.staffNames) ? selected.staffNames : [];
+
+  // Show loading state immediately
+  document.getElementById('userChecks').innerHTML =
+    '<div style="color:#9ca3af;font-size:11px;padding:6px;"><i class="bi bi-hourglass-split"></i> Loading recipients…</div>';
+
+  // Load login users from auth system (fetches from Firestore via auth.js)
+  let loginUsers = [];
+  try {
+    if (window.BCOT_AUTH?.fetchExtUsers) loginUsers = await window.BCOT_AUTH.fetchExtUsers();
+  } catch(e) { console.warn('Could not load login users:', e); }
+
+  const otherLoginUsers = loginUsers.filter(u => u.id !== currentUserId && u.name !== currentUser);
+  const staffNames      = getStaffNames().filter(n => n !== currentUser);
+
+  const sect = (title, color, icon, rows) =>
+    `<div style="font-size:10px;font-weight:700;color:${color};padding:5px 0 3px;letter-spacing:.3px;">` +
+    `<i class="bi ${icon}"></i> ${title}</div>${rows}`;
+
+  const userRows = otherLoginUsers.length
+    ? otherLoginUsers.map(u => `<div class="user-check-row">
+        <input type="checkbox" name="shareUserIds" id="lu_${esc(u.id)}" value="${esc(u.id)}" ${selIds.includes(u.id)?'checked':''}/>
+        <label for="lu_${esc(u.id)}">${esc(u.name)}</label>
       </div>`).join('')
-    : '<div style="color:#9ca3af;font-size:11px;padding:4px;"><i class="bi bi-info-circle"></i> No other staff found in this device\'s records.</div>';
+    : '<div style="color:#9ca3af;font-size:11px;padding:2px 0 5px;">No other login users found.</div>';
+
+  const staffRows = staffNames.length
+    ? staffNames.map(n => `<div class="user-check-row">
+        <input type="checkbox" name="shareStaffNames" id="sf_${esc(n)}" value="${esc(n)}" ${selStaff.includes(n)?'checked':''}/>
+        <label for="sf_${esc(n)}">${esc(n)}</label>
+      </div>`).join('')
+    : '<div style="color:#9ca3af;font-size:11px;padding:2px 0;">No staff found in local records.</div>';
+
+  document.getElementById('userChecks').innerHTML =
+    sect('APP LOGIN USERS', '#1a4f8b', 'bi-person-badge-fill', userRows) +
+    `<div style="border-top:1px solid #e5e7eb;margin:4px 0;"></div>` +
+    sect('STAFF MEMBERS (Rota)', '#0f766e', 'bi-people-fill', staffRows);
 }
 
 // ── Navigation ──────────────────────────────────────────────────────────────
@@ -932,7 +989,8 @@ function applyFilters() {
 // ── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   const session = getSession();
-  currentUser = session.name || session.id || 'Unknown';
+  currentUser   = session.name || session.id || 'Unknown';
+  currentUserId = session.id   || '';
 
   // Instant render from localStorage
   try { TASKS = JSON.parse(localStorage.getItem(TASKS_LS)||'[]') || []; } catch { TASKS=[]; }
