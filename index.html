@@ -454,7 +454,7 @@
             onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;80&quot; height=&quot;80&quot;><rect width=&quot;80&quot; height=&quot;80&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;12&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>';">
         </div>
         <!-- UPDATE THIS on every commit -->
-        <div class="app-ver">v1.5 · 26 Jun 2026</div>
+        <div class="app-ver">v1.7 · 26 Jun 2026</div>
       </div>
       <div class="header-text" style="position:relative;">
         <!-- Print-only rota name — tiny, top-right of header text block -->
@@ -489,6 +489,7 @@
           <button onclick="openLoadPicker()" style="background:#d97706;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-folder2-open"></i> Load</button>
           <button id="btn-staff"  onclick="SM.open()" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-person-lines-fill"></i> Staff</button>
           <button id="btn-duties" onclick="DM.open()" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard-check"></i> Duties</button>
+          <button id="btn-areas" onclick="AM.open()" style="background:#0891b2;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-map"></i> Areas</button>
           <button onclick="clearAllTable()" style="background:#dc2626;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-printer-fill"></i> Print</button>
         </div>
@@ -1026,7 +1027,7 @@
     window.FB = { db, doc, setDoc, getDoc, onSnapshot };
   </script>
 
-  <script src="js/index.js?v=12"></script>
+  <script src="js/index.js?v=14"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL
@@ -1037,6 +1038,7 @@
         <h2 style="margin:0;font-size:16px;color:#1a4f8b;">📋 Duties Management</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <button onclick="DM.loadFromCloud()" style="background:#1a4f8b;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">☁ Load from Cloud</button>
+          <button onclick="DM.openReport()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📊 Report</button>
           <button onclick="DM.saveAndClose()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">💾 Save &amp; Close</button>
           <button onclick="DM.close()" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;">✕ Close</button>
         </div>
@@ -1085,6 +1087,50 @@
         </table>
       </div>
       <datalist id="dm-areasDatalist"></datalist>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       AREAS MODAL
+  ══════════════════════════════════════════════════════════════════════ -->
+  <div id="areasModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:8000;overflow-y:auto;padding:16px;">
+    <div style="background:#fff;border-radius:16px;max-width:960px;margin:0 auto;padding:24px;position:relative;min-height:400px;">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+        <h2 style="margin:0;font-size:16px;color:#0891b2;"><i class="bi bi-map"></i> Area Management</h2>
+        <button onclick="AM.close()" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;">✕ Close</button>
+      </div>
+      <!-- Summary boxes -->
+      <div id="am-summary" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;"></div>
+      <!-- Add area row -->
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:12px;font-weight:700;color:#0369a1;white-space:nowrap;">Add Area:</label>
+        <input id="am-newCode" type="text" placeholder="Code (e.g. ACC)" maxlength="20"
+          style="width:110px;text-transform:uppercase;font-size:12px;padding:5px 8px;border:1px solid #bae6fd;border-radius:6px;"
+          onkeydown="if(event.key==='Enter')AM.addArea()"/>
+        <input id="am-newLabel" type="text" placeholder="Description (e.g. Accident &amp; Emergency Pharmacy)" maxlength="80"
+          style="flex:1;min-width:200px;font-size:12px;padding:5px 8px;border:1px solid #bae6fd;border-radius:6px;"
+          onkeydown="if(event.key==='Enter')AM.addArea()"/>
+        <button type="button" onclick="AM.addArea()" style="background:#0891b2;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;cursor:pointer;font-weight:700;">+ Add</button>
+      </div>
+      <!-- Table -->
+      <div style="overflow:auto;max-height:58vh;border-radius:8px;border:1px solid #e5e7eb;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead>
+            <tr style="background:#0891b2;color:#fff;position:sticky;top:0;z-index:1;">
+              <th style="padding:7px 6px;text-align:center;">#</th>
+              <th style="padding:7px 6px;text-align:center;">Code</th>
+              <th style="padding:7px 6px;">Label / Description</th>
+              <th style="padding:7px 6px;text-align:center;">Status</th>
+              <th style="padding:7px 6px;">Created By</th>
+              <th style="padding:7px 6px;text-align:center;">Date</th>
+              <th style="padding:7px 6px;">Remarks</th>
+              <th style="padding:7px 6px;text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="am-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -1202,6 +1248,7 @@ window.addEventListener('bcotAuth', function (e) {
     hide('settings-security');
     hide('dm-addAreaBtn');
     hide('dm-newAreaInput');
+    hide('btn-areas');
   }
 
   // ── User: no access to Duties, Staff, or restricted report pages ────────

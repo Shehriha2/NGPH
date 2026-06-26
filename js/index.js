@@ -40,6 +40,7 @@
     const TARGET_STORAGE_KEY = "BCOT_MONTHLY_TARGET_V1";
     const STAFF_RECORDS_KEY  = "BCOT_STAFF_RECORDS_V2";   // unified pool
     const DUTIES_ALL_KEY     = "BCOT_DUTIES_ALL_V1";      // unified pool
+    const AREAS_META_KEY     = "BCOT_AREAS_META_V1";      // area metadata
     const COMP_TYPE_LS_KEY   = "BCOT_COMP_TYPE_V1";       // per-area comp type
     const CONSUMPTION_LS_KEY = "BCOT_AREA_CONSUMPTION_V1"; // saved monthly consumption
 
@@ -704,6 +705,17 @@
       if (area && area !== "ALL" && !list.includes(area)) {
         list.push(area); list.sort();
         localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(list));
+      }
+      if (area && area !== "ALL") {
+        try {
+          const meta = JSON.parse(localStorage.getItem(AREAS_META_KEY)||'{}')||{};
+          if (!meta[area]) {
+            const sess=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};}catch{return{};}})();
+            const who=[sess.nameTitle,sess.name].filter(Boolean).join(' ')||sess.name||'—';
+            meta[area]={label:'',enabled:true,createdBy:who,createdAt:new Date().toISOString(),remarks:''};
+            localStorage.setItem(AREAS_META_KEY,JSON.stringify(meta));
+          }
+        } catch(e){console.error('Area meta init failed',e);}
       }
     }
 
@@ -4180,6 +4192,136 @@
         });
       }
 
+      function openReport() {
+        let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+        const _amm=(()=>{try{return JSON.parse(localStorage.getItem(AREAS_META_KEY)||'{}')||{};}catch{return{};}})();
+        const getAreaLbl=code=>{if(!code)return'—';const lbl=_amm[code]?.label;return lbl?`${code} · ${lbl}`:code;};
+        const f=getFilter();
+        const filtered=Object.entries(all).filter(([,m])=>{
+          if(f==='ALL')return true;
+          const areas=(m.area||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+          return !areas.length||areas.includes(f);
+        });
+        const active  =filtered.filter(([,m])=>m.enabled!==false);
+        const disabled=filtered.filter(([,m])=>m.enabled===false);
+        const sumHrs=arr=>arr.reduce((s,[,m])=>s+(Number(m.hours)||0),0);
+        const activeHrs=sumHrs(active), disabledHrs=sumHrs(disabled);
+        const fmtD=iso=>{try{return new Date(iso).toLocaleDateString('en-SA',{day:'2-digit',month:'short',year:'numeric'});}catch{return'—';}};
+        const lastChg=m=>{const log=m.changesLog||[];if(!log.length)return'—';const l=log[log.length-1];return`${l.by||'?'} · ${fmtD(l.at)}`;};
+        const areaLabel=f==='ALL'?'All Areas':f;
+        const today=new Date().toLocaleDateString('en-SA',{day:'2-digit',month:'long',year:'numeric'});
+
+        const activeRows=active.map(([code,m],i)=>{
+          const bg=m.color||'#1a4f8b',fg=contrastColor(bg);
+          const schTxt=m.scheduleDays&&m.schedulePeriod?`${m.scheduleDays}d/${m.schedulePeriod==='week'?'wk':'mo'}`:'—';
+          const totPer=m.scheduleDays&&m.schedulePeriod?((Number(m.hours)||0)*Number(m.scheduleDays)).toFixed(1)+' h':null;
+          return`<tr style="border-bottom:1px solid #e5e7eb;">
+            <td style="padding:6px;text-align:center;color:#9ca3af;font-size:11px;">${i+1}</td>
+            <td style="padding:6px;text-align:center;"><span style="background:${bg};color:${fg};font-weight:700;border-radius:4px;padding:2px 8px;font-size:11px;font-family:monospace;">${code}</span></td>
+            <td style="padding:6px;font-size:12px;">${(m.label||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>
+            <td style="padding:6px;font-size:11px;">${getAreaLbl(m.area||'')}</td>
+            <td style="padding:6px;text-align:center;font-weight:700;font-size:13px;color:#0369a1;">${m.hours||0}</td>
+            <td style="padding:6px;text-align:center;font-size:11px;">${schTxt}</td>
+            <td style="padding:6px;text-align:center;font-size:11px;font-weight:700;color:#0f766e;">${totPer||'—'}</td>
+            <td style="padding:6px;text-align:center;font-size:11px;">${m.assignedSt||0}</td>
+          </tr>`;
+        }).join('');
+
+        const disabledRows=disabled.map(([code,m],i)=>{
+          const bg=m.color||'#1a4f8b',fg=contrastColor(bg);
+          return`<tr style="border-bottom:1px solid #fee2e2;">
+            <td style="padding:6px;text-align:center;color:#9ca3af;font-size:11px;">${i+1}</td>
+            <td style="padding:6px;text-align:center;"><span style="background:${bg};color:${fg};font-weight:700;border-radius:4px;padding:2px 8px;font-size:11px;font-family:monospace;">${code}</span></td>
+            <td style="padding:6px;font-size:12px;">${(m.label||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>
+            <td style="padding:6px;font-size:11px;">${getAreaLbl(m.area||'')}</td>
+            <td style="padding:6px;text-align:center;font-weight:700;font-size:13px;color:#dc2626;">${m.hours||0}</td>
+            <td style="padding:6px;font-size:11px;color:#374151;">${(m.remarks||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>
+            <td style="padding:6px;font-size:11px;color:#6b7280;">${lastChg(m)}</td>
+          </tr>`;
+        }).join('');
+
+        const rptHtml=`
+          <div style="text-align:center;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #e5e7eb;">
+            <div style="font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#1a4f8b;">Duties Status Report</div>
+            <div style="font-size:12px;color:#374151;margin-top:4px;">KAMC-WR — Pharmaceutical Care Department</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:4px;">Area: <b>${areaLabel}</b> &nbsp;|&nbsp; Date: <b>${today}</b></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;">
+            <div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:10px;padding:16px 20px;">
+              <div style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">✓ Active Duties</div>
+              <div style="font-size:30px;font-weight:900;color:#15803d;line-height:1;">${active.length}</div>
+              <div style="font-size:13px;color:#166534;margin-top:6px;font-weight:700;">Total: ${activeHrs} hrs / shift</div>
+            </div>
+            <div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:10px;padding:16px 20px;">
+              <div style="font-size:11px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">⛔ Disabled Duties</div>
+              <div style="font-size:30px;font-weight:900;color:#991b1b;line-height:1;">${disabled.length}</div>
+              <div style="font-size:13px;color:#7f1d1d;margin-top:6px;font-weight:700;">Total: ${disabledHrs} hrs / shift withheld</div>
+            </div>
+          </div>
+          <div style="font-size:13px;font-weight:800;color:#15803d;margin-bottom:8px;border-left:4px solid #16a34a;padding-left:10px;">Active Duties (${active.length})</div>
+          ${active.length?`<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <thead><tr style="background:#1a4f8b;color:#fff;">
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">#</th>
+              <th style="padding:7px 6px;font-size:11px;">Code</th>
+              <th style="padding:7px 6px;font-size:11px;">Label</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Area</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Hrs/Shift</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Schedule</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Total/Period</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Staff</th>
+            </tr></thead>
+            <tbody>${activeRows}</tbody>
+            <tfoot><tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #86efac;">
+              <td colspan="4" style="padding:7px 10px;font-size:12px;text-align:right;">Total active hrs/shift:</td>
+              <td style="padding:7px 6px;font-size:14px;text-align:center;color:#15803d;font-weight:900;">${activeHrs}</td>
+              <td colspan="3"></td>
+            </tr></tfoot>
+          </table>`:'<p style="color:#9ca3af;font-style:italic;margin-bottom:22px;">No active duties.</p>'}
+          <div style="font-size:13px;font-weight:800;color:#991b1b;margin-bottom:8px;border-left:4px solid #dc2626;padding-left:10px;">Disabled Duties (${disabled.length})</div>
+          ${disabled.length?`<table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:#dc2626;color:#fff;">
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">#</th>
+              <th style="padding:7px 6px;font-size:11px;">Code</th>
+              <th style="padding:7px 6px;font-size:11px;">Label</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Area</th>
+              <th style="padding:7px 6px;font-size:11px;text-align:center;">Hrs/Shift</th>
+              <th style="padding:7px 6px;font-size:11px;">Remarks</th>
+              <th style="padding:7px 6px;font-size:11px;">Last Changed</th>
+            </tr></thead>
+            <tbody>${disabledRows}</tbody>
+            <tfoot><tr style="background:#fef2f2;font-weight:700;border-top:2px solid #fca5a5;">
+              <td colspan="4" style="padding:7px 10px;font-size:12px;text-align:right;">Total disabled hrs/shift:</td>
+              <td style="padding:7px 6px;font-size:14px;text-align:center;color:#991b1b;font-weight:900;">${disabledHrs}</td>
+              <td colspan="2"></td>
+            </tr></tfoot>
+          </table>`:'<p style="color:#9ca3af;font-style:italic;">No disabled duties.</p>'}`;
+
+        const overlay=document.createElement('div');
+        overlay.id='__dm_rpt';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;';
+        overlay.innerHTML=`
+          <div style="background:#fff;border-radius:12px;width:min(940px,98%);font-family:Arial,sans-serif;overflow:hidden;margin:auto;">
+            <div id="__dm_rpt_tb" style="background:#1a4f8b;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:15px;font-weight:700;color:#fff;">📊 Duties Status Report — ${areaLabel}</span>
+              <div style="display:flex;gap:8px;">
+                <button id="__dm_rpt_print" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">🖨 Print</button>
+                <button id="__dm_rpt_x" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;">✕ Close</button>
+              </div>
+            </div>
+            <div style="padding:24px 28px 32px;">${rptHtml}</div>
+          </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#__dm_rpt_x').addEventListener('click',()=>overlay.remove());
+        overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+        overlay.querySelector('#__dm_rpt_print').addEventListener('click',()=>{
+          const ps=document.createElement('style'); ps.id='__rpt_ps';
+          ps.textContent='@media print{body>*{display:none!important}#__dm_rpt{display:flex!important;position:static!important;background:none!important;overflow:visible!important;padding:0!important}#__dm_rpt>div{box-shadow:none!important;border-radius:0!important;width:100%!important}#__dm_rpt_tb{display:none!important}th{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}span[style*="background"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}';
+          document.head.appendChild(ps);
+          window.print();
+          window.addEventListener('afterprint',()=>{const s=document.getElementById('__rpt_ps');if(s)s.remove();},{once:true});
+        });
+      }
+
       function toggleEnabled(code) {
         let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
         if(!all[code])return;
@@ -4242,7 +4384,7 @@
       }
       function close() { document.getElementById("dutiesModal").style.display="none"; }
 
-      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,applyDutySearchFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode,deleteDuty,toggleEnabled,openLog};
+      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,applyDutySearchFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode,deleteDuty,toggleEnabled,openLog,openReport};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -4606,6 +4748,155 @@
       }
 
       return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName};
+    })();
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // AREA MANAGER  (AM namespace)
+    // ══════════════════════════════════════════════════════════════════════════
+    const AM = (() => {
+      function getMeta()    { try{return JSON.parse(localStorage.getItem(AREAS_META_KEY)||'{}')||{};}catch{return{};} }
+      function saveMeta(m)  { localStorage.setItem(AREAS_META_KEY,JSON.stringify(m)); }
+      function getLabel(code){ const m=getMeta(); return m[code]?.label||''; }
+
+      function _getWho() {
+        try{const s=JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};return [s.nameTitle,s.name].filter(Boolean).join(' ')||s.name||'—';}catch{return '—';}
+      }
+      function _isAdmin() {
+        try{return (JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{}).app_role==='admin';}catch{return false;}
+      }
+
+      function render() {
+        const raw=JSON.parse(localStorage.getItem(AREAS_LIST_KEY)||'[]')||[];
+        const meta=getMeta();
+        let dirty=false;
+        raw.forEach(code=>{if(!meta[code]){meta[code]={label:'',enabled:true,createdBy:'—',createdAt:null,remarks:''};dirty=true;}});
+        if(dirty)saveMeta(meta);
+
+        const active  =raw.filter(c=>meta[c]?.enabled!==false);
+        const disabled=raw.filter(c=>meta[c]?.enabled===false);
+
+        const sum=document.getElementById('am-summary');
+        if(sum)sum.innerHTML=`
+          <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;">Total Areas</div>
+            <div style="font-size:26px;font-weight:900;color:#0369a1;">${raw.length}</div>
+          </div>
+          <div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;">✓ Active</div>
+            <div style="font-size:26px;font-weight:900;color:#15803d;">${active.length}</div>
+          </div>
+          <div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:8px;padding:12px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:#991b1b;text-transform:uppercase;">⛔ Disabled</div>
+            <div style="font-size:26px;font-weight:900;color:#991b1b;">${disabled.length}</div>
+          </div>`;
+
+        const isAdmin=_isAdmin();
+        const fmtD=iso=>{if(!iso)return'—';try{return new Date(iso).toLocaleDateString('en-SA',{day:'2-digit',month:'short',year:'numeric'});}catch{return iso;}};
+        const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+        const tbody=document.getElementById('am-body');
+        if(!tbody)return;
+        tbody.innerHTML=raw.map((code,i)=>{
+          const m=meta[code]||{};
+          const enabled=m.enabled!==false;
+          return`<tr style="border-bottom:1px solid #e5e7eb;${!enabled?'opacity:.72;':''}">
+            <td style="padding:6px;text-align:center;color:#9ca3af;font-size:11px;">${i+1}</td>
+            <td style="padding:6px;text-align:center;">
+              <span style="background:#0891b2;color:#fff;font-weight:700;border-radius:4px;padding:2px 9px;font-size:11px;font-family:monospace;">${code}</span>
+            </td>
+            <td style="padding:6px;font-size:12px;">${m.label?esc(m.label):'<span style="color:#9ca3af;font-style:italic;">No label</span>'}</td>
+            <td style="padding:6px;text-align:center;">
+              ${isAdmin?`<span onclick="AM.toggleEnabled('${code}')" title="Click to toggle" style="cursor:pointer;display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;user-select:none;background:${enabled?'#dcfce7':'#fee2e2'};color:${enabled?'#15803d':'#991b1b'};">${enabled?'✓ Active':'⛔ Disabled'}</span>`
+              :`<span style="display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;background:${enabled?'#dcfce7':'#fee2e2'};color:${enabled?'#15803d':'#991b1b'};">${enabled?'✓ Active':'⛔ Disabled'}</span>`}
+            </td>
+            <td style="padding:6px;font-size:11px;">${esc(m.createdBy||'—')}</td>
+            <td style="padding:6px;font-size:11px;color:#6b7280;white-space:nowrap;">${fmtD(m.createdAt)}</td>
+            <td style="padding:6px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${esc(m.remarks)}">
+              ${m.remarks?esc(m.remarks):'<span style="color:#d1d5db;">—</span>'}
+            </td>
+            <td style="padding:6px;white-space:nowrap;">
+              ${isAdmin?`<button type="button" onclick="AM.editArea('${code}')" style="background:#0891b2;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700;">Edit</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#9ca3af;font-style:italic;">No areas yet. Add a new area above.</td></tr>';
+      }
+
+      function toggleEnabled(code) {
+        if(!_isAdmin())return;
+        const meta=getMeta();
+        if(!meta[code])meta[code]={label:'',enabled:true,createdBy:'—',createdAt:null,remarks:''};
+        meta[code].enabled=meta[code].enabled===false;
+        saveMeta(meta); render();
+        showStatusMessage(`Area "${code}" ${meta[code].enabled?'enabled':'disabled'} ✅`);
+      }
+
+      function editArea(code) {
+        if(!_isAdmin())return;
+        const meta=getMeta();
+        const m=meta[code]||{};
+        const ov=document.createElement('div');
+        ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        ov.innerHTML=`
+          <div style="background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(440px,96%);font-family:Arial,sans-serif;overflow:hidden;">
+            <div style="background:#0891b2;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:700;color:#fff;">✏️ Edit Area — <b>${code}</b></span>
+              <button id="_ae_x" style="background:transparent;border:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:0 4px;">✕</button>
+            </div>
+            <div style="padding:20px;">
+              <label style="display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;">Label / Description</label>
+              <input id="_ae_lbl" type="text" maxlength="80" value="${(m.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Accident &amp; Emergency Pharmacy" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:14px;font-family:Arial,sans-serif;"/>
+              <label style="display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;">Remarks</label>
+              <textarea id="_ae_rmk" maxlength="300" rows="3" placeholder="Optional note…" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:13px;resize:vertical;font-family:Arial,sans-serif;">${(m.remarks||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+            </div>
+            <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
+              <button id="_ae_cn" style="background:#f3f4f6;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:Arial,sans-serif;">Cancel</button>
+              <button id="_ae_sv" style="background:#0891b2;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-weight:700;font-family:Arial,sans-serif;">Save</button>
+            </div>
+          </div>`;
+        document.body.appendChild(ov);
+        const dismiss=()=>ov.remove();
+        ov.querySelector('#_ae_x').addEventListener('click',dismiss);
+        ov.querySelector('#_ae_cn').addEventListener('click',dismiss);
+        ov.addEventListener('click',e=>{if(e.target===ov)dismiss();});
+        ov.querySelector('#_ae_sv').addEventListener('click',()=>{
+          if(!meta[code])meta[code]={label:'',enabled:true,createdBy:'—',createdAt:null,remarks:''};
+          meta[code].label  =(ov.querySelector('#_ae_lbl').value||'').trim();
+          meta[code].remarks=(ov.querySelector('#_ae_rmk').value||'').trim();
+          saveMeta(meta); dismiss(); render();
+          showStatusMessage(`Area "${code}" updated ✅`);
+        });
+        setTimeout(()=>ov.querySelector('#_ae_lbl').focus(),50);
+      }
+
+      function addArea() {
+        if(!_isAdmin())return;
+        const codeEl =document.getElementById('am-newCode');
+        const labelEl=document.getElementById('am-newLabel');
+        const code =(codeEl?.value||'').trim().toUpperCase().replace(/[^A-Z0-9_\-]/g,'').slice(0,20);
+        const label=(labelEl?.value||'').trim();
+        if(!code){showStatusMessage('Area code is required.','error');return;}
+        const raw=JSON.parse(localStorage.getItem(AREAS_LIST_KEY)||'[]')||[];
+        if(raw.includes(code)){showStatusMessage(`Area "${code}" already exists.`,'error');return;}
+        raw.push(code);raw.sort();
+        localStorage.setItem(AREAS_LIST_KEY,JSON.stringify(raw));
+        const meta=getMeta();
+        meta[code]={label,enabled:true,createdBy:_getWho(),createdAt:new Date().toISOString(),remarks:''};
+        saveMeta(meta);
+        if(codeEl)codeEl.value=''; if(labelEl)labelEl.value='';
+        try{DM.rebuildUI();}catch{}
+        render();
+        showStatusMessage(`Area "${code}" added ✅`);
+      }
+
+      function open() {
+        document.getElementById('areasModal').style.display='block';
+        render();
+      }
+      function close() {
+        document.getElementById('areasModal').style.display='none';
+      }
+
+      return {open,close,toggleEnabled,editArea,addArea,getMeta,saveMeta,getLabel};
     })();
 
     // ── Init ──────────────────────────────────────────────────────────────────
