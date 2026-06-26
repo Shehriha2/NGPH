@@ -49,17 +49,17 @@ function fmtDate(d) {
 }
 function statusBadge(r) {
   const s = typeof r === 'string' ? r : (r.status || '');
-  if (s === 'granted')          return `<span class="badge b-granted">✅ Granted</span>`;
-  if (s === 'cancelled')        return `<span class="badge b-cancelled">❌ Rejected</span>`;
-  if (s === 'manager_approved') return `<span class="badge b-mgr">Mgr Approved</span>`;
+  if (s === 'granted')          return `<span class="badge b-granted"><i class="bi bi-check-circle-fill"></i> Granted</span>`;
+  if (s === 'cancelled')        return `<span class="badge b-cancelled"><i class="bi bi-x-circle-fill"></i> Rejected</span>`;
+  if (s === 'manager_approved') return `<span class="badge b-mgr"><i class="bi bi-check-circle"></i> Mgr Approved</span>`;
   if (typeof r === 'object') {
     const done = (r.approvals || []).filter(a => a.action === 'approved').length;
     const req  = r.approvalsRequired || 1;
-    return `<span class="badge b-pending">Pending ${done}/${req}</span>`;
+    return `<span class="badge b-pending"><i class="bi bi-hourglass-split"></i> Pending ${done}/${req}</span>`;
   }
-  return `<span class="badge b-pending">Pending</span>`;
+  return `<span class="badge b-pending"><i class="bi bi-hourglass-split"></i> Pending</span>`;
 }
-function waBtn(phone, msg, label='📱 WhatsApp') {
+function waBtn(phone, msg, label='<i class="bi bi-whatsapp"></i> WhatsApp') {
   const n = (phone || '').replace(/\D/g,''); if (!n) return '';
   return `<a class="wa-btn" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank">${label}</a>`;
 }
@@ -90,7 +90,7 @@ async function startExtension() {
     se('roleBadge').textContent = '⛔ No Access';
     se('appNav').innerHTML = '';
     se('appBody').innerHTML = `<div style="text-align:center;padding:60px 20px;color:#6b7280;">
-      <div style="font-size:40px;margin-bottom:16px;">🔒</div>
+      <i class="bi bi-lock-fill" style="font-size:40px;color:#9ca3af;margin-bottom:16px;display:block;"></i>
       <div style="font-size:15px;font-weight:700;color:#374151;margin-bottom:8px;">No Extension Access</div>
       <div style="font-size:13px;">Your account does not have access to the extension system.</div>
     </div>`;
@@ -123,7 +123,7 @@ async function startExtension() {
 function launchApp() {
   show('appShell');
   se('userNameBadge').textContent = currentUser.name;
-  const rl = { charge:'👤 Charge Person', admin:'🔑 Administrator' };
+  const rl = { charge:'<i class="bi bi-person-badge"></i> Charge Person', admin:'<i class="bi bi-shield-lock"></i> Administrator' };
   const rc = { charge:'rgba(15,118,110,.65)', admin:'rgba(124,58,237,.65)' };
   const b  = se('roleBadge');
   b.textContent      = rl[currentUser.role] || currentUser.role;
@@ -134,14 +134,14 @@ function launchApp() {
 function buildNav() {
   const tabs = {
     charge: [
-      { id:'sv_new',    label:'➕ New Request' },
-      { id:'sv_mine',   label:'📋 My Requests' }
+      { id:'sv_new',    label:'<i class="bi bi-plus-circle"></i> New Request' },
+      { id:'sv_mine',   label:'<i class="bi bi-list-check"></i> My Requests' }
     ],
     admin: [
-      { id:'adm_rules', label:'⚙ Rules' },
-      { id:'adm_pend',  label:'🕐 Pending' },
-      { id:'adm_hist',  label:'📁 History' },
-      { id:'report',    label:'📊 Report' }
+      { id:'adm_rules', label:'<i class="bi bi-gear-fill"></i> Rules' },
+      { id:'adm_pend',  label:'<i class="bi bi-clock"></i> Pending' },
+      { id:'adm_hist',  label:'<i class="bi bi-folder2"></i> History' },
+      { id:'report',    label:'<i class="bi bi-bar-chart-line"></i> Report' }
     ]
   };
   const myTabs = tabs[currentUser.role] || [];
@@ -186,7 +186,7 @@ function reqCard(r) {
       <b>Justification:</b> ${esc(r.justification||'—')}
       ${(r.approvals||[]).map(a =>
         `<br><span style="color:${a.action==='approved'?'var(--green)':'var(--red)'};">
-          <b>${esc(a.byName)}:</b> ${a.action==='approved'?'✅ Approved':'❌ Rejected'}${a.note?' — '+esc(a.note):''}
+          <b>${esc(a.byName)}:</b> <i class="bi ${a.action==='approved'?'bi-check-circle-fill':'bi-x-circle-fill'}"></i> ${a.action==='approved'?'Approved':'Rejected'}${a.note?' — '+esc(a.note):''}
         </span>`
       ).join('')}
     </div>
@@ -199,7 +199,7 @@ function renderNewReq() {
   if (!myAreas.length) return `
     <div class="section-title">New Extension Request</div>
     <div class="empty-state">
-      <div style="font-size:30px;margin-bottom:12px;">⚙</div>
+      <i class="bi bi-gear" style="font-size:30px;color:#9ca3af;margin-bottom:12px;display:block;"></i>
       No areas assigned to you yet.<br>Ask an administrator to configure the Extension Rules.
     </div>`;
   const aOpts = myAreas.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
@@ -289,7 +289,7 @@ function renderRulesTab() {
   const charges = users.filter(u => (u.app_role||'user') === 'charge');
 
   if (!areas.length) return `
-    <div class="section-title">⚙ Extension Approval Rules</div>
+    <div class="section-title"><i class="bi bi-gear-fill"></i> Extension Approval Rules</div>
     <div class="empty-state">No areas found. Create areas in the main rota first.</div>`;
 
   const rows = areas.map(area => {
@@ -298,7 +298,7 @@ function renderRulesTab() {
     if (!rule) return `<tr>
       <td><b>${esc(area)}</b></td>
       <td colspan="3" style="color:#9ca3af;font-style:italic;font-size:11px;">Not configured</td>
-      <td><button class="btn btn-sm btn-primary" onclick="editRule('${esc(area)}')">+ Configure</button></td>
+      <td><button class="btn btn-sm btn-primary" onclick="editRule('${esc(area)}')"><i class="bi bi-plus-circle"></i> Configure</button></td>
     </tr>`;
     const cp  = users.find(u => u.id === rule.chargePersonId);
     const aps = (rule.approverIds||[]).map(id => users.find(u=>u.id===id)?.name||'?').join(' · ');
@@ -308,14 +308,14 @@ function renderRulesTab() {
       <td style="text-align:center;">${rule.approvalsRequired||1}</td>
       <td>${esc(aps||'—')}</td>
       <td>
-        <button class="btn btn-sm btn-outline" onclick="editRule('${esc(area)}')">✏ Edit</button>
-        <button class="btn btn-sm btn-red" style="margin-left:4px;" onclick="deleteRule('${esc(area)}')">✖</button>
+        <button class="btn btn-sm btn-outline" onclick="editRule('${esc(area)}')"><i class="bi bi-pencil"></i> Edit</button>
+        <button class="btn btn-sm btn-red" style="margin-left:4px;" onclick="deleteRule('${esc(area)}')"><i class="bi bi-x-lg"></i></button>
       </td>
     </tr>`;
   }).join('');
 
   return `
-    <div class="section-title">⚙ Extension Approval Rules</div>
+    <div class="section-title"><i class="bi bi-gear-fill"></i> Extension Approval Rules</div>
     <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">
       Configure who submits and who approves extension requests for each area.
     </p>
@@ -348,7 +348,7 @@ function editRuleRow(area, existing, charges, admins) {
 
   return `<tr style="background:#eef2ff;">
     <td colspan="5" style="padding:16px;">
-      <div style="font-weight:800;color:#3730a3;margin-bottom:12px;">Configuring: <b>${esc(area)}</b></div>
+      <div style="font-weight:800;color:#3730a3;margin-bottom:12px;"><i class="bi bi-gear"></i> Configuring: <b>${esc(area)}</b></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;align-items:end;">
         <div class="fg" style="margin:0;"><label>Charge Person</label><select id="re_charge">${cOpts}</select></div>
         <div class="fg" style="margin:0;">
@@ -364,8 +364,8 @@ function editRuleRow(area, existing, charges, admins) {
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:14px;">
-        <button class="btn btn-green btn-sm" onclick="saveRule('${esc(area)}')">💾 Save</button>
-        <button class="btn btn-outline btn-sm" onclick="cancelEditRule()">Cancel</button>
+        <button class="btn btn-green btn-sm" onclick="saveRule('${esc(area)}')"><i class="bi bi-floppy"></i> Save</button>
+        <button class="btn btn-outline btn-sm" onclick="cancelEditRule()"><i class="bi bi-x-lg"></i> Cancel</button>
       </div>
       <div class="err-msg" id="re_err"></div>
     </td>
@@ -417,13 +417,13 @@ function renderAdminPending() {
     !(r.approvals||[]).some(a => a.by === currentUser.id)
   );
   const refreshBtn = `<button class="btn btn-sm btn-outline no-print" style="margin-bottom:14px;"
-    onclick="loadAll().then(()=>renderTab('adm_pend'))">🔄 Refresh</button>`;
+    onclick="loadAll().then(()=>renderTab('adm_pend'))"><i class="bi bi-arrow-clockwise"></i> Refresh</button>`;
 
   if (!list.length) return `
-    <div class="section-title">🕐 Pending Approvals</div>${refreshBtn}
+    <div class="section-title"><i class="bi bi-clock"></i> Pending Approvals</div>${refreshBtn}
     <div class="empty-state">No requests waiting for your approval.</div>`;
 
-  return `<div class="section-title">Pending Approvals (${list.length})</div>${refreshBtn}` +
+  return `<div class="section-title"><i class="bi bi-clock"></i> Pending Approvals (${list.length})</div>${refreshBtn}` +
     list.map(r => {
       const done = (r.approvals||[]).filter(a=>a.action==='approved').length;
       return `<div class="req-card">
@@ -438,13 +438,13 @@ function renderAdminPending() {
           <b>By:</b> ${esc(r.supervisorName||'—')} &nbsp;·&nbsp; <b>Submitted:</b> ${fmtDate(r.submittedAt)}<br>
           <b>Justification:</b> ${esc(r.justification||'—')}
           ${r.approvalsRequired>1&&done>0 ? `<br><b>Progress:</b> ${done}/${r.approvalsRequired} approvals received` : ''}
-          ${(r.approvals||[]).map(a=>`<br><b>${esc(a.byName)}:</b> ✅ Approved${a.note?' — '+esc(a.note):''}`).join('')}
+          ${(r.approvals||[]).map(a=>`<br><b>${esc(a.byName)}:</b> <i class="bi bi-check-circle-fill" style="color:var(--green);"></i> Approved${a.note?' — '+esc(a.note):''}`).join('')}
         </div>
         <div class="req-card-actions">
           <input type="text" id="an_${r.id}" placeholder="Note (optional)"
             style="flex:1;min-width:140px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"/>
-          <button class="btn btn-green btn-sm" onclick="adminApprove('${r.id}')">✔ Approve</button>
-          <button class="btn btn-red   btn-sm" onclick="adminReject('${r.id}')">✖ Reject</button>
+          <button class="btn btn-green btn-sm" onclick="adminApprove('${r.id}')"><i class="bi bi-check-lg"></i> Approve</button>
+          <button class="btn btn-red   btn-sm" onclick="adminReject('${r.id}')"><i class="bi bi-x-lg"></i> Reject</button>
         </div>
       </div>`;
     }).join('');
@@ -472,9 +472,9 @@ async function adminApprove(id) {
   let notice;
   if (granted) {
     const msg = `✅ Extension GRANTED\n\nArea: ${r.area}\nStaff: ${(r.staffList||[]).join(', ')}\nDate: ${r.date} | ${r.startTime}–${r.endTime} (${r.hours}h)\nApproved by: ${currentUser.name}`;
-    notice = `<div class="notice notice-green">✅ Extension granted — all approvals complete. ${sub?waBtn(sub.phone||'',msg,'📱 Notify'):''}</div>`;
+    notice = `<div class="notice notice-green"><i class="bi bi-check-circle-fill"></i> Extension granted — all approvals complete. ${sub?waBtn(sub.phone||'',msg):''}</div>`;
   } else {
-    notice = `<div class="notice notice-green">✔ Your approval recorded — waiting for the second approver.</div>`;
+    notice = `<div class="notice notice-green"><i class="bi bi-check-lg"></i> Your approval recorded — waiting for the second approver.</div>`;
   }
   renderTab('adm_pend');
   se('appBody').insertAdjacentHTML('afterbegin', notice);
@@ -493,7 +493,7 @@ async function adminReject(id) {
 
   const sub = users.find(u=>u.id===r.supervisorId);
   const msg = `❌ Extension Request Rejected\n\nArea: ${r.area}\nDate: ${r.date}\nRejected by: ${currentUser.name}\nReason: ${note}`;
-  const notice = `<div class="notice notice-red">Request rejected. ${sub?waBtn(sub.phone||'',msg,'📱 Notify'):''}</div>`;
+  const notice = `<div class="notice notice-red"><i class="bi bi-x-circle-fill"></i> Request rejected. ${sub?waBtn(sub.phone||'',msg):''}</div>`;
   renderTab('adm_pend');
   se('appBody').insertAdjacentHTML('afterbegin', notice);
 }
@@ -505,9 +505,9 @@ function renderAdminHist() {
     && r.status !== 'pending'
   );
   const refreshBtn = `<button class="btn btn-sm btn-outline no-print" style="margin-bottom:14px;"
-    onclick="loadAll().then(()=>renderTab('adm_hist'))">🔄 Refresh</button>`;
-  if (!list.length) return `<div class="section-title">📁 History</div>${refreshBtn}<div class="empty-state">No history yet.</div>`;
-  return `<div class="section-title">History (${list.length})</div>${refreshBtn}` + list.map(r => reqCard(r)).join('');
+    onclick="loadAll().then(()=>renderTab('adm_hist'))"><i class="bi bi-arrow-clockwise"></i> Refresh</button>`;
+  if (!list.length) return `<div class="section-title"><i class="bi bi-folder2"></i> History</div>${refreshBtn}<div class="empty-state">No history yet.</div>`;
+  return `<div class="section-title"><i class="bi bi-folder2"></i> History (${list.length})</div>${refreshBtn}` + list.map(r => reqCard(r)).join('');
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────
@@ -520,7 +520,7 @@ function renderReportTab(){
   const firstM = new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
   return `
   <div class="rpt-controls no-print">
-    <div class="section-title" style="margin-bottom:12px;">📊 Extension Hours Report</div>
+    <div class="section-title" style="margin-bottom:12px;"><i class="bi bi-bar-chart-line"></i> Extension Hours Report</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;align-items:end;">
       <div class="fg" style="margin:0;"><label>From Date</label><input type="date" id="rptFrom" value="${firstM}"/></div>
       <div class="fg" style="margin:0;"><label>To Date</label><input type="date" id="rptTo" value="${today}"/></div>
@@ -534,7 +534,7 @@ function renderReportTab(){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="generateReport()">Generate</button>
-        <button class="btn btn-outline no-print" onclick="window.print()" style="display:none;" id="rptPrintBtn">🖨 Print</button>
+        <button class="btn btn-outline no-print" onclick="window.print()" style="display:none;" id="rptPrintBtn"><i class="bi bi-printer-fill"></i> Print</button>
       </div>
     </div>
   </div>
