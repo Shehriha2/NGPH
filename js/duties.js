@@ -202,6 +202,10 @@
             ${buildDayCountOptions()}
           </select>
         </td>
+        <td style="text-align:center;">
+          <input type="checkbox" class="duty-enabled" ${(data?.enabled !== false) ? 'checked' : ''} title="Enabled" style="width:15px;height:15px;cursor:pointer;"/>
+        </td>
+        <td><input type="text" class="duty-remarks" value="${(data?.remarks||'').toString().replace(/"/g,'&quot;')}" placeholder="Remarks" style="width:120px"/></td>
         <td class="no-print"><button class="btn-danger" type="button">X</button></td>
       `;
 
@@ -264,7 +268,9 @@
           assignedSt:  Number(tr.cells[5].querySelector("input").value || 0) || 0,
           startDay:    (tr.cells[6].querySelector("select").value || "Any").toString(),
           startTime:   (tr.cells[7].querySelector("select").value || "Any").toString(),
-          defaultDays: (tr.cells[9].querySelector("select").value || "Any").toString()
+          defaultDays: (tr.cells[9].querySelector("select").value || "Any").toString(),
+          enabled:     tr.querySelector('.duty-enabled')?.checked !== false,
+          remarks:     (tr.querySelector('.duty-remarks')?.value || '').trim()
         };
       }
       if (!Object.keys(out).length) throw new Error("No duties to save.");

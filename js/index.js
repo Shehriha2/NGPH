@@ -3797,7 +3797,7 @@
         const entries=Object.entries(all);
         const ce=document.getElementById("dm-dutyCount");
         if(!entries.length){
-          tbody.innerHTML=`<tr><td colspan="13" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No duties yet. Click "+ Add Duty" to create one.</td></tr>`;
+          tbody.innerHTML=`<tr><td colspan="16" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic;">No duties yet. Click "+ Add Duty" to create one.</td></tr>`;
           if(ce)ce.textContent="0 duties"; return;
         }
         entries.forEach(([code,meta],idx)=>{
@@ -3819,12 +3819,21 @@
             <td style="padding:5px;text-align:center;font-size:11px;">${endTime}</td>
             ${(()=>{const sd=Number(meta.scheduleDays)||0,sp=meta.schedulePeriod||'',h=Number(meta.hours)||0;const lbl=sd&&sp?`${sd}d/${sp==='week'?'wk':'mo'}`:'—';const thr=sd&&sp&&h?`${(h*sd).toFixed(2)}h`:'—';return`<td style="padding:5px;text-align:center;font-size:11px;">${lbl}</td><td style="padding:5px;text-align:center;font-size:11px;font-weight:700;color:${thr!=='—'?'#0369a1':'#9ca3af'};">${thr}</td>`;})()}
             <td style="padding:5px;text-align:center;font-size:11px;">${meta.assignedSt||0}</td>
+            <td style="padding:5px;text-align:center;">
+              <span onclick="DM.toggleEnabled('${code}')" style="cursor:pointer;display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;user-select:none;background:${meta.enabled===false?'#fee2e2':'#dcfce7'};color:${meta.enabled===false?'#991b1b':'#15803d'};">
+                ${meta.enabled===false?'⛔ Disabled':'✓ Enabled'}
+              </span>
+            </td>
+            <td style="padding:5px;font-size:11px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(meta.remarks||'').replace(/"/g,'&quot;')}">
+              ${meta.remarks?meta.remarks.replace(/&/g,'&amp;').replace(/</g,'&lt;'):'<span style="color:#d1d5db;">—</span>'}
+            </td>
+            <td style="padding:5px;text-align:center;">
+              <button type="button" onclick="DM.openLog('${code}')" style="background:${(meta.changesLog||[]).length?'#4f46e5':'#9ca3af'};color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer;" title="${(meta.changesLog||[]).length} change(s)">📋 ${(meta.changesLog||[]).length||0}</button>
+            </td>
             <td style="padding:5px;white-space:nowrap;">
-              <button type="button" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;">Edit</button>
-              <button type="button" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;margin-left:3px;">Del</button>
+              <button type="button" onclick="DM.openEditByCode('${code}')" style="background:#0f766e;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;">Edit</button>
+              <button type="button" onclick="DM.deleteDuty('${code}')" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;margin-left:3px;">Del</button>
             </td>`;
-          tr.querySelectorAll("button")[0].addEventListener("click",()=>openEditByCode(code));
-          tr.querySelectorAll("button")[1].addEventListener("click",()=>deleteDuty(code));
           tr.cells[5].addEventListener("dblclick",()=>{
             let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
             SM.openAreaPicker("dm-area-"+code,null,`Area — ${code}`,(all[code]?.area||""),newAreas=>{
@@ -3905,6 +3914,10 @@
                     </td></tr>
                 <tr><td style="padding:5px 6px;color:#6b7280;white-space:nowrap;">Total Hours</td>
                     <td style="padding:5px 6px;"><b id="_dan_thrs" style="font-size:13px;color:#0369a1;">—</b></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Status</td>
+                    <td style="padding:5px 6px;"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input id="_dan_en" type="checkbox" checked style="width:15px;height:15px;cursor:pointer;"/> Enabled</label></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;vertical-align:top;padding-top:8px;">Remarks</td>
+                    <td style="padding:5px 6px;"><textarea id="_dan_rmk" maxlength="300" rows="2" placeholder="Optional note…" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;resize:vertical;font-family:Arial,sans-serif;"></textarea></td></tr>
               </table>
             </div>
             <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
@@ -3936,7 +3949,7 @@
           if(!/^[A-Z][A-Z0-9_]{0,5}$/.test(code)){errEl.textContent="Code must start with a letter, 1–6 chars (A-Z, 0-9, _).";return;}
           let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
           if(all[code]){errEl.textContent=`Code "${code}" already exists.`;return;}
-          const newDuty={label:($('#_dan_lbl').value||code).trim(),hours:Number(hrs.value)||0,color:cp.value||'#1a4f8b',area:($('#_dan_ar').value||'').trim().toUpperCase(),assignedSt:Number($('#_dan_st').value)||0,startDay:$('#_dan_sd').value||'Any',startTime:st2.value||'Any',scheduleDays:Number(sdaysI.value)||0,schedulePeriod:sperI.value||''};
+          const newDuty={label:($('#_dan_lbl').value||code).trim(),hours:Number(hrs.value)||0,color:cp.value||'#1a4f8b',area:($('#_dan_ar').value||'').trim().toUpperCase(),assignedSt:Number($('#_dan_st').value)||0,startDay:$('#_dan_sd').value||'Any',startTime:st2.value||'Any',scheduleDays:Number(sdaysI.value)||0,schedulePeriod:sperI.value||'',enabled:$('#_dan_en').checked!==false,remarks:($('#_dan_rmk').value||'').trim(),changesLog:[]};
           all[code]=newDuty; DUTIES[code]=newDuty;
           localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all)); injectDutyStyles();
           try{
@@ -4079,6 +4092,10 @@
                     </td></tr>
                 <tr><td style="padding:5px 6px;color:#6b7280;white-space:nowrap;">Total Hours</td>
                     <td style="padding:5px 6px;"><b id="_dep_thrs" style="font-size:13px;color:#0369a1;">—</b></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;">Status</td>
+                    <td style="padding:5px 6px;"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;"><input id="_dep_en" type="checkbox" style="width:15px;height:15px;cursor:pointer;"/> Enabled</label></td></tr>
+                <tr><td style="padding:5px 6px;color:#6b7280;vertical-align:top;padding-top:8px;">Remarks</td>
+                    <td style="padding:5px 6px;"><textarea id="_dep_rmk" maxlength="300" rows="2" placeholder="Optional note…" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:13px;resize:vertical;font-family:Arial,sans-serif;"></textarea></td></tr>
               </table>
             </div>
             <div style="padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:10px;justify-content:flex-end;">
@@ -4104,6 +4121,8 @@
         const sdaysE=$('#_dep_sdays'),sperE=$('#_dep_sper'),thrsDE=$('#_dep_thrs');
         sdaysE.value = Number(duty.scheduleDays) || '';
         sperE.value  = duty.schedulePeriod || '';
+        $('#_dep_en').checked = duty.enabled !== false;
+        $('#_dep_rmk').value  = duty.remarks || '';
 
         const updEnd = () => { const e=calcEnd(st2.value,hrs.value); et.textContent=e!=='Any'?`→ ${e}`:''; };
         const updSchedE = () => { const h=Number(hrs.value)||0,d=Number(sdaysE.value)||0,p=sperE.value;const max=p==='week'?7:31;if(d>max)sdaysE.value=max;thrsDE.textContent=d&&p&&h?(h*Math.min(d,max)).toFixed(2)+' hrs':'—'; };
@@ -4123,20 +4142,32 @@
         overlay.addEventListener('click', e => { if (e.target===overlay) dismiss(); });
 
         $('#_dep_sv').addEventListener('click', async () => {
-          const updated = {
-            label:        ($('#_dep_lbl').value||code).trim(),
-            hours:        Number(hrs.value)||0,
-            color:        cp.value||'#1a4f8b',
-            area:         ($('#_dep_ar').value||'').trim().toUpperCase(),
-            assignedSt:   Number($('#_dep_st').value)||0,
-            startDay:     $('#_dep_sd').value||'Any',
-            startTime:    st2.value||'Any',
-            scheduleDays:   Number(sdaysE.value)||0,
-            schedulePeriod: sperE.value||'',
-          };
-          DUTIES[code] = updated;
           let allDuties={};
           try{allDuties=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+          const oldDuty=allDuties[code]||duty;
+          const sess=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};}catch{return{};}})();
+          const who=[sess.nameTitle,sess.name].filter(Boolean).join(' ')||sess.name||'Unknown';
+
+          const nLabel=($('#_dep_lbl').value||code).trim(), nHours=Number(hrs.value)||0,
+                nColor=cp.value||'#1a4f8b', nArea=($('#_dep_ar').value||'').trim().toUpperCase(),
+                nSt=Number($('#_dep_st').value)||0, nSday=$('#_dep_sd').value||'Any',
+                nStime=st2.value||'Any', nSDays=Number(sdaysE.value)||0,
+                nSPer=sperE.value||'', nEnabled=$('#_dep_en').checked!==false,
+                nRemarks=($('#_dep_rmk').value||'').trim();
+
+          const diff={};
+          const track={label:[oldDuty.label,nLabel],hours:[oldDuty.hours,nHours],color:[oldDuty.color,nColor],
+            area:[oldDuty.area,nArea],assignedSt:[oldDuty.assignedSt,nSt],startDay:[oldDuty.startDay,nSday],
+            startTime:[oldDuty.startTime,nStime],scheduleDays:[oldDuty.scheduleDays,nSDays],
+            schedulePeriod:[oldDuty.schedulePeriod,nSPer],enabled:[oldDuty.enabled!==false,nEnabled],
+            remarks:[oldDuty.remarks||'',nRemarks]};
+          Object.entries(track).forEach(([f,[ov,nv]])=>{if(String(ov)!==String(nv))diff[f]={from:ov,to:nv};});
+          const newLog=Object.keys(diff).length?[...(oldDuty.changesLog||[]),{at:new Date().toISOString(),by:who,changes:diff}]:(oldDuty.changesLog||[]);
+
+          const updated={label:nLabel,hours:nHours,color:nColor,area:nArea,assignedSt:nSt,
+            startDay:nSday,startTime:nStime,scheduleDays:nSDays,schedulePeriod:nSPer,
+            enabled:nEnabled,remarks:nRemarks,changesLog:newLog};
+          DUTIES[code]=updated;
           allDuties[code]=updated;
           localStorage.setItem(DUTIES_ALL_KEY, JSON.stringify(allDuties));
           injectDutyStyles();
@@ -4149,6 +4180,59 @@
         });
       }
 
+      function toggleEnabled(code) {
+        let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+        if(!all[code])return;
+        const wasEnabled=all[code].enabled!==false;
+        all[code].enabled=!wasEnabled;
+        if(DUTIES[code])DUTIES[code].enabled=all[code].enabled;
+        const sess=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};}catch{return{};}})();
+        const who=[sess.nameTitle,sess.name].filter(Boolean).join(' ')||sess.name||'Unknown';
+        if(!all[code].changesLog)all[code].changesLog=[];
+        all[code].changesLog.push({at:new Date().toISOString(),by:who,changes:{enabled:{from:wasEnabled,to:!wasEnabled}}});
+        localStorage.setItem(DUTIES_ALL_KEY,JSON.stringify(all));
+        const appKey=(window.BCOT_APP_KEY||'').trim();
+        if(appKey)window.FB.setDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',appKey,'duties_named',CLOUD_DOC),{savedAt:new Date().toISOString(),duties:all},{merge:true}).catch(e=>console.error(e));
+        renderDutyTable();
+        showStatusMessage(`Duty "${code}" ${!wasEnabled?'enabled':'disabled'} ✅`);
+      }
+
+      function openLog(code) {
+        let all={};try{all=JSON.parse(localStorage.getItem(DUTIES_ALL_KEY)||'{}')||{};}catch{}
+        const d=all[code]; if(!d)return;
+        const log=(d.changesLog||[]).slice().reverse();
+        const fmtD=iso=>{try{return new Date(iso).toLocaleString('en-SA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});}catch{return iso;}};
+        const fmtV=v=>v===true?'Enabled':v===false?'Disabled':(v??'—');
+        const entries=log.length?log.map(e=>{
+          const chgs=Object.entries(e.changes||{}).map(([f,{from,to}])=>
+            `<div style="margin:3px 0;font-size:11px;"><span style="color:#6b7280;min-width:90px;display:inline-block;font-weight:600;">${f}:</span><span style="color:#dc2626;text-decoration:line-through;margin-right:6px;">${fmtV(from)}</span>→ <span style="color:#16a34a;font-weight:700;">${fmtV(to)}</span></div>`
+          ).join('');
+          return `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px;">
+              <span style="font-weight:700;font-size:12px;color:#1f2937;">${(e.by||'Unknown').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>
+              <span style="font-size:11px;color:#6b7280;">${fmtD(e.at)}</span>
+            </div>
+            ${chgs||'<span style="font-size:11px;color:#9ca3af;font-style:italic;">No details recorded.</span>'}
+          </div>`;
+        }).join(''):'<p style="text-align:center;color:#9ca3af;font-style:italic;padding:30px 0;">No changes recorded yet.</p>';
+        const overlay=document.createElement('div');
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML=`
+          <div style="background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(520px,96%);max-height:80vh;display:flex;flex-direction:column;font-family:Arial,sans-serif;overflow:hidden;">
+            <div style="background:#4f46e5;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+              <span style="font-size:15px;font-weight:700;color:#fff;">📋 Changes Log — ${code}</span>
+              <button id="_log_x" style="background:transparent;border:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:0 4px;">✕</button>
+            </div>
+            <div style="padding:16px;overflow-y:auto;flex:1;">
+              <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">${log.length} change(s) — newest first</div>
+              ${entries}
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#_log_x').addEventListener('click',()=>overlay.remove());
+        overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+      }
+
       function open() {
         document.getElementById("dutiesModal").style.display="block";
         loadLocal(); rebuildUI();
@@ -4158,7 +4242,7 @@
       }
       function close() { document.getElementById("dutiesModal").style.display="none"; }
 
-      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,applyDutySearchFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode};
+      return {open,close,addDutyRow,saveToCloud,loadFromCloud,clearFiltered,applyAreaFilter,applyDutySearchFilter,rebuildUI,addNewArea,previewImport,selectAllImport,cancelImport,doImportDuties,saveAndClose,openEditByCode,deleteDuty,toggleEnabled,openLog};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════
