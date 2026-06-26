@@ -126,7 +126,7 @@ function launchApp() {
   const rl = { charge:'<i class="bi bi-person-badge"></i> Charge Person', admin:'<i class="bi bi-shield-lock"></i> Administrator' };
   const rc = { charge:'rgba(15,118,110,.65)', admin:'rgba(124,58,237,.65)' };
   const b  = se('roleBadge');
-  b.textContent      = rl[currentUser.role] || currentUser.role;
+  b.innerHTML        = rl[currentUser.role] || currentUser.role;
   b.style.background = rc[currentUser.role] || 'rgba(255,255,255,.15)';
   buildNav();
 }
