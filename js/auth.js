@@ -430,6 +430,7 @@
     window.BCOT_AUTH_ALLOWED_AREAS = user.areas || 'ALL';
     _removeOverlay();
     _addLogoutButton(user.name);
+    _initIdleTimer();
     _pendingUser = null;
     window.dispatchEvent(new CustomEvent('bcotAuth', { detail: getSession() }));
   }
@@ -455,6 +456,54 @@
     const ps = document.createElement('style');
     ps.textContent = '@media print{#bcot-logout-btn{display:none!important}}';
     document.head.appendChild(ps);
+  }
+
+  /* ── Idle-logout timer (15 min) ─────────────────────────────────────────── */
+  let _idleTimerStarted = false;
+  function _initIdleTimer() {
+    if (_idleTimerStarted) return;
+    _idleTimerStarted = true;
+    const IDLE_MS = 15 * 60 * 1000;
+    const WARN_MS =  1 * 60 * 1000;
+    let _idleT = null, _warnT = null, _warnEl = null;
+
+    function _clearWarn() {
+      if (_warnEl) { _warnEl.remove(); _warnEl = null; }
+    }
+    function _showWarn() {
+      _clearWarn();
+      _warnEl = document.createElement('div');
+      _warnEl.textContent = '⚠️  No activity detected — you will be logged out in 1 minute.';
+      _warnEl.style.cssText =
+        'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99999;' +
+        'background:#b45309;color:#fff;padding:10px 24px;border-radius:8px;' +
+        'font-size:13px;font-family:Arial,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.3);' +
+        'white-space:nowrap;';
+      document.body.appendChild(_warnEl);
+    }
+    function _doIdleLogout() {
+      _clearWarn();
+      clearSession();
+      const overlay = document.createElement('div');
+      overlay.textContent = 'Session expired due to inactivity. Logging out…';
+      overlay.style.cssText =
+        'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.75);' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'color:#fff;font-size:15px;font-family:Arial,sans-serif;text-align:center;padding:20px;';
+      document.body.appendChild(overlay);
+      setTimeout(() => location.reload(), 2500);
+    }
+    function _reset() {
+      clearTimeout(_idleT);
+      clearTimeout(_warnT);
+      _clearWarn();
+      _warnT = setTimeout(_showWarn,     IDLE_MS - WARN_MS);
+      _idleT = setTimeout(_doIdleLogout, IDLE_MS);
+    }
+    ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(ev =>
+      document.addEventListener(ev, _reset, { passive: true })
+    );
+    _reset();
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
