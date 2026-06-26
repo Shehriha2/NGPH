@@ -4899,6 +4899,163 @@
       return {open,close,toggleEnabled,editArea,addArea,getMeta,saveMeta,getLabel};
     })();
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // DUTY PALETTE  (DP namespace) — floating picker for filling rota cells
+    // ══════════════════════════════════════════════════════════════════════════
+    const DP = (() => {
+      let _anchor = null;
+      let _timer  = null;
+      const $ = id => document.getElementById(id);
+
+      function _areaLbl() {
+        const a = getCurrentArea();
+        if (!a || a === 'ALL') return 'All Duties';
+        const lbl = AM.getLabel(a);
+        return lbl ? `${a} · ${lbl}` : a;
+      }
+
+      function _filteredDuties(search) {
+        const area = getCurrentArea();
+        const s = (search || '').toLowerCase().trim();
+        return Object.entries(DUTIES).filter(([code, d]) => {
+          if (d.enabled === false) return false;
+          if (area && area !== 'ALL') {
+            const areas = (d.area || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+            if (areas.length && !areas.includes(area.toUpperCase())) return false;
+          }
+          if (!s) return true;
+          return code.toLowerCase().includes(s) || (d.label || '').toLowerCase().includes(s);
+        });
+      }
+
+      function render() {
+        const search  = ($('dp-search')?.value || '');
+        const duties  = _filteredDuties(search);
+        const total   = _filteredDuties('').length;
+        const chipsEl = $('dp-chips');
+        const cntEl   = $('dp-count');
+        if (!chipsEl) return;
+
+        chipsEl.innerHTML = duties.length
+          ? duties.map(([code, d]) => {
+              const bg  = d.color || '#1a4f8b';
+              const fg  = contrastColor(bg);
+              const lbl = (d.label || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+              const tip = `${code}${d.label?' — '+d.label:''} · ${d.hours||0}h`;
+              return `<button type="button" class="dp-chip" onclick="DP.pick('${code}')"
+                style="background:${bg};color:${fg};" title="${tip.replace(/"/g,'&quot;')}">
+                <span class="dp-code">${code}</span>
+                <span class="dp-lbl">${lbl}</span>
+              </button>`;
+            }).join('')
+          : '<div style="padding:14px;color:#9ca3af;font-size:12px;text-align:center;width:100%;">No duties match</div>';
+
+        if (cntEl) cntEl.textContent = duties.length < total
+          ? `${duties.length} of ${total} duties`
+          : `${total} duties`;
+      }
+
+      function pick(code) {
+        if (_anchor && DUTIES[code]) {
+          applyDutyToCell(_anchor, code);
+          _anchor.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        close();
+      }
+
+      function open(cell) {
+        if (!cell) return;
+        _anchor = cell;
+        const pal = $('dutyPalette');
+        if (!pal) return;
+
+        const aHdr = $('dp-area-label');
+        if (aHdr) aHdr.textContent = _areaLbl();
+
+        // Smart position: prefer below the cell, flip up if near viewport bottom
+        const rect = cell.getBoundingClientRect();
+        const palW = 364, palH = 330;
+        let top  = rect.bottom + 5;
+        let left = rect.left;
+        if (top  + palH > window.innerHeight - 8) top  = rect.top - palH - 5;
+        if (left + palW > window.innerWidth  - 8) left = window.innerWidth - palW - 8;
+        if (top  < 8) top  = 8;
+        if (left < 8) left = 8;
+
+        pal.style.top     = top  + 'px';
+        pal.style.left    = left + 'px';
+        pal.style.display = 'block';
+
+        const s = $('dp-search');
+        if (s) { s.value = ''; s.focus(); }
+        render();
+      }
+
+      function close() {
+        const pal = $('dutyPalette');
+        if (pal) pal.style.display = 'none';
+        _anchor = null;
+      }
+
+      function _shouldOpen(td) {
+        if (!td || !td.isContentEditable) return false;
+        if (patternModeArmed) return false;          // let pattern mode handle the click
+        const skip = ['hours-cell','sched-cell','ot-cell','ext-cell','note-cell'];
+        if (skip.some(c => td.classList.contains(c))) return false;
+        if (td.cellIndex === 0) return false;        // staff name column
+        return true;
+      }
+
+      function _onClick(e) {
+        const td = e.target.closest('td');
+        if (!_shouldOpen(td)) return;
+        clearTimeout(_timer);
+        _timer = setTimeout(() => open(td), 200);   // 200 ms debounce guards against dblclick
+      }
+
+      function init() {
+        const tbl = document.getElementById('rotaTable');
+        if (tbl) {
+          tbl.addEventListener('click',    _onClick);
+          tbl.addEventListener('dblclick', () => clearTimeout(_timer));
+        }
+        // Escape closes palette
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && $('dutyPalette')?.style.display !== 'none') {
+            e.stopPropagation(); close();
+          }
+        }, true);
+        // Click outside palette → close
+        document.addEventListener('mousedown', e => {
+          const pal = $('dutyPalette');
+          if (pal && pal.style.display !== 'none' && !pal.contains(e.target)) close();
+        }, true);
+        // Search box keyboard shortcuts
+        $('dp-search')?.addEventListener('keydown', e => {
+          if (e.key === 'Enter')    { e.preventDefault(); document.querySelector('#dp-chips .dp-chip')?.click(); }
+          if (e.key === 'ArrowDown'){ e.preventDefault(); document.querySelector('#dp-chips .dp-chip')?.focus(); }
+        });
+        // Arrow navigation inside chip grid
+        $('dp-chips')?.addEventListener('keydown', e => {
+          if (!['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key)) return;
+          e.preventDefault();
+          const chips = [...document.querySelectorAll('#dp-chips .dp-chip')];
+          const idx   = chips.indexOf(document.activeElement);
+          if (idx < 0) return;
+          const perRow = Math.round(364 / 84);
+          if (e.key === 'ArrowRight' && idx + 1 < chips.length) chips[idx+1].focus();
+          if (e.key === 'ArrowLeft'  && idx - 1 >= 0)           chips[idx-1].focus();
+          if (e.key === 'ArrowDown'  && idx + perRow < chips.length) chips[idx+perRow].focus();
+          if (e.key === 'ArrowUp') {
+            if (idx - perRow >= 0) chips[idx-perRow].focus();
+            else $('dp-search')?.focus();
+          }
+        });
+      }
+
+      return { open, close, pick, render, init };
+    })();
+
     // ── Init ──────────────────────────────────────────────────────────────────
     (function init() {
       setKeyFieldFromStorage();
@@ -5010,4 +5167,5 @@
         });
       }
     })();
-  
+
+    DP.init();
