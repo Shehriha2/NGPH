@@ -127,7 +127,28 @@
     .ha-reopened {background:#fef3c7;color:#d97706;}
     .ha-deleted  {background:#fee2e2;color:#dc2626;}
     .ha-shared   {background:#fce7f3;color:#be185d;}
-    .ha-priority {background:#f5f3ff;color:#7c3aed;}
+    .ha-priority      {background:#f5f3ff;color:#7c3aed;}
+    .ha-remark_added  {background:#ecfdf5;color:#059669;}
+    .ha-remark_deleted{background:#fef3c7;color:#b45309;}
+
+    /* Remarks panel */
+    .remarks-panel{background:#f8faff;border:1px solid #dbeafe;border-radius:0 0 10px 10px;padding:10px 14px;margin-top:-2px;border-top:2px solid #2563eb;}
+    .remarks-header{font-size:11px;font-weight:700;color:#1a4f8b;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+    .remark-count{background:#2563eb;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;min-width:18px;text-align:center;}
+    .remarks-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:220px;overflow-y:auto;}
+    .remark-item{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:7px 10px;}
+    .remark-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
+    .remark-author{font-size:10px;font-weight:700;color:#1a4f8b;}
+    .remark-time{font-size:10px;color:#9ca3af;white-space:nowrap;}
+    .remark-del-btn{margin-left:auto;background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer;}
+    .remark-del-btn:hover{background:#fca5a5;}
+    .remark-text{font-size:12px;color:#374151;white-space:pre-wrap;word-break:break-word;}
+    .remark-empty{color:#9ca3af;font-size:11px;text-align:center;padding:8px 0;font-style:italic;}
+    .remark-add-row{display:flex;gap:8px;align-items:flex-end;}
+    .remark-input-wrap{flex:1;position:relative;}
+    .remark-input{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;font-family:inherit;resize:none;}
+    .remark-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);}
+    .remark-counter{position:absolute;bottom:4px;right:8px;font-size:10px;color:#9ca3af;pointer-events:none;}
 
     /* Toast */
     #toast{position:fixed;top:18px;right:18px;padding:9px 18px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;z-index:99999;display:none;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:360px;}
@@ -413,6 +434,7 @@ let calMonth     = new Date().getMonth();
 let calSelected  = null;
 let editingId    = null;
 let filters      = { priority:'ALL', status:'ALL', due:'ALL' };
+let openRemarksId = null;
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 function uid() { return 'tk_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
@@ -602,6 +624,7 @@ function renderList() {
     return;
   }
   el.innerHTML = tasks.map(t => taskCardHTML(t)).join('');
+  openRemarksId = null;
 }
 
 function taskCardHTML(t) {
@@ -629,6 +652,7 @@ function taskCardHTML(t) {
     ${t.status !== 'completed'
       ? `<button class="btn-green btn-sm" title="Mark complete" onclick="completeTask('${t.id}')"><i class="bi bi-check-lg"></i></button>`
       : `<button class="btn-gray  btn-sm" title="Reopen" onclick="reopenTask('${t.id}')"><i class="bi bi-arrow-counterclockwise"></i></button>`}
+    ${(()=>{ const rc=(t.remarks||[]).length; return `<button class="btn-teal btn-sm" id="rb_${t.id}" title="Remarks" onclick="toggleRemarks('${t.id}')"><i class="bi bi-chat-text${rc?'-fill':''}"></i>${rc?' '+rc:''}</button>`; })()}
     ${isOwner ? `<button class="btn-blue btn-sm" title="Edit" onclick="openEditModal('${t.id}')"><i class="bi bi-pencil"></i></button>` : ''}
     ${isOwner ? `<button class="btn-red  btn-sm" title="Delete" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>` : ''}
   </div>
@@ -719,9 +743,11 @@ function renderHistory() {
   document.getElementById('histCount').textContent = `${entries.length} entr${entries.length===1?'y':'ies'}`;
 
   const cls = { created:'ha-created', updated:'ha-updated', completed:'ha-completed',
-                reopened:'ha-reopened', deleted:'ha-deleted', shared:'ha-shared', priority_changed:'ha-priority' };
+                reopened:'ha-reopened', deleted:'ha-deleted', shared:'ha-shared', priority_changed:'ha-priority',
+                remark_added:'ha-remark_added', remark_deleted:'ha-remark_deleted' };
   const ico = { created:'bi-plus-circle', updated:'bi-pencil', completed:'bi-check-circle-fill',
-                reopened:'bi-arrow-counterclockwise', deleted:'bi-trash', shared:'bi-share-fill', priority_changed:'bi-flag-fill' };
+                reopened:'bi-arrow-counterclockwise', deleted:'bi-trash', shared:'bi-share-fill', priority_changed:'bi-flag-fill',
+                remark_added:'bi-chat-text-fill', remark_deleted:'bi-chat-text' };
 
   document.getElementById('histBody').innerHTML = entries.length
     ? entries.map(h=>`<tr>
@@ -759,6 +785,124 @@ function deleteTask(id) {
   t._deleted = true; t.updatedAt = new Date().toISOString(); // soft-delete (keeps audit)
   saveToCloud(); renderAll();
   showToast('Task deleted','info');
+}
+
+// ── Remarks ────────────────────────────────────────────────────────────────
+function toggleRemarks(id) {
+  if (openRemarksId === id) {
+    openRemarksId = null;
+    document.getElementById('rm_'+id)?.remove();
+    return;
+  }
+  if (openRemarksId) document.getElementById('rm_'+openRemarksId)?.remove();
+  openRemarksId = id;
+  const task = TASKS.find(x => x.id === id); if (!task) return;
+  const card = document.getElementById('tc_'+id); if (!card) return;
+  const panel = document.createElement('div');
+  panel.innerHTML = _buildRemarksHTML(task);
+  card.insertAdjacentElement('afterend', panel.firstElementChild);
+}
+
+function _buildRemarksHTML(task) {
+  const remarks = Array.isArray(task.remarks) ? task.remarks : [];
+  const listHTML = remarks.length
+    ? remarks.map(r => {
+        const mine = r.by === currentUser || r.byId === currentUserId;
+        return `<div class="remark-item" id="ri_${r.id}">
+          <div class="remark-meta">
+            <span class="remark-author"><i class="bi bi-person-fill"></i> ${esc(r.by)}</span>
+            <span class="remark-time">${fmtDT(r.at)}</span>
+            ${mine ? `<button class="remark-del-btn" onclick="deleteRemark('${task.id}','${r.id}')" title="Delete your remark"><i class="bi bi-trash"></i></button>` : ''}
+          </div>
+          <div class="remark-text">${esc(r.text)}</div>
+        </div>`;
+      }).join('')
+    : `<div class="remark-empty"><i class="bi bi-chat-dots"></i> No remarks yet.</div>`;
+
+  return `<div class="remarks-panel" id="rm_${task.id}">
+    <div class="remarks-header"><i class="bi bi-chat-text-fill"></i> Remarks <span class="remark-count">${remarks.length}</span></div>
+    <div class="remarks-list" id="rml_${task.id}">${listHTML}</div>
+    <div class="remark-add-row">
+      <div class="remark-input-wrap">
+        <textarea id="rt_${task.id}" class="remark-input" maxlength="200" rows="2"
+          placeholder="Add a remark… (max 200 characters)"
+          oninput="document.getElementById('rc_${task.id}').textContent=(200-this.value.length)+' left'"></textarea>
+        <span id="rc_${task.id}" class="remark-counter">200 left</span>
+      </div>
+      <button class="btn-teal btn-sm" onclick="addRemark('${task.id}')" style="padding:5px 10px;"><i class="bi bi-send"></i> Add</button>
+    </div>
+  </div>`;
+}
+
+function addRemark(taskId) {
+  const t = TASKS.find(x => x.id === taskId); if (!t) return;
+  const input = document.getElementById('rt_'+taskId);
+  const text = (input?.value || '').trim();
+  if (!text) { showToast('Remark cannot be empty.','err'); return; }
+  if (text.length > 200) { showToast('Remark must not exceed 200 characters.','err'); return; }
+
+  if (!Array.isArray(t.remarks)) t.remarks = [];
+  const r = { id:'rk_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), text, by:currentUser, byId:currentUserId, at:new Date().toISOString() };
+  t.remarks.push(r);
+  t.updatedAt = new Date().toISOString();
+  addHistory(t,'remark_added',`Remark by ${currentUser}: "${text.slice(0,60)}${text.length>60?'…':''}"`);
+  saveToCloud();
+
+  // Update list in DOM
+  const listEl = document.getElementById('rml_'+taskId);
+  if (listEl) listEl.innerHTML = t.remarks.map(r2 => {
+    const mine = r2.by === currentUser || r2.byId === currentUserId;
+    return `<div class="remark-item" id="ri_${r2.id}">
+      <div class="remark-meta">
+        <span class="remark-author"><i class="bi bi-person-fill"></i> ${esc(r2.by)}</span>
+        <span class="remark-time">${fmtDT(r2.at)}</span>
+        ${mine ? `<button class="remark-del-btn" onclick="deleteRemark('${taskId}','${r2.id}')" title="Delete your remark"><i class="bi bi-trash"></i></button>` : ''}
+      </div>
+      <div class="remark-text">${esc(r2.text)}</div>
+    </div>`;
+  }).join('');
+
+  // Update count badge on panel header
+  const countEl = document.querySelector(`#rm_${taskId} .remark-count`);
+  if (countEl) countEl.textContent = t.remarks.length;
+
+  // Update button on card
+  const btn = document.getElementById('rb_'+taskId);
+  if (btn) btn.innerHTML = `<i class="bi bi-chat-text-fill"></i> ${t.remarks.length}`;
+
+  // Clear input
+  if (input) input.value = '';
+  const ctr = document.getElementById('rc_'+taskId);
+  if (ctr) ctr.textContent = '200 left';
+
+  showToast('Remark added ✓');
+}
+
+function deleteRemark(taskId, remarkId) {
+  const t = TASKS.find(x => x.id === taskId); if (!t) return;
+  const r = (t.remarks||[]).find(x => x.id === remarkId);
+  if (!r) return;
+  if (r.by !== currentUser && r.byId !== currentUserId) { showToast('You can only delete your own remarks.','err'); return; }
+  if (!confirm('Delete this remark?')) return;
+
+  t.remarks = t.remarks.filter(x => x.id !== remarkId);
+  t.updatedAt = new Date().toISOString();
+  addHistory(t,'remark_deleted',`Remark deleted by ${currentUser}`);
+  saveToCloud();
+
+  document.getElementById('ri_'+remarkId)?.remove();
+
+  const countEl = document.querySelector(`#rm_${taskId} .remark-count`);
+  if (countEl) countEl.textContent = t.remarks.length;
+
+  const btn = document.getElementById('rb_'+taskId);
+  if (btn) btn.innerHTML = t.remarks.length ? `<i class="bi bi-chat-text-fill"></i> ${t.remarks.length}` : `<i class="bi bi-chat-text"></i>`;
+
+  if (!t.remarks.length) {
+    const listEl = document.getElementById('rml_'+taskId);
+    if (listEl) listEl.innerHTML = `<div class="remark-empty"><i class="bi bi-chat-dots"></i> No remarks yet.</div>`;
+  }
+  showToast('Remark deleted','info');
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────
@@ -889,6 +1033,7 @@ function saveTask() {
       recurrence,
       shared,
       history: [],
+      remarks: [],
       _deleted: false,
     };
     addHistory(t,'created',
