@@ -433,7 +433,7 @@
     document.querySelectorAll('#formWrapper .ot-table tbody tr').forEach(tr => {
       if (tr.classList.contains('total-row')) return;
       const idx = parseInt(tr.cells[0]?.textContent || '0') - 1;
-      if (idx < 0 || idx >= _cachedRows.length) return;
+      if (!Number.isFinite(idx) || idx < 0 || idx >= _cachedRows.length) return;
       _cachedRows[idx].loc  = tr.querySelector('td.loc  .picker-trigger')?.value || '';
       _cachedRows[idx].just = tr.querySelector('td.just .picker-trigger')?.value || '';
     });
