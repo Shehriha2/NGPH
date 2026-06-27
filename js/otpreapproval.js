@@ -74,6 +74,7 @@
   function monthRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId); }
   function releaseIndexRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'release_index',docId); }
   function releaseDocRef(key,area,releaseId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'releases',releaseId); }
+  function formDataRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'ot_form_data',docId); }
 
   // ── Release picker ────────────────────────────────────────────────────────
   let _selectedReleaseId = null;
@@ -564,6 +565,51 @@
     return rows;
   }
 
+  // ── Form data: save/load loc+just per badge to Firestore ─────────────────
+  function _deriveCostCenter(rows) {
+    return rows.some(r => (r.loc||'').toUpperCase().includes('KASCH')) ? '028498-7330' : '7330';
+  }
+
+  async function _loadFormData(key, area, month, year) {
+    try {
+      const docId = `${year}-${String(month).padStart(2,'0')}`;
+      const snap = await window.FB.getDoc(formDataRef(key, area, docId));
+      return snap.exists() ? (snap.data().rows || {}) : null;
+    } catch(e) { console.warn('[BCOT] loadFormData:', e); return null; }
+  }
+
+  function _mergeFormData(rows, savedRows) {
+    if (!savedRows) return rows;
+    return rows.map(r => {
+      const saved = savedRows[r.badge];
+      if (!saved) return r;
+      const just = saved.just || '';
+      const mult = just === 'ON-CALL DUTY' ? 0.1 : 1.5;
+      return { ...r, loc: saved.loc || '', just, totalCost: Math.round(r.otHours * r.hrr * mult) };
+    });
+  }
+
+  async function saveFormData() {
+    if (!_cachedRows) { showStatus('Build the form first.', false); return; }
+    const key = (window.BCOT_APP_KEY||'').trim();
+    if (!key) { showStatus('config.js not found.', false); return; }
+    _snapRowSelections();
+    const month = Number(document.getElementById('monthSel').value);
+    const year  = Number(document.getElementById('yearSel').value) || new Date().getFullYear();
+    const area  = (_cachedArea || '').toUpperCase();
+    if (!area || area === 'ALL') { showStatus('Select a specific area before saving.', false); return; }
+    const docId = `${year}-${String(month).padStart(2,'0')}`;
+    const rowsData = {};
+    _cachedRows.forEach(r => {
+      if (r.badge && r.badge !== '—') rowsData[r.badge] = { loc: r.loc || '', just: r.just || '' };
+    });
+    try {
+      showStatus('Saving to cloud…');
+      await window.FB.setDoc(formDataRef(key, area, docId), { rows: rowsData });
+      showStatus('Saved ✅ — other users will see this on next load.');
+    } catch(e) { showStatus('Save failed: '+(e?.message||e), false); }
+  }
+
   // ── Load & Build ──────────────────────────────────────────────────────────
   async function loadAndBuild() {
     const key=(window.BCOT_APP_KEY||'').trim();
@@ -576,8 +622,8 @@
     const meta = {
       dept:     document.getElementById('deptName')?.value   || 'PHARMACEUTICAL CARE DEPARTMENT KASC 6755',
       period:   document.getElementById('periodCovered')?.value || '',
-      cost:     document.getElementById('costCenter')?.value  || '028498-7330',
-      tel:      document.getElementById('inchargeTel')?.value || '67845 / 67843',
+      cost:     '',
+      tel:      '62998 / 67841 / 62903',
       reqName:  document.getElementById('reqName')?.value     || 'Dr. Mohammed Aseeri',
       reqTitle: document.getElementById('reqTitle')?.value    || 'Director Pharmaceutical Care Services-WR',
       reqID:    document.getElementById('reqID')?.value       || '9146184',
@@ -612,11 +658,13 @@
     staffRecs.forEach(s=>{ if(s.name&&s.hrr) hrrByName[s.name.trim()]=Number(s.hrr)||0; });
 
     // Fetch approved extensions from Extension page (Firebase-approved takes priority over manual entry)
-    const extMap = await fetchGrantedExtensions(month, year, area);
-    const rows = _buildRowsFromPayload(payload, staffRecs, hrrByName, extMap);
-
-    buildForm(rows, area, meta);
-    showStatus(`Form built — ${rows.length} staff with OT | ${Math.ceil(rows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
+    const extMap  = await fetchGrantedExtensions(month, year, area);
+    const rawRows = _buildRowsFromPayload(payload, staffRecs, hrrByName, extMap);
+    const _saved  = await _loadFormData(key, area, month, year);
+    const finalRows = _mergeFormData(rawRows, _saved);
+    meta.cost = _deriveCostCenter(finalRows);
+    buildForm(finalRows, area, meta);
+    showStatus(`Form built — ${finalRows.length} staff with OT${_saved ? ' · pre-filled from cloud' : ''} | ${Math.ceil(finalRows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
   }
 
   // ── Fetch latest named release for one area ───────────────────────────────
@@ -691,8 +739,8 @@
     const baseMeta = {
       dept:     document.getElementById('deptName')?.value     || 'PHARMACEUTICAL CARE DEPARTMENT KASC 6755',
       period:   new Date(year,month-1,1).toLocaleString('default',{month:'long'}) + '-' + String(year).slice(-2),
-      cost:     document.getElementById('costCenter')?.value   || '028498-7330',
-      tel:      document.getElementById('inchargeTel')?.value  || '67845 / 67843',
+      cost:     '',
+      tel:      '62998 / 67841 / 62903',
       reqName:  document.getElementById('reqName')?.value      || 'Dr. Mohammed Aseeri',
       reqTitle: document.getElementById('reqTitle')?.value     || 'Director Pharmaceutical Care Services-WR',
       reqID:    document.getElementById('reqID')?.value        || '9146184',
@@ -708,10 +756,10 @@
       const result = await _fetchLatestRelease(key, area, month, year);
       if (!result) { noRelease.push(area); continue; }
 
-      const extMap = await fetchGrantedExtensions(month, year, area);
-      const rows   = _buildRowsFromPayload(result.payload, staffRecs, hrrByName, extMap);
+      const extMap  = await fetchGrantedExtensions(month, year, area);
+      const rawRows = _buildRowsFromPayload(result.payload, staffRecs, hrrByName, extMap);
 
-      if (!rows.length) {
+      if (!rawRows.length) {
         if (zeroAction === 'zeros') {
           summaryItems.push({ area, staffCount:0, totalHours:0, totalCost:0 });
         } else {
@@ -720,7 +768,9 @@
         continue;
       }
 
-      const meta = { ...baseMeta };
+      const _saved = await _loadFormData(key, area, month, year);
+      const rows   = _mergeFormData(rawRows, _saved);
+      const meta   = { ...baseMeta, cost: _deriveCostCenter(rows) };
       fullHtml += buildFormHtml(rows, area, meta, 'full', false);
       summaryItems.push({
         area,
