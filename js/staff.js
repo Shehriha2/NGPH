@@ -1,5 +1,7 @@
     const AREAS_LIST_KEY     = "BCOT_AREAS_LIST_V1";
     const STAFF_RECORDS_KEY  = "BCOT_STAFF_RECORDS_V2";   // unified pool
+    const ROLES_KEY          = "BCOT_ROLES_LIST";
+    const DEFAULT_ROLES      = ["Pharmacist", "Technician", "Pharmacy Aide"];
 
     let staffRecords = [];   // full in-memory list (all areas)
 
@@ -38,6 +40,73 @@
     }
     function getCurrentFilter() {
       return (document.getElementById("areaFilter")?.value || "ALL").toUpperCase();
+    }
+
+    // ── Role helpers ───────────────────────────────────────────────────────────
+    function getRolesList() {
+      try {
+        const r = JSON.parse(localStorage.getItem(ROLES_KEY) || "[]");
+        return (Array.isArray(r) && r.length) ? r : [...DEFAULT_ROLES];
+      } catch { return [...DEFAULT_ROLES]; }
+    }
+
+    function saveRoleToList(role) {
+      role = role.trim();
+      if (!role) return;
+      const list = getRolesList();
+      if (!list.includes(role)) {
+        list.push(role);
+        localStorage.setItem(ROLES_KEY, JSON.stringify(list));
+      }
+    }
+
+    function rebuildRoleSelects() {
+      const roles = getRolesList();
+      ["stRole", "importRole"].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const cur = sel.value;
+        sel.innerHTML = roles.map(r => `<option${r === cur ? " selected" : ""}>${escapeHtml(r)}</option>`).join("");
+      });
+      renderRoleTags();
+    }
+
+    function renderRoleTags() {
+      const container = document.getElementById("roleTagsContainer");
+      if (!container) return;
+      const roles = getRolesList();
+      container.innerHTML = roles.map(r => {
+        const isDef = DEFAULT_ROLES.includes(r);
+        return `<span style="display:inline-flex;align-items:center;gap:3px;background:#dbeafe;color:#1e40af;
+          font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;">
+          ${escapeHtml(r)}${isDef ? "" : `<button type="button" onclick="removeRole('${escapeHtml(r)}')"
+            style="background:none;border:none;cursor:pointer;color:#1e40af;padding:0 0 0 2px;font-size:12px;line-height:1;"
+            title="Remove">✕</button>`}
+        </span>`;
+      }).join("");
+    }
+
+    function addCustomRole() {
+      const input = document.getElementById("newRoleInput");
+      const val = (input?.value || "").trim();
+      if (!val) return;
+      if (getRolesList().includes(val)) { showStatusMessage(`"${val}" already exists.`, true); return; }
+      saveRoleToList(val);
+      rebuildRoleSelects();
+      ["stRole", "importRole"].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) sel.value = val;
+      });
+      if (input) input.value = "";
+      showStatusMessage(`Role "${val}" added ✅`);
+    }
+
+    function removeRole(role) {
+      if (DEFAULT_ROLES.includes(role)) return;
+      const list = getRolesList().filter(r => r !== role);
+      localStorage.setItem(ROLES_KEY, JSON.stringify(list));
+      rebuildRoleSelects();
+      showStatusMessage(`Role "${role}" removed.`);
     }
 
     function rebuildAreaUI() {
@@ -485,9 +554,7 @@
             </label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Role
               <select id="editRole" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;">
-                <option${rec.role==='Pharmacist'?' selected':''}>Pharmacist</option>
-                <option${rec.role==='Technician'?' selected':''}>Technician</option>
-                <option${rec.role==='Pharmacy Aide'?' selected':''}>Pharmacy Aide</option>
+                ${getRolesList().map(r => `<option${r===rec.role?' selected':''}>${escapeHtml(r)}</option>`).join('')}
               </select>
             </label>
             <label style="font-size:11px;font-weight:700;color:#374151;">HRR
@@ -811,6 +878,7 @@
 
     // ── Init ───────────────────────────────────────────────────────────────────
     (function init() {
+      rebuildRoleSelects();
       rebuildAreaUI();
 
       // Restore last used filter

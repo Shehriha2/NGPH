@@ -4475,6 +4475,52 @@
         },1500);
       }
 
+      const SM_ROLES_KEY     = "BCOT_ROLES_LIST";
+      const SM_DEFAULT_ROLES = ["Pharmacist","Technician","Pharmacy Aide"];
+
+      function getRolesList() {
+        try { const r=JSON.parse(localStorage.getItem(SM_ROLES_KEY)||"[]"); return (Array.isArray(r)&&r.length)?r:[...SM_DEFAULT_ROLES]; }
+        catch { return [...SM_DEFAULT_ROLES]; }
+      }
+      function saveRoleToList(role) {
+        role=(role||"").trim(); if(!role)return;
+        const list=getRolesList();
+        if(!list.includes(role)){ list.push(role); localStorage.setItem(SM_ROLES_KEY,JSON.stringify(list)); }
+      }
+      function rebuildRoleSelects() {
+        const roles=getRolesList();
+        ["sm-stRole","sm-importRole"].forEach(id=>{
+          const sel=document.getElementById(id); if(!sel)return;
+          const cur=sel.value;
+          sel.innerHTML=roles.map(r=>`<option${r===cur?" selected":""}>${r}</option>`).join("");
+        });
+        renderRoleTags();
+      }
+      function renderRoleTags() {
+        const container=document.getElementById("sm-roleTagsContainer"); if(!container)return;
+        const roles=getRolesList();
+        container.innerHTML=roles.map(r=>{
+          const isDef=SM_DEFAULT_ROLES.includes(r);
+          return `<span style="display:inline-flex;align-items:center;gap:3px;background:#dbeafe;color:#1e40af;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;">${r}${isDef?"":`<button type="button" onclick="SM.removeRole('${r.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;color:#1e40af;padding:0 0 0 2px;font-size:12px;line-height:1;" title="Remove">✕</button>`}</span>`;
+        }).join("");
+      }
+      function addCustomRole() {
+        const input=document.getElementById("sm-newRoleInput");
+        const val=(input?.value||"").trim(); if(!val)return;
+        if(getRolesList().includes(val)){showStatusMessage(`"${val}" already exists.`,"error");return;}
+        saveRoleToList(val); rebuildRoleSelects();
+        ["sm-stRole","sm-importRole"].forEach(id=>{const s=document.getElementById(id);if(s)s.value=val;});
+        if(input)input.value="";
+        showStatusMessage(`Role "${val}" added ✅`);
+      }
+      function removeRole(role) {
+        if(SM_DEFAULT_ROLES.includes(role))return;
+        const list=getRolesList().filter(r=>r!==role);
+        localStorage.setItem(SM_ROLES_KEY,JSON.stringify(list));
+        rebuildRoleSelects();
+        showStatusMessage(`Role "${role}" removed.`);
+      }
+
       function normalize(r) { return {name:String(r?.name||"").trim(),badge:String(r?.badge||"").trim(),role:String(r?.role||"Pharmacist").trim()||"Pharmacist",hrr:Number(r?.hrr??0)||0,area:String(r?.area||"").trim().toUpperCase(),contractDate:String(r?.contractDate||"").trim()}; }
 
       function rebuildUI() {
@@ -4605,7 +4651,7 @@
           <div style="display:grid;gap:10px;">
             <label style="font-size:11px;font-weight:700;color:#374151;">Name<input id="sm-eName" type="text" value="${rec.name.replace(/"/g,"&quot;")}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Badge<input id="sm-eBadge" type="text" value="${rec.badge}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
-            <label style="font-size:11px;font-weight:700;color:#374151;">Role<select id="sm-eRole" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"><option${rec.role==="Pharmacist"?" selected":""}>Pharmacist</option><option${rec.role==="Technician"?" selected":""}>Technician</option><option${rec.role==="Pharmacy Aide"?" selected":""}>Pharmacy Aide</option></select></label>
+            <label style="font-size:11px;font-weight:700;color:#374151;">Role<select id="sm-eRole" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;">${getRolesList().map(r=>`<option${r===rec.role?" selected":""}>${r}</option>`).join("")}</select></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">HRR<input id="sm-eHRR" type="number" step="0.01" value="${rec.hrr||0}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Contract Date<input id="sm-eContractDate" type="date" value="${rec.contractDate||""}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Areas
@@ -4780,7 +4826,7 @@
       function open() {
         document.getElementById("staffModal").style.display="block";
         records=(()=>{try{const r=JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY)||"[]");return Array.isArray(r)?r.map(normalize).filter(s=>s.name):[];}catch{return [];}})();
-        rebuildUI(); renderTable();
+        rebuildRoleSelects(); rebuildUI(); renderTable();
         // Set area filter to match rota
         const area=getCurrentArea(), sel=document.getElementById("sm-areaFilter");
         if(sel&&area&&(area==="ALL"||getAreasList().includes(area)))sel.value=area;
@@ -4803,7 +4849,7 @@
         else doOpen();
       }
 
-      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName};
+      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName,addCustomRole,removeRole};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -1190,9 +1190,7 @@
         <b style="font-size:12px;color:#374151;white-space:nowrap;">Add Staff:</b>
         <input id="sm-stName"  type="text" placeholder="Name (required)" style="min-width:180px;font-size:12px;"/>
         <input id="sm-stBadge" type="text" placeholder="Badge" style="min-width:100px;font-size:12px;"/>
-        <select id="sm-stRole" style="min-width:120px;font-size:12px;">
-          <option>Pharmacist</option><option>Technician</option><option>Pharmacy Aide</option>
-        </select>
+        <select id="sm-stRole" style="min-width:120px;font-size:12px;"><!-- populated by JS --></select>
         <input id="sm-stHRR" type="number" step="0.01" placeholder="HRR" style="min-width:80px;font-size:12px;"/>
         <input type="hidden" id="sm-stAreaValue" value=""/>
         <button type="button" id="sm-stAreaBtn" onclick="SM.openAreaPicker('sm-stAreaValue','sm-stAreaBtn','Select Areas')"
@@ -1207,13 +1205,20 @@
             <b style="font-size:12px;">Import from Excel:</b>
             <button type="button" onclick="document.getElementById('sm-xlsxInput').click()" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">📂 Choose File</button>
             <input type="file" id="sm-xlsxInput" accept=".xlsx,.xls" style="display:none;" onchange="SM.importFromExcel(this)"/>
-            <select id="sm-importRole" style="font-size:12px;">
-              <option>Pharmacist</option><option>Technician</option><option>Pharmacy Aide</option>
-            </select>
+            <select id="sm-importRole" style="font-size:12px;"><!-- populated by JS --></select>
             <input type="hidden" id="sm-importAreaValue" value=""/>
             <button type="button" id="sm-importAreaBtn" onclick="SM.openAreaPicker('sm-importAreaValue','sm-importAreaBtn','Import Area')"
               style="min-width:90px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;color:#0369a1;">— Area —</button>
             <input type="number" id="sm-importHRR" step="0.01" placeholder="HRR (opt.)" style="min-width:90px;font-size:12px;"/>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:12px;">Role Categories:</b>
+            <span id="sm-roleTagsContainer" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;"></span>
+            <input type="text" id="sm-newRoleInput" placeholder="New role…"
+              style="min-width:110px;font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;"
+              onkeydown="if(event.key==='Enter')SM.addCustomRole()"/>
+            <button type="button" onclick="SM.addCustomRole()"
+              style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">+ Add</button>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <b style="font-size:12px;">Update HRR:</b>
