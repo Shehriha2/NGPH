@@ -298,7 +298,7 @@
       updateRotaLabel();
 
       if (choice === 'fresh') {
-        await onAreaChanged(area);
+        await onAreaChanged(area, false);
         showStatusMessage(`New release: ${getRotaDisplayName()} — grid cleared, staff loaded from cloud ✅`);
         return;
       }
@@ -975,7 +975,7 @@
       await onAreaChanged(area);
     }
 
-    async function onAreaChanged(area) {
+    async function onAreaChanged(area, autoLoad = true) {
       // Clear the rota table
       document.querySelector('#rotaTable tbody').innerHTML = '';
       // Load duties then staff from cloud for the new area
@@ -986,6 +986,44 @@
       const _y = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
       const _m = String(document.getElementById('monthSelect')?.value||'1').padStart(2,'0');
       LockManager.onRotaChange(area, `${_y}-${_m}`);
+      if (autoLoad && area && area !== 'ALL') {
+        await autoLoadLastRelease(area);
+      }
+    }
+
+    async function autoLoadLastRelease(area) {
+      const key = (window.BCOT_APP_KEY || '').trim();
+      if (!key) return;
+      showStatusMessage('Loading last release…', 'info');
+      try {
+        const docId = monthDocId();
+        const idxSnap = await window.FB.getDoc(getReleasesIndexRef(key, area, docId));
+        const rels = idxSnap.exists() ? (idxSnap.data().releases || []) : [];
+        if (rels.length) {
+          const latest = rels[rels.length - 1]; // sorted ascending — last = newest
+          const snap = await window.FB.getDoc(getReleaseDocRef(key, area, latest.id));
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.releaseNum) { releaseNum = Number(data.releaseNum); saveReleaseNum(area, releaseNum); }
+            applyPayloadToTable(data);
+            updateRotaLabel();
+            showStatusMessage(`Auto-loaded ${latest.id} ✅`);
+            return;
+          }
+        }
+        // Fallback: legacy monthly save
+        const mSnap = await window.FB.getDoc(getMonthDocRef(key, docId));
+        if (mSnap.exists()) {
+          applyPayloadToTable(mSnap.data());
+          updateRotaLabel();
+          showStatusMessage('Auto-loaded monthly save ✅');
+        } else {
+          showStatusMessage('No saved rota found for this area — grid is clear.', 'info');
+        }
+      } catch(err) {
+        console.warn('Auto-load failed:', err);
+        showStatusMessage('Could not auto-load last release.', 'error');
+      }
     }
 
     function getAreaOrWarn() {

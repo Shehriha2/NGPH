@@ -75,11 +75,11 @@
     button:active{ transform:translateY(1px); }
     button[disabled]{ opacity:.6; cursor:not-allowed; }
 
-    .btn-green{ background:var(--secondary-color); } .btn-green:hover{ background:var(--secondary-dark); }
-    .btn-purple{ background:var(--accent-color); }   .btn-purple:hover{ background:var(--accent-dark); }
-    .btn-orange{ background:var(--warning-color); }  .btn-orange:hover{ background:#b45309; }
-    .save-btn{ background:#16a34a; }   .save-btn:hover{ background:#15803d; }
-    .saveas-btn{ background:var(--accent-color); } .saveas-btn:hover{ background:var(--accent-dark); }
+    .btn-green{ background:#1a4f8b; }  .btn-green:hover{ background:#163a5a; }
+    .btn-purple{ background:#1a4f8b; } .btn-purple:hover{ background:#163a5a; }
+    .btn-orange{ background:#1a4f8b; } .btn-orange:hover{ background:#163a5a; }
+    .save-btn{ background:#1a4f8b; }   .save-btn:hover{ background:#163a5a; }
+    .saveas-btn{ background:#1a4f8b; } .saveas-btn:hover{ background:#163a5a; }
     .ghost-link{ text-decoration:none; }
 
     .dashboard-grid .metric{ font-size:20px; font-weight:800; color:#0f172a; margin-bottom:4px; }
@@ -510,13 +510,13 @@
           </button>
           <button type="button" onclick="openSettingsWithAuth()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:13px;padding:9px 20px;border-radius:10px;font-weight:800;letter-spacing:.3px;"><i class="bi bi-gear-fill"></i> Settings &amp; Tools</button>
           <button onclick="addNewRow()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-plus-lg"></i> Row</button>
-          <button onclick="populateStaff()" title="Load staff assigned to the current area filter into the rota" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-people-fill"></i> Load Staff</button>
-          <button onclick="saveToCloud()" style="background:#16a34a;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-cloud-upload-fill"></i> Save</button>
-          <button onclick="openLoadPicker()" style="background:#d97706;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-folder2-open"></i> Load</button>
-          <button id="btn-staff"  onclick="SM.open()" style="background:#0f766e;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-person-lines-fill"></i> Staff</button>
-          <button id="btn-duties" onclick="DM.open()" style="background:#6f42c1;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard-check"></i> Duties</button>
-          <button id="btn-areas" onclick="AM.open()" style="background:#0891b2;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-map"></i> Areas</button>
-          <button onclick="clearAllTable()" style="background:#dc2626;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
+          <button onclick="populateStaff()" title="Load staff assigned to the current area filter into the rota" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-people-fill"></i> Load Staff</button>
+          <button onclick="saveToCloud()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-cloud-upload-fill"></i> Save</button>
+          <button onclick="openLoadPicker()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-folder2-open"></i> Load</button>
+          <button id="btn-staff"  onclick="SM.open()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-person-lines-fill"></i> Staff</button>
+          <button id="btn-duties" onclick="DM.open()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard-check"></i> Duties</button>
+          <button id="btn-areas" onclick="AM.open()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-map"></i> Areas</button>
+          <button onclick="clearAllTable()" style="background:#991b1b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-printer-fill"></i> Print</button>
         </div>
         <!-- Print: area filter info -->
@@ -674,17 +674,17 @@
               <button type="button" class="btn-green" onclick="DM.open()"><i class="bi bi-clipboard-check"></i> Open Duties</button>
               <a href="Areas.html" class="ghost-link"><button type="button" class="btn-orange"><i class="bi bi-bank"></i> Cost Centers</button></a>
               <a href="BudgetReport.html"  class="ghost-link"><button type="button" class="btn-purple"><i class="bi bi-graph-up"></i> Budget Report</button></a>
-              <button type="button" onclick="openOTPreApproval()" style="background:#be185d;"><i class="bi bi-calendar-check"></i> OT Pre-Approval</button>
-              <a href="Extension.html" class="ghost-link"><button type="button" style="background:#7c3aed;"><i class="bi bi-calendar-plus"></i> Extensions</button></a>
-              <a href="MultiMonth.html"   class="ghost-link"><button type="button" style="background:#0f766e;"><i class="bi bi-calendar-range"></i> Multi-Month View</button></a>
-              <a href="OTAdjustment.html" class="ghost-link"><button type="button" style="background:#b45309;"><i class="bi bi-pencil-square"></i> OT Adjustments</button></a>
-              <a href="Training.html"     class="ghost-link"><button type="button" style="background:#7c3aed;"><i class="bi bi-mortarboard"></i> Training</button></a>
-              <a href="LieuDays.html"     class="ghost-link"><button type="button" style="background:#0f766e;"><i class="bi bi-calendar2-check"></i> Lieu Days</button></a>
+              <button type="button" onclick="openOTPreApproval()" style="background:#1a4f8b;"><i class="bi bi-calendar-check"></i> OT Pre-Approval</button>
+              <a href="Extension.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-plus"></i> Extensions</button></a>
+              <a href="MultiMonth.html"   class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-range"></i> Multi-Month View</button></a>
+              <a href="OTAdjustment.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-pencil-square"></i> OT Adjustments</button></a>
+              <a href="Training.html"     class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-mortarboard"></i> Training</button></a>
+              <a href="LieuDays.html"     class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar2-check"></i> Lieu Days</button></a>
               <span id="nav-restricted-pages">
-              <a href="VacationPlans.html"    class="ghost-link"><button type="button" style="background:#0369a1;"><i class="bi bi-umbrella"></i> Vacation Plans</button></a>
-              <a href="CostCenterReport.html" class="ghost-link"><button type="button" style="background:#b45309;"><i class="bi bi-pie-chart"></i> CC Report</button></a>
+              <a href="VacationPlans.html"    class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-umbrella"></i> Vacation Plans</button></a>
+              <a href="CostCenterReport.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-pie-chart"></i> CC Report</button></a>
               </span>
-              <a href="Tasks.html"            class="ghost-link"><button type="button" style="background:#059669;"><i class="bi bi-check2-square"></i> Tasks</button></a>
+              <a href="Tasks.html"            class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-check2-square"></i> Tasks</button></a>
             </div>
           </div>
         </div>
@@ -695,8 +695,8 @@
             <h3>🔒 Security</h3>
             <div class="btn-row">
               <button type="button" onclick="openAuthAdmin();" style="background:#1a4f8b;"><i class="bi bi-shield-lock"></i> Manage Login Users</button>
-              <button type="button" onclick="openIPAdmin();" style="background:#065f46;"><i class="bi bi-globe"></i> Manage IP Access</button>
-              <button type="button" onclick="AM.open();" style="background:#6b21a8;"><i class="bi bi-folder2-open"></i> Manage Areas</button>
+              <button type="button" onclick="openIPAdmin();" style="background:#1a4f8b;"><i class="bi bi-globe"></i> Manage IP Access</button>
+              <button type="button" onclick="AM.open();" style="background:#1a4f8b;"><i class="bi bi-folder2-open"></i> Manage Areas</button>
             </div>
             <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">Manage login users, device access, and areas (including per-area user permissions). All require the OT override password.</p>
           </div>
