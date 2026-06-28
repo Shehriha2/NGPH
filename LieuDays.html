@@ -761,23 +761,24 @@
     if (e.target === document.getElementById('detailModal')) closeDetail();
   });
 
-  // ── Init: password gate ───────────────────────────────────────────────────────
+  // ── Init: session gate ───────────────────────────────────────────────────────
   async function init() {
-    const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-    if (pwd) {
-      const entered = await window.BCOT_AUTH.prompt(
-        'Enter the password to access Lieu Days Management.',
-        { title: 'Lieu Days Management', placeholder: 'Password', type: 'password', confirmLabel: 'Enter' }
-      );
-      if (entered === null || entered.trim() !== pwd) {
-        document.getElementById('authOverlay').innerHTML = `
-          <div style="text-align:center;color:#dc2626;font-size:14px;">
-            <div style="font-size:36px;margin-bottom:12px;">&#128683;</div>
-            Incorrect password. Returning…
-          </div>`;
-        setTimeout(() => { window.location.href = 'index.html'; }, 1800);
-        return;
-      }
+    const valid = (() => {
+      try {
+        const s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
+        return !!(s.ts && Date.now() - s.ts < 43200000);
+      } catch { return false; }
+    })();
+
+    if (!valid) {
+      document.getElementById('authOverlay').innerHTML = `
+        <div style="text-align:center;font-family:Arial,sans-serif;">
+          <div style="font-size:40px;margin-bottom:14px;">🔑</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">Sign In Required</div>
+          <div style="font-size:13px;color:#64748b;margin-bottom:18px;">Please sign in to access Lieu Days Management.</div>
+          <a href="index.html" style="background:#1a4f8b;color:#fff;text-decoration:none;padding:9px 22px;border-radius:8px;font-weight:700;font-size:13px;">← Return to Rota</a>
+        </div>`;
+      return;
     }
     document.getElementById('authOverlay').style.display = 'none';
     await loadAll();

@@ -15,17 +15,6 @@
 
     /* ── Auth overlay ── */
     #authOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
-    .login-box{background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);padding:32px 36px;width:min(380px,96%);}
-    .login-logo{font-size:44px;text-align:center;margin-bottom:8px;}
-    .login-title{font-size:18px;font-weight:800;color:var(--navy);text-align:center;margin-bottom:4px;}
-    .login-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:22px;}
-    .lf{margin-bottom:14px;}
-    .lf label{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
-    .lf select,.lf input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:Arial,sans-serif;}
-    .lf select:focus,.lf input:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,79,139,.12);}
-    .btn-login{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:background .15s;}
-    .btn-login:hover{background:#163e70;}
-    .login-err{color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-top:10px;display:none;}
 
     /* ── Top bar ── */
     .topbar{background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);}
@@ -123,21 +112,9 @@
 
 <!-- ── Auth Overlay ─────────────────────────────────────────────────────── -->
 <div id="authOverlay">
-  <div class="login-box">
-    <div class="login-logo">🎓</div>
-    <div class="login-title">Preceptor Portal</div>
-    <div class="login-sub">Pharmaceutical Care · KAMC-WR</div>
-    <div class="lf">
-      <label>Your Name</label>
-      <select id="loginName"><option value="">— Loading… —</option></select>
-    </div>
-    <div class="lf">
-      <label>Password</label>
-      <input type="password" id="loginPwd" placeholder="Enter your password"
-        onkeydown="if(event.key==='Enter')doLogin()"/>
-    </div>
-    <button class="btn-login" onclick="doLogin()">Sign In →</button>
-    <div class="login-err" id="loginErr"></div>
+  <div style="text-align:center;color:#64748b;font-family:Arial,sans-serif;">
+    <div style="font-size:40px;margin-bottom:12px;">🎓</div>
+    <div style="font-size:14px;" id="authMsg">Verifying access…</div>
   </div>
 </div>
 
@@ -151,7 +128,6 @@
     </div>
     <div class="topbar-right">
       <span class="topbar-name" id="topbarName"></span>
-      <button class="btn-ghost btn-sm" onclick="openChangePwd()">🔑 Change Password</button>
       <a href="Training.html" style="text-decoration:none;"><button class="btn-ghost btn-sm">← Training</button></a>
       <button class="btn-red btn-sm" onclick="doLogout()">Sign Out</button>
     </div>
@@ -260,25 +236,6 @@
   </div>
 </div>
 
-<!-- ── Modal: Change Password ────────────────────────────────────────────── -->
-<div id="mPwd" class="mbd">
-  <div class="mbox" style="width:min(380px,96%);">
-    <div class="mhd" style="background:linear-gradient(135deg,var(--navy),var(--teal));">
-      <span>🔑 Change Password</span>
-      <button onclick="closeModal('mPwd')">&#x2715;</button>
-    </div>
-    <div class="mbody">
-      <div class="fg"><label class="fl">Current Password</label><input type="password" id="pwdCur" placeholder="Current password"/></div>
-      <div class="fg"><label class="fl">New Password</label><input type="password" id="pwdNew" placeholder="New password (min 4 chars)"/></div>
-      <div class="fg"><label class="fl">Confirm New Password</label><input type="password" id="pwdCon" placeholder="Repeat new password"/></div>
-    </div>
-    <div class="mft">
-      <button class="btn-ghost" onclick="closeModal('mPwd')">Cancel</button>
-      <button class="btn-green" onclick="savePassword()">Save Password</button>
-    </div>
-  </div>
-</div>
-
 <div id="statusBox"></div>
 
 <script src="config.js"></script>
@@ -344,50 +301,18 @@
   // ── Load ─────────────────────────────────────────────────────────────────
   async function loadData() {
     const k = _key(); if (!k) return;
-    try {
-      const [ps, ts] = await Promise.all([
-        getDocs(collection(db, 'bcot_overtime_secure', k, 'preceptors')),
-        getDocs(collection(db, 'bcot_overtime_secure', k, 'trainees'))
-      ]);
-      _preceptors = []; ps.forEach(d => _preceptors.push({ _id: d.id, ...d.data() }));
-      _trainees   = []; ts.forEach(d => _trainees.push({ _id: d.id, ...d.data() }));
-      _preceptors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-      const sel = document.getElementById('loginName');
-      sel.innerHTML = '<option value="">— Select your name —</option>' +
-        _preceptors.filter(p => p.active !== false)
-          .map(p => `<option value="${esc(p._id)}">${esc(p.name)}</option>`).join('');
-    } catch (e) {
-      console.error(e);
-      document.getElementById('loginName').innerHTML = '<option value="">— Failed to load —</option>';
-    }
+    const [ps, ts] = await Promise.all([
+      getDocs(collection(db, 'bcot_overtime_secure', k, 'preceptors')),
+      getDocs(collection(db, 'bcot_overtime_secure', k, 'trainees'))
+    ]);
+    _preceptors = []; ps.forEach(d => _preceptors.push({ _id: d.id, ...d.data() }));
+    _trainees   = []; ts.forEach(d => _trainees.push({ _id: d.id, ...d.data() }));
+    _preceptors.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
   // ── Auth ─────────────────────────────────────────────────────────────────
-  window.doLogin = function () {
-    const id  = document.getElementById('loginName').value;
-    const pwd = document.getElementById('loginPwd').value;
-    const err = document.getElementById('loginErr');
-    if (!id)  { err.textContent = 'Please select your name.'; err.style.display = 'block'; return; }
-    const p   = _preceptors.find(x => x._id === id);
-    if (!p)   { err.textContent = 'Preceptor not found.'; err.style.display = 'block'; return; }
-    if (pwd !== (p.password || '12345')) {
-      err.textContent = 'Incorrect password. Please try again.';
-      err.style.display = 'block'; return;
-    }
-    err.style.display = 'none';
-    _me = p;
-    sessionStorage.setItem('BCOT_PREC_SESSION', JSON.stringify({ id: p._id }));
-    showDashboard();
-  };
-
   window.doLogout = function () {
-    sessionStorage.removeItem('BCOT_PREC_SESSION');
-    _me = null; _tab = 'active';
-    document.getElementById('mainContent').style.display = 'none';
-    document.getElementById('authOverlay').style.display = 'flex';
-    document.getElementById('loginPwd').value = '';
-    document.getElementById('loginErr').style.display = 'none';
+    window.location.href = 'index.html';
   };
 
   function showDashboard() {
@@ -588,39 +513,47 @@
     } catch (e) { ss('Remove failed: ' + (e?.message || e), false); }
   };
 
-  // ── Change password ───────────────────────────────────────────────────────
-  window.openChangePwd = function () {
-    ['pwdCur', 'pwdNew', 'pwdCon'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('mPwd').classList.add('show');
-    setTimeout(() => document.getElementById('pwdCur').focus(), 100);
-  };
-
-  window.savePassword = async function () {
-    const cur = document.getElementById('pwdCur').value;
-    const nw  = document.getElementById('pwdNew').value;
-    const cn  = document.getElementById('pwdCon').value;
-    if (cur !== (_me.password || '12345')) { ss('Current password is incorrect.', false); return; }
-    if (nw.length < 4)  { ss('New password must be at least 4 characters.', false); return; }
-    if (nw !== cn)      { ss('Passwords do not match.', false); return; }
-    try {
-      await updateDoc(pRef(_me._id), { password: nw });
-      _me.password = nw;
-      window.closeModal('mPwd');
-      ss('Password changed successfully ✅');
-    } catch (e) { ss('Save failed: ' + (e?.message || e), false); }
-  };
-
   // ── Init ─────────────────────────────────────────────────────────────────
   async function init() {
-    await loadData();
+    // Check main app session
+    let badge = null, sessName = null;
     try {
-      const sess = JSON.parse(sessionStorage.getItem('BCOT_PREC_SESSION') || 'null');
-      if (sess?.id) {
-        const p = _preceptors.find(x => x._id === sess.id && x.active !== false);
-        if (p) { _me = p; showDashboard(); return; }
+      const s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
+      if (!s.ts || Date.now() - s.ts > 43200000) {
+        window.location.href = 'index.html'; return;
       }
-    } catch {}
-    // Show login
+      badge    = String(s.badge || '').trim();
+      sessName = String(s.name  || '').trim().toLowerCase();
+    } catch {
+      window.location.href = 'index.html'; return;
+    }
+
+    // Load Firebase data
+    try {
+      await loadData();
+    } catch (e) {
+      document.getElementById('authMsg').textContent = 'Failed to load data. Check connection.';
+      console.error(e); return;
+    }
+
+    // Match by badge first, fall back to name
+    const match = _preceptors.find(p => p.active !== false && (
+      (badge    && String(p.badge || '').trim() === badge) ||
+      (sessName && String(p.name  || '').trim().toLowerCase() === sessName)
+    ));
+
+    if (match) {
+      _me = match;
+      showDashboard();
+    } else {
+      document.getElementById('authOverlay').innerHTML = `
+        <div style="text-align:center;font-family:Arial,sans-serif;">
+          <div style="font-size:48px;margin-bottom:14px;">🎓</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">Not Registered as Preceptor</div>
+          <div style="font-size:13px;color:#64748b;margin-bottom:18px;">Your account is not linked to a preceptor record.<br>Contact the Training Coordinator to be added.</div>
+          <a href="Training.html" style="background:#1a4f8b;color:#fff;text-decoration:none;padding:9px 22px;border-radius:8px;font-weight:700;font-size:13px;">← Back to Training</a>
+        </div>`;
+    }
   }
 
   init();

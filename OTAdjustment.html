@@ -634,23 +634,29 @@
     if (e.target === document.getElementById('editModal')) closeEditModal();
   });
 
-  // ── Init: password gate (any user with the password) ─────────────────────
+  // ── Init: role gate (admin only) ─────────────────────────────────────────
   async function init() {
-    const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-    if (pwd) {
-      const entered = await window.BCOT_AUTH.prompt(
-        'Enter the password to access OT Adjustment & Disclosure.',
-        { title: '🔑 OT Adjustment', placeholder: 'Password', type: 'password', confirmLabel: 'Enter' }
-      );
-      if (entered === null || entered.trim() !== pwd) {
-        document.getElementById('authOverlay').innerHTML = `
-          <div style="text-align:center;color:#dc2626;font-size:14px;">
-            <div style="font-size:36px;margin-bottom:12px;">🚫</div>
-            Incorrect password. Returning…
-          </div>`;
-        setTimeout(() => { window.location.href = 'index.html'; }, 1800);
-        return;
-      }
+    const role = (() => {
+      try {
+        const s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
+        if (!s.ts || Date.now() - s.ts > 43200000) return null;
+        return s.app_role || 'user';
+      } catch { return null; }
+    })();
+
+    if (role !== 'admin') {
+      document.getElementById('authOverlay').innerHTML = `
+        <div style="text-align:center;font-family:Arial,sans-serif;">
+          <div style="font-size:40px;margin-bottom:14px;">${role ? '🚫' : '🔑'}</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">
+            ${role ? 'Admin Access Required' : 'Sign In Required'}
+          </div>
+          <div style="font-size:13px;color:#64748b;margin-bottom:18px;">
+            ${role ? 'This page is restricted to administrators.' : 'Please sign in to continue.'}
+          </div>
+          <a href="index.html" style="background:#1a4f8b;color:#fff;text-decoration:none;padding:9px 22px;border-radius:8px;font-weight:700;font-size:13px;">← Return to Rota</a>
+        </div>`;
+      return;
     }
 
     document.getElementById('authOverlay').style.display = 'none';
