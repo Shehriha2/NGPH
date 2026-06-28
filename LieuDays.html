@@ -184,6 +184,8 @@
   <input type="text" id="staffSearch" placeholder="Name or badge…"
     style="min-width:200px;" oninput="applyFilter()"/>
   <button onclick="loadAll()" class="btn-ghost">&#8635; Refresh</button>
+  <button id="reqsBtn" onclick="openPendingModal()" class="btn-orange"
+    style="display:none;">📋 Requests <span id="reqsBadge"></span></button>
   <button onclick="window.print()" class="btn-ghost">Print Summary</button>
   <a href="Staff.html" style="text-decoration:none;"><button type="button" class="btn-ghost">Staff Management</button></a>
   <a href="index.html" style="text-decoration:none;margin-left:auto;"><button type="button" class="btn-ghost">&#8592; Back to Rota</button></a>
@@ -225,6 +227,18 @@
   </div>
 </div>
 
+<!-- Pending requests modal -->
+<div id="reqsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9100;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(800px,98%);margin:auto;">
+    <div style="background:linear-gradient(135deg,#d97706,#b45309);color:#fff;padding:14px 20px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:15px;font-weight:800;">📋 Staff Lieu Day Requests</span>
+      <button onclick="document.getElementById('reqsModal').style.display='none';"
+        style="background:transparent;border:none;color:#fff;font-size:22px;cursor:pointer;padding:0 4px;line-height:1;">&times;</button>
+    </div>
+    <div id="reqsModalBody" style="padding:20px;"></div>
+  </div>
+</div>
+
 <div class="status-message" id="statusBox"></div>
 
 <script src="config.js"></script>
@@ -232,7 +246,7 @@
 
 <script type="module">
   import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, collection, doc, getDocs, setDoc }
+  import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, query, where }
     from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -249,16 +263,22 @@
   const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
   const AREAS_KEY = 'BCOT_AREAS_LIST_V1';
   const COLL      = 'lieu_days';
+  const REQS_COLL = 'lieu_requests';
 
   let _staffRecords  = [];
   let _lieuData      = {};   // badge → lieu doc
   let _currentBadge  = null;
+  let _pendingReqs   = [];
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   function appKey() { return (window.BCOT_APP_KEY || '').trim(); }
 
   function lieuRef(badge) {
     return doc(db, 'bcot_overtime_secure', appKey(), COLL, String(badge));
+  }
+
+  function reqRef(id) {
+    return doc(db, 'bcot_overtime_secure', appKey(), REQS_COLL, id);
   }
 
   function showStatus(msg, ok = true) {
@@ -339,6 +359,7 @@
 
     buildAreaFilter();
     renderSummary();
+    await loadRequests();
   }
 
   function buildAreaFilter() {
@@ -754,6 +775,149 @@
       console.error(e);
       showStatus('Delete failed: ' + (e?.message || e), false);
     }
+  };
+
+  // ── Pending Requests ──────────────────────────────────────────────────────────
+  async function loadRequests() {
+    const k = appKey(); if (!k) return;
+    try {
+      const snap = await getDocs(collection(db, 'bcot_overtime_secure', k, REQS_COLL));
+      _pendingReqs = [];
+      snap.forEach(d => _pendingReqs.push({ _id: d.id, ...d.data() }));
+      _pendingReqs.sort((a,b) => (b.submittedAt||'').localeCompare(a.submittedAt||''));
+      const pending = _pendingReqs.filter(r => r.status === 'pending');
+      const btn  = document.getElementById('reqsBtn');
+      const badge = document.getElementById('reqsBadge');
+      if (pending.length) {
+        btn.style.display = '';
+        badge.textContent = '(' + pending.length + ')';
+      } else {
+        btn.style.display = 'none';
+      }
+    } catch(e) { console.error('loadRequests:', e); }
+  }
+
+  window.openPendingModal = function() {
+    const pending = _pendingReqs.filter(r => r.status === 'pending');
+    const body    = document.getElementById('reqsModalBody');
+
+    if (!pending.length) {
+      body.innerHTML = '<div style="text-align:center;padding:36px;color:#94a3b8;font-size:13px;">No pending requests.</div>';
+    } else {
+      body.innerHTML = pending.map(r => {
+        const typeLabel = r.type === 'earn' ? 'Addition' : 'Consumption';
+        const typeColor = r.type === 'earn' ? '#166534' : '#1e40af';
+        const typeBg    = r.type === 'earn' ? '#dcfce7' : '#eff6ff';
+        const sub = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+        const dateStr = r.date ? new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+        return `
+        <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;background:#fafafa;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                <span style="font-size:14px;font-weight:800;color:#0f172a;">${esc(r.staffName||'—')}</span>
+                <span style="font-size:10px;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:8px;font-weight:700;">${esc(r.badge||'—')}</span>
+                <span style="font-size:11px;background:${typeBg};color:${typeColor};padding:2px 9px;border-radius:8px;font-weight:700;border:1px solid ${r.type==='earn'?'#86efac':'#93c5fd'};">${typeLabel}</span>
+              </div>
+              <div style="font-size:12px;color:#374151;margin-bottom:4px;">
+                <strong>${r.days} day${r.days!==1?'s':''}</strong> &nbsp;·&nbsp; ${dateStr} &nbsp;·&nbsp; ${esc(r.reason||'—')}
+              </div>
+              ${r.note ? `<div style="font-size:11px;color:#64748b;font-style:italic;">${esc(r.note)}</div>` : ''}
+              <div style="font-size:10px;color:#94a3b8;margin-top:4px;">Submitted: ${sub}</div>
+            </div>
+            <div style="display:flex;gap:7px;flex-shrink:0;align-items:center;">
+              <button onclick="approveReq('${r._id}')"
+                style="padding:6px 14px;background:#16a34a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">
+                ✓ Approve
+              </button>
+              <button onclick="rejectReq('${r._id}')"
+                style="padding:6px 14px;background:#dc2626;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">
+                ✗ Reject
+              </button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('reqsModal').style.display = 'flex';
+  };
+
+  window.approveReq = async function(reqId) {
+    const r  = _pendingReqs.find(x => x._id === reqId); if (!r) return;
+    const s  = _staffRecords.find(x => x.badge === r.badge);
+    const k  = appKey(); if (!k) return;
+
+    const confirmed = await window.BCOT_AUTH.confirm(
+      `Approve <strong>${r.type === 'earn' ? 'addition' : 'consumption'}</strong> of <strong>${r.days} day${r.days!==1?'s':''}</strong> for <strong>${r.staffName}</strong>?<br>This will create a transaction in their lieu day record.`,
+      'Approve Request',
+      { confirmLabel: 'Approve' }
+    );
+    if (!confirmed) return;
+
+    try {
+      // Create lieu_days transaction
+      const txn = {
+        id:        'txn_' + Date.now(),
+        date:      r.date,
+        type:      r.type === 'earn' ? 'earn' : 'use',
+        days:      Number(r.days),
+        reason:    r.reason + (r.note ? ' — ' + r.note : '') + ' [Staff Request]',
+        by:        getSubmitter(),
+        createdAt: new Date().toISOString(),
+      };
+      const badge   = r.badge;
+      const existing = _lieuData[badge] || {};
+      const staffRec = s || { badge, name: r.staffName, role: '', area: '' };
+      const newDoc = {
+        badge,
+        staffName:       staffRec.name  || r.staffName,
+        role:            staffRec.role  || '',
+        area:            staffRec.area  || '',
+        startingBalance: Number(existing.startingBalance) || 0,
+        history:         existing.history     || '',
+        startingSet:     existing.startingSet || false,
+        transactions:    [...(existing.transactions || []), txn],
+      };
+      await setDoc(lieuRef(badge), newDoc);
+      _lieuData[badge] = newDoc;
+
+      // Update request status
+      await updateDoc(reqRef(reqId), {
+        status:     'approved',
+        reviewedBy: getSubmitter(),
+        reviewedAt: new Date().toISOString(),
+        reviewNote: ''
+      });
+      r.status = 'approved';
+
+      renderSummary();
+      openPendingModal();
+      await loadRequests();
+      showStatus('Request approved ✅ — transaction added.');
+    } catch(e) { showStatus('Approve failed: '+(e?.message||e), false); }
+  };
+
+  window.rejectReq = async function(reqId) {
+    const r = _pendingReqs.find(x => x._id === reqId); if (!r) return;
+    const note = await window.BCOT_AUTH.prompt(
+      'Enter a note for the staff member explaining why this request was rejected (optional):',
+      { title: 'Reject Request', placeholder: 'Reason for rejection…', confirmLabel: 'Reject' }
+    );
+    if (note === null) return;
+    try {
+      await updateDoc(reqRef(reqId), {
+        status:     'rejected',
+        reviewedBy: getSubmitter(),
+        reviewedAt: new Date().toISOString(),
+        reviewNote: (note||'').trim()
+      });
+      r.status     = 'rejected';
+      r.reviewNote = (note||'').trim();
+      openPendingModal();
+      await loadRequests();
+      showStatus('Request rejected.');
+    } catch(e) { showStatus('Reject failed: '+(e?.message||e), false); }
   };
 
   // ── Wire-up ───────────────────────────────────────────────────────────────────

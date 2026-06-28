@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>My Portal — KAMC-WR</title>
+  <style>
+    :root{
+      --navy:#1a4f8b; --teal:#0f766e; --green:#16a34a; --red:#dc2626;
+      --amber:#d97706; --purple:#7c3aed;
+      --bg:#f1f5f9; --card:#fff; --border:#e2e8f0; --muted:#64748b;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;background:var(--bg);color:#1e293b;font-size:13px;}
+
+    /* ── Auth overlay ── */
+    #authOv{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+
+    /* ── TopBar ── */
+    .topbar{background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);}
+    .topbar-title{font-size:15px;font-weight:800;}
+    .topbar-sub{font-size:11px;opacity:.8;margin-top:2px;}
+    .topbar-right{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+    .topbar-name{font-size:12px;font-weight:700;opacity:.85;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;}
+
+    /* ── Buttons ── */
+    button{cursor:pointer;border:none;border-radius:7px;font-size:12px;font-weight:700;padding:6px 14px;transition:background .15s;font-family:Arial,sans-serif;}
+    .btn-navy{background:var(--navy);color:#fff;} .btn-navy:hover{background:#163e70;}
+    .btn-teal{background:var(--teal);color:#fff;} .btn-teal:hover{background:#0b5c56;}
+    .btn-green{background:var(--green);color:#fff;} .btn-green:hover{background:#15803d;}
+    .btn-red{background:var(--red);color:#fff;} .btn-red:hover{background:#b91c1c;}
+    .btn-ghost{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);} .btn-ghost:hover{background:rgba(255,255,255,.28);}
+    .btn-sm{padding:4px 11px;font-size:11px;}
+
+    /* ── Layout ── */
+    .page{max-width:900px;margin:0 auto;padding:16px 14px;}
+    .card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.09);border:1px solid var(--border);padding:18px 20px;margin-bottom:14px;}
+    .card-title{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:8px;}
+
+    /* ── Balance formula ── */
+    .bal-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .bf-block{text-align:center;min-width:56px;}
+    .bf-val{font-size:22px;font-weight:800;line-height:1.2;}
+    .bf-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+    .bf-op{font-size:22px;color:#94a3b8;font-weight:300;}
+    .bf-cur{background:var(--navy);color:#fff;border-radius:10px;padding:8px 16px;}
+    .bf-cur .bf-val{color:#fff;}
+    .bf-cur .bf-label{color:rgba(255,255,255,.7);}
+
+    /* ── Action cards ── */
+    .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    @media(max-width:520px){.action-grid{grid-template-columns:1fr;}}
+    .action-card{border:2px solid var(--border);border-radius:12px;padding:22px 18px;cursor:pointer;transition:all .18s;text-align:center;user-select:none;}
+    .action-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.12);}
+    .action-earn{border-color:#86efac;} .action-earn:hover{border-color:var(--green);background:#f0fdf4;}
+    .action-use{border-color:#93c5fd;} .action-use:hover{border-color:var(--navy);background:#eff6ff;}
+    .action-icon{font-size:32px;margin-bottom:8px;}
+    .action-label{font-size:14px;font-weight:800;color:#0f172a;margin-bottom:5px;}
+    .action-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+
+    /* ── Request history table ── */
+    .req-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+    table.req-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .req-table th{background:#f8fafc;color:#374151;padding:8px 10px;text-align:left;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;}
+    .req-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+    .req-table tr:last-child td{border-bottom:none;}
+
+    /* ── Status chips ── */
+    .chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;border:1px solid transparent;white-space:nowrap;}
+    .c-pending{background:#fef3c7;color:#92400e;border-color:#fde68a;}
+    .c-approved{background:#dcfce7;color:#166534;border-color:#86efac;}
+    .c-rejected{background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
+    .c-earn{background:#dcfce7;color:#166534;border-color:#86efac;}
+    .c-use{background:#eff6ff;color:#1e40af;border-color:#93c5fd;}
+
+    /* ── Modal ── */
+    .mbd{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:8000;}
+    .mbd.show{display:flex;}
+    .mbox{background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.25);width:min(460px,96%);max-height:90vh;overflow-y:auto;}
+    .mhd{padding:13px 18px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;color:#fff;}
+    .mhd button{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;font-family:Arial,sans-serif;}
+    .mbody{padding:18px 20px;}
+    .mft{padding:12px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;}
+    .fg{margin-bottom:13px;}
+    .fl{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
+    .fg input,.fg textarea,.fg select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:Arial,sans-serif;outline:none;}
+    .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,79,139,.1);}
+    .fr{display:flex;gap:12px;} .fr .fg{flex:1;}
+
+    /* ── Status toast ── */
+    #statusBox{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:10px;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);display:none;z-index:9000;max-width:90vw;text-align:center;}
+
+    .empty{text-align:center;padding:36px;color:var(--muted);font-size:13px;}
+    @media print{.no-print{display:none!important;}}
+  </style>
+</head>
+<body>
+
+<!-- Auth overlay -->
+<div id="authOv">
+  <div style="text-align:center;color:#64748b;font-family:Arial,sans-serif;">
+    <div style="font-size:40px;margin-bottom:12px;">🏠</div>
+    <div style="font-size:14px;" id="authMsg">Verifying access…</div>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="main" style="display:none;">
+
+  <div class="topbar no-print">
+    <div>
+      <div class="topbar-title">🏠 My Portal</div>
+      <div class="topbar-sub" id="topbarSub">KAMC-WR · Pharmaceutical Care</div>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-name" id="topbarName"></span>
+      <button id="precBtn" class="btn-ghost btn-sm" style="display:none;"
+        onclick="window.location.href='Preceptor.html'">🎓 Preceptorship</button>
+      <button class="btn-red btn-sm" onclick="doSignOut()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="page">
+
+    <!-- Balance card -->
+    <div class="card">
+      <div class="card-title">My Lieu Day Balance</div>
+      <div id="balanceView">
+        <span style="color:#94a3b8;font-size:12px;">Loading…</span>
+      </div>
+      <div id="pendingBanner" style="display:none;margin-top:12px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#92400e;">
+        ⏳ <span id="pendingCount"></span>
+      </div>
+    </div>
+
+    <!-- Actions card -->
+    <div class="card no-print">
+      <div class="card-title">Submit a Request</div>
+      <div class="action-grid">
+        <div class="action-card action-earn" onclick="openReqModal('earn')">
+          <div class="action-icon">➕</div>
+          <div class="action-label">Request Lieu Day Addition</div>
+          <div class="action-desc">I worked on a day off, public holiday, or did extra hours that qualify for a lieu day</div>
+        </div>
+        <div class="action-card action-use" onclick="openReqModal('use')">
+          <div class="action-icon">➖</div>
+          <div class="action-label">Request Lieu Day Consumption</div>
+          <div class="action-desc">I would like to use accumulated lieu days to take time off</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Request history -->
+    <div class="card">
+      <div class="card-title">My Requests</div>
+      <div id="reqList"><span style="color:#94a3b8;font-size:12px;">Loading…</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Request modal -->
+<div id="mReq" class="mbd">
+  <div class="mbox">
+    <div class="mhd" id="mReqHd" style="background:linear-gradient(135deg,var(--green),#0f766e);">
+      <span id="mReqTitle">Request</span>
+      <button onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="mbody">
+      <div id="mReqDesc" style="background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:12px;color:#374151;margin-bottom:14px;border:1px solid var(--border);line-height:1.6;"></div>
+      <div class="fr">
+        <div class="fg">
+          <label class="fl">Date *</label>
+          <input type="date" id="rDate"/>
+        </div>
+        <div class="fg">
+          <label class="fl">Days *</label>
+          <input type="number" id="rDays" min="0.5" max="30" step="0.5" placeholder="e.g. 1"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Reason *</label>
+        <input type="text" id="rReason" placeholder="e.g. Weekend on-call 12 Jan, Public holiday coverage…"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Additional Notes</label>
+        <textarea id="rNote" rows="2" placeholder="Any extra details (optional)…"></textarea>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" style="background:#e2e8f0;color:#334155;" onclick="closeModal()">Cancel</button>
+      <button id="mReqSubmitBtn" class="btn-green" onclick="submitReq()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<div id="statusBox"></div>
+
+<script src="config.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, query, where, orderBy }
+    from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+    storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894",
+    appId:"1:659421824894:web:f0546879df8808491ad52f"
+  });
+  const db = getFirestore(app);
+
+  // ── State ───────────────────────────────────────────────────────────────
+  let _sess     = null;
+  let _badge    = '';
+  let _lieu     = null;
+  let _requests = [];
+  let _reqType  = 'earn';
+
+  const _key = () => (window.BCOT_APP_KEY || '').trim();
+  const lieuRef  = badge => doc(db, 'bcot_overtime_secure', _key(), 'lieu_days', String(badge));
+  const reqsColl = ()    => collection(db, 'bcot_overtime_secure', _key(), 'lieu_requests');
+
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function today(){ return new Date().toISOString().slice(0,10); }
+  function fd(d) {
+    if (!d) return '—';
+    return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  }
+
+  function ss(msg, ok=true) {
+    const el = document.getElementById('statusBox');
+    el.textContent = msg;
+    el.style.cssText = `display:block;background:${ok?'#166534':'#dc2626'};color:#fff;`;
+    clearTimeout(el._t);
+    el._t = setTimeout(()=>el.style.display='none', ok?3200:5000);
+  }
+
+  function calcBalance(lieu) {
+    const starting = Number(lieu?.startingBalance) || 0;
+    let earned=0, used=0, adjusted=0;
+    (lieu?.transactions||[]).forEach(t=>{
+      const d = Number(t.days)||0;
+      if(t.type==='earn')   earned   += d;
+      if(t.type==='use')    used     += d;
+      if(t.type==='adjust') adjusted += d;
+    });
+    return { starting, earned, used, adjusted, current: starting+earned-used+adjusted };
+  }
+
+  function fmtDays(n){ const v=Number(n)||0; return v===Math.floor(v)?String(v):v.toFixed(1); }
+
+  // ── Render balance ───────────────────────────────────────────────────────
+  function renderBalance() {
+    const el = document.getElementById('balanceView');
+    if (!_lieu) {
+      el.innerHTML = '<span style="color:#94a3b8;font-size:12px;">No lieu day record found. Contact your manager.</span>';
+      return;
+    }
+    const b  = calcBalance(_lieu);
+    const adjSign = b.adjusted >= 0 ? '' : '−';
+    const curColor = b.current > 0 ? '#166534' : b.current < 0 ? '#dc2626' : '#64748b';
+    el.innerHTML = `
+      <div class="bal-row">
+        <div class="bf-block">
+          <div class="bf-val" style="color:#1a4f8b;">${fmtDays(b.starting)}</div>
+          <div class="bf-label">Starting</div>
+        </div>
+        <div class="bf-op">+</div>
+        <div class="bf-block">
+          <div class="bf-val" style="color:#166534;">${fmtDays(b.earned)}</div>
+          <div class="bf-label">Earned</div>
+        </div>
+        <div class="bf-op">−</div>
+        <div class="bf-block">
+          <div class="bf-val" style="color:#dc2626;">${fmtDays(b.used)}</div>
+          <div class="bf-label">Used</div>
+        </div>
+        <div class="bf-op">+</div>
+        <div class="bf-block">
+          <div class="bf-val" style="color:#d97706;">${adjSign}${fmtDays(Math.abs(b.adjusted))}</div>
+          <div class="bf-label">Adjustments</div>
+        </div>
+        <div class="bf-op">=</div>
+        <div class="bf-block bf-cur">
+          <div class="bf-val">${fmtDays(b.current)}</div>
+          <div class="bf-label">Current Balance</div>
+        </div>
+      </div>`;
+  }
+
+  // ── Render request history ───────────────────────────────────────────────
+  function renderRequests() {
+    const el = document.getElementById('reqList');
+    const pending = _requests.filter(r=>r.status==='pending');
+    const bannerEl = document.getElementById('pendingBanner');
+    const countEl  = document.getElementById('pendingCount');
+    if (pending.length) {
+      countEl.textContent = `You have ${pending.length} pending request${pending.length>1?'s':''} awaiting review by your manager.`;
+      bannerEl.style.display = '';
+    } else {
+      bannerEl.style.display = 'none';
+    }
+
+    if (!_requests.length) {
+      el.innerHTML = '<div class="empty">No requests submitted yet.</div>';
+      return;
+    }
+
+    const sorted = [..._requests].sort((a,b)=>(b.submittedAt||'').localeCompare(a.submittedAt||''));
+    el.innerHTML = `
+      <div class="req-table-wrap">
+        <table class="req-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Date</th>
+              <th style="text-align:center;">Days</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th>Review Note</th>
+              <th>Submitted</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(r=>{
+              const typeChip = r.type==='earn'
+                ? '<span class="chip c-earn">Addition</span>'
+                : '<span class="chip c-use">Consumption</span>';
+              const statChip = r.status==='approved'
+                ? '<span class="chip c-approved">Approved</span>'
+                : r.status==='rejected'
+                  ? '<span class="chip c-rejected">Rejected</span>'
+                  : '<span class="chip c-pending">Pending</span>';
+              const sub = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+              return `<tr>
+                <td>${typeChip}</td>
+                <td style="white-space:nowrap;">${fd(r.date)}</td>
+                <td style="text-align:center;font-weight:700;">${fmtDays(r.days)}</td>
+                <td>${esc(r.reason||'—')}</td>
+                <td>${statChip}</td>
+                <td style="font-size:11px;color:#64748b;">${esc(r.reviewNote||'—')}</td>
+                <td style="white-space:nowrap;font-size:11px;color:#64748b;">${sub}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── Request modal ────────────────────────────────────────────────────────
+  const EARN_GRADIENT = 'linear-gradient(135deg,#16a34a,#0f766e)';
+  const USE_GRADIENT  = 'linear-gradient(135deg,#1a4f8b,#0f766e)';
+
+  window.openReqModal = function(type) {
+    _reqType = type;
+    const isEarn = type === 'earn';
+    document.getElementById('mReqHd').style.background   = isEarn ? EARN_GRADIENT : USE_GRADIENT;
+    document.getElementById('mReqTitle').textContent      = isEarn ? '➕ Request Lieu Day Addition' : '➖ Request Lieu Day Consumption';
+    document.getElementById('mReqSubmitBtn').className    = isEarn ? 'btn-green' : 'btn-navy';
+    document.getElementById('mReqDesc').innerHTML         = isEarn
+      ? 'Submit this form to request that lieu days be added to your balance.<br>Your manager will review and approve.'
+      : 'Submit this form to request consumption of lieu days from your balance.<br>Your manager will review and approve.';
+    document.getElementById('rDate').value   = today();
+    document.getElementById('rDays').value   = '';
+    document.getElementById('rReason').value = '';
+    document.getElementById('rNote').value   = '';
+    document.getElementById('mReq').classList.add('show');
+    setTimeout(()=>document.getElementById('rDays').focus(), 120);
+  };
+
+  window.closeModal = function() {
+    document.getElementById('mReq').classList.remove('show');
+  };
+
+  window.submitReq = async function() {
+    const date   = document.getElementById('rDate').value;
+    const days   = parseFloat(document.getElementById('rDays').value);
+    const reason = document.getElementById('rReason').value.trim();
+    const note   = document.getElementById('rNote').value.trim();
+    if (!date)        { ss('Please select a date.',false); return; }
+    if (!days||days<=0){ ss('Enter a valid number of days.',false); return; }
+    if (!reason)      { ss('Reason is required.',false); return; }
+
+    const entry = {
+      badge:       _badge,
+      staffName:   _sess.name || '',
+      type:        _reqType,
+      days,
+      date,
+      reason,
+      note,
+      status:      'pending',
+      submittedAt: new Date().toISOString()
+    };
+
+    try {
+      const ref = await addDoc(reqsColl(), entry);
+      _requests.push({ _id: ref.id, ...entry });
+      closeModal();
+      renderRequests();
+      ss(`Request submitted ✅ — awaiting manager review.`);
+    } catch(e) { ss('Submit failed: '+(e?.message||e), false); }
+  };
+
+  // ── Sign out ─────────────────────────────────────────────────────────────
+  window.doSignOut = function() {
+    localStorage.removeItem('BCOT_AUTH_SESSION_V1');
+    window.location.href = 'index.html';
+  };
+
+  // ── Load ─────────────────────────────────────────────────────────────────
+  async function loadData() {
+    const k = _key(); if(!k) return;
+    try {
+      const [lieuSnap, reqSnap, precSnap] = await Promise.all([
+        getDoc(lieuRef(_badge)),
+        getDocs(query(reqsColl(), where('badge','==',_badge))),
+        getDocs(collection(db,'bcot_overtime_secure',k,'preceptors'))
+      ]);
+      _lieu = lieuSnap.exists() ? lieuSnap.data() : null;
+      _requests = [];
+      reqSnap.forEach(d => _requests.push({ _id:d.id, ...d.data() }));
+
+      // Check preceptor status
+      const sessName = (_sess.name||'').toLowerCase().trim();
+      const isPreceptor = (() => {
+        let found = false;
+        precSnap.forEach(d => {
+          const p = d.data();
+          if (p.active===false) return;
+          if (_badge && String(p.badge||'').trim()===_badge) { found=true; }
+          if (sessName && String(p.name||'').toLowerCase().trim()===sessName) { found=true; }
+        });
+        return found;
+      })();
+      if (isPreceptor) document.getElementById('precBtn').style.display = '';
+    } catch(e) {
+      console.error(e);
+      ss('Failed to load data — check connection.',false);
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function init() {
+    // Session check
+    try {
+      const raw = localStorage.getItem('BCOT_AUTH_SESSION_V1');
+      const s   = JSON.parse(raw||'{}');
+      if (!s.ts || Date.now()-s.ts > 43200000) { window.location.href='index.html'; return; }
+      if (s.app_role==='admin'||s.app_role==='charge') { window.location.href='index.html'; return; }
+      _sess = s;
+    } catch { window.location.href='index.html'; return; }
+
+    // Resolve badge: stored in session (after auth.js fix), else look up in staff records
+    _badge = (_sess.badge||'').trim();
+    if (!_badge) {
+      const sessName = (_sess.name||'').trim().toLowerCase();
+      const staff    = (() => { try{ return JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]'); }catch{return[];} })();
+      const found    = staff.find(r=>String(r.name||'').toLowerCase().trim()===sessName);
+      if (found) _badge = found.badge||'';
+    }
+
+    // Populate topbar
+    const dispName = [_sess.nameTitle, _sess.name].filter(Boolean).join(' ') || _sess.name || 'User';
+    document.getElementById('topbarName').textContent = dispName + (_badge ? '  ·  ' + _badge : '');
+    document.getElementById('topbarSub').textContent  =
+      [_sess.position, 'KAMC-WR'].filter(Boolean).join(' · ') || 'KAMC-WR · Pharmaceutical Care';
+
+    // Load Firebase data
+    await loadData();
+
+    // Render
+    renderBalance();
+    renderRequests();
+
+    // Show page
+    document.getElementById('authOv').style.display = 'none';
+    document.getElementById('main').style.display   = '';
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1302,11 +1302,10 @@ window.addEventListener('bcotAuth', function (e) {
     hide('btn-areas');
   }
 
-  // ── User: no access to Duties, Staff, or restricted report pages ────────
+  // ── User: redirect to personal portal ───────────────────────────────────
   if (role === 'user') {
-    hide('btn-duties');
-    hide('btn-staff');
-    hide('nav-restricted-pages');
+    window.location.href = 'UserHome.html';
+    return;
   }
 
   // ── Charge person: lock DM area filter to their assigned areas ──────────

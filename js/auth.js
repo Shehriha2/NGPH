@@ -40,6 +40,7 @@
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       id:             user.id,
+      badge:          user.badge          || '',
       name:           user.name,
       nameTitle:      user.nameTitle || '',
       position:       user.position || user.title || '',
