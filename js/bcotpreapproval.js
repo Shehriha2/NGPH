@@ -381,16 +381,26 @@
     records.forEach(rec => {
       if ((rec.schedType||'') !== 'BC') return;  // only BC rows
       const name = (rec.staffName||'').trim(); if (!name) return;
-      const hours = Number(rec.hours) || 0;
-      if (hours <= 0) return;
       const staffRec = staffRecs.find(s => s.name.trim() === name);
       const badge    = staffRec?.badge || '—';
-      // Auto-detect location from assigned duty names (e.g. "Oncology Pharmacist" → "Oncology")
       const location = detectLocation(rec.daysData, duties);
-      // Firebase-approved extensions take priority; fall back to manually entered value
-      const firebaseExt = extMap[name] || 0;
-      const ext         = firebaseExt > 0 ? firebaseExt : (Number(rec.extension)||0);
-      const combined    = ext > 0 ? Math.ceil(hours + ext) : hours;
+
+      let combined;
+      // Manual OT override = user's final word — use it directly, no extension added
+      const overrideRaw = rec.otOverride != null
+        ? parseFloat(String(rec.otOverride).replace('+', '')) : NaN;
+      if (Number.isFinite(overrideRaw) && overrideRaw >= 0) {
+        combined = overrideRaw;
+      } else {
+        // Firebase-approved extensions take priority; fall back to manually entered value
+        const hours = Number(rec.hours) || 0;
+        if (hours <= 0) return;
+        const firebaseExt = extMap[name] || 0;
+        const ext         = firebaseExt > 0 ? firebaseExt : (Number(rec.extension)||0);
+        combined = ext > 0 ? Math.ceil(hours + ext) : hours;
+      }
+
+      if (combined <= 0) return;
       rows.push({ name, badge, hours: combined, loc: location, just: BC_JUSTIFICATION });
     });
 

@@ -7,7 +7,7 @@
   <style>
     :root{
       --navy:#1a4f8b; --teal:#0f766e; --green:#16a34a; --red:#dc2626;
-      --amber:#d97706; --purple:#7c3aed;
+      --amber:#d97706; --purple:#7c3aed; --orange:#ea580c;
       --bg:#f1f5f9; --card:#fff; --border:#e2e8f0; --muted:#64748b;
     }
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -29,11 +29,13 @@
     .btn-teal{background:var(--teal);color:#fff;} .btn-teal:hover{background:#0b5c56;}
     .btn-green{background:var(--green);color:#fff;} .btn-green:hover{background:#15803d;}
     .btn-red{background:var(--red);color:#fff;} .btn-red:hover{background:#b91c1c;}
+    .btn-amber{background:var(--amber);color:#fff;} .btn-amber:hover{background:#b45309;}
+    .btn-purple{background:var(--purple);color:#fff;} .btn-purple:hover{background:#6d28d9;}
     .btn-ghost{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);} .btn-ghost:hover{background:rgba(255,255,255,.28);}
     .btn-sm{padding:4px 11px;font-size:11px;}
 
     /* ── Layout ── */
-    .page{max-width:900px;margin:0 auto;padding:16px 14px;}
+    .page{max-width:960px;margin:0 auto;padding:16px 14px;}
     .card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.09);border:1px solid var(--border);padding:18px 20px;margin-bottom:14px;}
     .card-title{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:8px;}
 
@@ -44,18 +46,19 @@
     .bf-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
     .bf-op{font-size:22px;color:#94a3b8;font-weight:300;}
     .bf-cur{background:var(--navy);color:#fff;border-radius:10px;padding:8px 16px;}
-    .bf-cur .bf-val{color:#fff;}
-    .bf-cur .bf-label{color:rgba(255,255,255,.7);}
+    .bf-cur .bf-val{color:#fff;} .bf-cur .bf-label{color:rgba(255,255,255,.7);}
 
-    /* ── Action cards ── */
-    .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    /* ── Action cards (2×2 grid) ── */
+    .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
     @media(max-width:520px){.action-grid{grid-template-columns:1fr;}}
-    .action-card{border:2px solid var(--border);border-radius:12px;padding:22px 18px;cursor:pointer;transition:all .18s;text-align:center;user-select:none;}
+    .action-card{border:2px solid var(--border);border-radius:12px;padding:18px 16px;cursor:pointer;transition:all .18s;text-align:center;user-select:none;}
     .action-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.12);}
     .action-earn{border-color:#86efac;} .action-earn:hover{border-color:var(--green);background:#f0fdf4;}
     .action-use{border-color:#93c5fd;} .action-use:hover{border-color:var(--navy);background:#eff6ff;}
-    .action-icon{font-size:32px;margin-bottom:8px;}
-    .action-label{font-size:14px;font-weight:800;color:#0f172a;margin-bottom:5px;}
+    .action-vac{border-color:#fcd34d;} .action-vac:hover{border-color:var(--amber);background:#fffbeb;}
+    .action-duty{border-color:#c4b5fd;} .action-duty:hover{border-color:var(--purple);background:#f5f3ff;}
+    .action-icon{font-size:30px;margin-bottom:7px;}
+    .action-label{font-size:13px;font-weight:800;color:#0f172a;margin-bottom:4px;}
     .action-desc{font-size:11px;color:var(--muted);line-height:1.5;}
 
     /* ── Request history table ── */
@@ -65,27 +68,31 @@
     .req-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     .req-table tr:last-child td{border-bottom:none;}
 
-    /* ── Status chips ── */
+    /* ── Status & category chips ── */
     .chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;border:1px solid transparent;white-space:nowrap;}
     .c-pending{background:#fef3c7;color:#92400e;border-color:#fde68a;}
     .c-approved{background:#dcfce7;color:#166534;border-color:#86efac;}
     .c-rejected{background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
     .c-earn{background:#dcfce7;color:#166534;border-color:#86efac;}
     .c-use{background:#eff6ff;color:#1e40af;border-color:#93c5fd;}
+    .c-vac{background:#fef9c3;color:#713f12;border-color:#fef08a;}
+    .c-duty{background:#f3e8ff;color:#6b21a8;border-color:#d8b4fe;}
 
     /* ── Modal ── */
     .mbd{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:8000;}
     .mbd.show{display:flex;}
-    .mbox{background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.25);width:min(460px,96%);max-height:90vh;overflow-y:auto;}
+    .mbox{background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.25);width:min(480px,96%);max-height:90vh;overflow-y:auto;}
     .mhd{padding:13px 18px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;color:#fff;}
     .mhd button{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;font-family:Arial,sans-serif;}
     .mbody{padding:18px 20px;}
     .mft{padding:12px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;}
     .fg{margin-bottom:13px;}
     .fl{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
-    .fg input,.fg textarea,.fg select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:Arial,sans-serif;outline:none;}
+    .fg input,.fg textarea,.fg select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:Arial,sans-serif;outline:none;color:#1e293b;}
     .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,79,139,.1);}
+    .fg input[readonly]{background:#f8fafc;color:var(--muted);}
     .fr{display:flex;gap:12px;} .fr .fg{flex:1;}
+    .info-box{background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:12px;color:#374151;margin-bottom:14px;border:1px solid var(--border);line-height:1.6;}
 
     /* ── Status toast ── */
     #statusBox{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:10px;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);display:none;z-index:9000;max-width:90vw;text-align:center;}
@@ -139,13 +146,23 @@
       <div class="action-grid">
         <div class="action-card action-earn" onclick="openReqModal('earn')">
           <div class="action-icon">➕</div>
-          <div class="action-label">Request Lieu Day Addition</div>
-          <div class="action-desc">I worked on a day off, public holiday, or did extra hours that qualify for a lieu day</div>
+          <div class="action-label">Lieu Day Addition</div>
+          <div class="action-desc">I worked on a day off or public holiday that qualifies for a lieu day</div>
         </div>
         <div class="action-card action-use" onclick="openReqModal('use')">
           <div class="action-icon">➖</div>
-          <div class="action-label">Request Lieu Day Consumption</div>
+          <div class="action-label">Lieu Day Consumption</div>
           <div class="action-desc">I would like to use accumulated lieu days to take time off</div>
+        </div>
+        <div class="action-card action-vac" onclick="openVacModal()">
+          <div class="action-icon">📅</div>
+          <div class="action-label">Vacation Plan</div>
+          <div class="action-desc">Submit a vacation or leave request for review by your charge person</div>
+        </div>
+        <div class="action-card action-duty" onclick="openDutyModal()">
+          <div class="action-icon">🏥</div>
+          <div class="action-label">Request a Duty</div>
+          <div class="action-desc">Request to be assigned a specific duty in a particular area</div>
         </div>
       </div>
     </div>
@@ -159,15 +176,15 @@
   </div>
 </div>
 
-<!-- Request modal -->
+<!-- ── Lieu Day Modal ───────────────────────────────────────────────────── -->
 <div id="mReq" class="mbd">
   <div class="mbox">
     <div class="mhd" id="mReqHd" style="background:linear-gradient(135deg,var(--green),#0f766e);">
       <span id="mReqTitle">Request</span>
-      <button onclick="closeModal()">&#x2715;</button>
+      <button onclick="closeModal('mReq')">&#x2715;</button>
     </div>
     <div class="mbody">
-      <div id="mReqDesc" style="background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:12px;color:#374151;margin-bottom:14px;border:1px solid var(--border);line-height:1.6;"></div>
+      <div id="mReqDesc" class="info-box"></div>
       <div class="fr">
         <div class="fg">
           <label class="fl">Date *</label>
@@ -180,7 +197,7 @@
       </div>
       <div class="fg">
         <label class="fl">Reason *</label>
-        <input type="text" id="rReason" placeholder="e.g. Weekend on-call 12 Jan, Public holiday coverage…"/>
+        <input type="text" id="rReason" placeholder="e.g. Weekend on-call 12 Jan, public holiday coverage…"/>
       </div>
       <div class="fg">
         <label class="fl">Additional Notes</label>
@@ -188,8 +205,106 @@
       </div>
     </div>
     <div class="mft">
-      <button class="btn-ghost" style="background:#e2e8f0;color:#334155;" onclick="closeModal()">Cancel</button>
+      <button style="background:#e2e8f0;color:#334155;" onclick="closeModal('mReq')">Cancel</button>
       <button id="mReqSubmitBtn" class="btn-green" onclick="submitReq()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Vacation Modal ──────────────────────────────────────────────────── -->
+<div id="mVac" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,var(--amber),var(--orange));">
+      <span>📅 Vacation / Leave Request</span>
+      <button onclick="closeModal('mVac')">&#x2715;</button>
+    </div>
+    <div class="mbody">
+      <div class="info-box">Submit your planned leave for review by your charge person. All fields marked * are required.</div>
+      <div class="fg">
+        <label class="fl">Leave Type *</label>
+        <select id="vType">
+          <option value="">— Select type —</option>
+          <option>Annual Leave</option>
+          <option>Emergency Leave</option>
+          <option>Sick Leave</option>
+          <option>Compensatory Leave</option>
+          <option>Training Leave</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <label class="fl">Start Date *</label>
+          <input type="date" id="vStart" oninput="updateVacDays()"/>
+        </div>
+        <div class="fg">
+          <label class="fl">End Date *</label>
+          <input type="date" id="vEnd" oninput="updateVacDays()"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Duration (days)</label>
+        <input type="text" id="vDays" readonly placeholder="Auto-calculated"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Reason *</label>
+        <input type="text" id="vReason" placeholder="e.g. Family visit, medical procedure…"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Additional Notes</label>
+        <textarea id="vNote" rows="2" placeholder="Handover arrangement, contact during leave, etc. (optional)…"></textarea>
+      </div>
+    </div>
+    <div class="mft">
+      <button style="background:#e2e8f0;color:#334155;" onclick="closeModal('mVac')">Cancel</button>
+      <button class="btn-amber" onclick="submitVacation()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Duty Request Modal ──────────────────────────────────────────────── -->
+<div id="mDuty" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,var(--purple),var(--navy));">
+      <span>🏥 Duty Assignment Request</span>
+      <button onclick="closeModal('mDuty')">&#x2715;</button>
+    </div>
+    <div class="mbody">
+      <div class="info-box">Request to be assigned a specific duty. Your charge person will review and arrange the schedule accordingly.</div>
+      <div class="fg">
+        <label class="fl">Area *</label>
+        <select id="dArea">
+          <option value="">— Select area —</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">Duty *</label>
+        <select id="dDuty">
+          <option value="">— Select duty —</option>
+        </select>
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <label class="fl">Start Date *</label>
+          <input type="date" id="dStart"/>
+        </div>
+        <div class="fg">
+          <label class="fl">End Date</label>
+          <input type="date" id="dEnd" placeholder="Same as start if single day"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Reason *</label>
+        <input type="text" id="dReason" placeholder="e.g. Skill development, area experience, coverage…"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Additional Notes</label>
+        <textarea id="dNote" rows="2" placeholder="Any extra details (optional)…"></textarea>
+      </div>
+    </div>
+    <div class="mft">
+      <button style="background:#e2e8f0;color:#334155;" onclick="closeModal('mDuty')">Cancel</button>
+      <button class="btn-purple" onclick="submitDuty()">Submit Request</button>
     </div>
   </div>
 </div>
@@ -199,7 +314,7 @@
 <script src="config.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, query, where, orderBy }
+  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, query, where }
     from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const app = initializeApp({
@@ -212,56 +327,65 @@
   const db = getFirestore(app);
 
   // ── State ───────────────────────────────────────────────────────────────
-  let _sess     = null;
-  let _badge    = '';
-  let _lieu     = null;
-  let _requests = [];
-  let _reqType  = 'earn';
+  let _sess      = null;
+  let _badge     = '';
+  let _lieu      = null;
+  let _lieuReqs  = [];   // lieu_requests
+  let _vacReqs   = [];   // vacation_requests
+  let _dutyReqs  = [];   // duty_requests
+  let _reqType   = 'earn';
 
-  const _key = () => (window.BCOT_APP_KEY || '').trim();
-  const lieuRef  = badge => doc(db, 'bcot_overtime_secure', _key(), 'lieu_days', String(badge));
-  const reqsColl = ()    => collection(db, 'bcot_overtime_secure', _key(), 'lieu_requests');
+  const _key        = () => (window.BCOT_APP_KEY || '').trim();
+  const lieuRef     = b  => doc(db, 'bcot_overtime_secure', _key(), 'lieu_days', String(b));
+  const lieuReqColl = ()  => collection(db, 'bcot_overtime_secure', _key(), 'lieu_requests');
+  const vacReqColl  = ()  => collection(db, 'bcot_overtime_secure', _key(), 'vacation_requests');
+  const dutyReqColl = ()  => collection(db, 'bcot_overtime_secure', _key(), 'duty_requests');
 
-  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function today(){ return new Date().toISOString().slice(0,10); }
-  function fd(d) {
-    if (!d) return '—';
+  function fd(d){
+    if(!d) return '—';
     return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
   }
-
-  function ss(msg, ok=true) {
-    const el = document.getElementById('statusBox');
-    el.textContent = msg;
-    el.style.cssText = `display:block;background:${ok?'#166534':'#dc2626'};color:#fff;`;
-    clearTimeout(el._t);
-    el._t = setTimeout(()=>el.style.display='none', ok?3200:5000);
-  }
-
-  function calcBalance(lieu) {
-    const starting = Number(lieu?.startingBalance) || 0;
-    let earned=0, used=0, adjusted=0;
-    (lieu?.transactions||[]).forEach(t=>{
-      const d = Number(t.days)||0;
-      if(t.type==='earn')   earned   += d;
-      if(t.type==='use')    used     += d;
-      if(t.type==='adjust') adjusted += d;
-    });
-    return { starting, earned, used, adjusted, current: starting+earned-used+adjusted };
-  }
-
   function fmtDays(n){ const v=Number(n)||0; return v===Math.floor(v)?String(v):v.toFixed(1); }
+  function calcDays(s,e){
+    if(!s||!e) return 0;
+    const a=new Date(s+'T00:00:00'), b=new Date(e+'T00:00:00');
+    if(b<a) return 0;
+    return Math.round((b-a)/(1000*60*60*24))+1;
+  }
 
-  // ── Render balance ───────────────────────────────────────────────────────
-  function renderBalance() {
-    const el = document.getElementById('balanceView');
-    if (!_lieu) {
-      el.innerHTML = '<span style="color:#94a3b8;font-size:12px;">No lieu day record found. Contact your manager.</span>';
+  function ss(msg, ok=true){
+    const el=document.getElementById('statusBox');
+    el.textContent=msg;
+    el.style.cssText=`display:block;background:${ok?'#166534':'#dc2626'};color:#fff;`;
+    clearTimeout(el._t);
+    el._t=setTimeout(()=>el.style.display='none', ok?3200:5000);
+  }
+
+  // ── Balance ──────────────────────────────────────────────────────────────
+  function calcBalance(lieu){
+    const starting=Number(lieu?.startingBalance)||0;
+    let earned=0,used=0,adjusted=0;
+    (lieu?.transactions||[]).forEach(t=>{
+      const d=Number(t.days)||0;
+      if(t.type==='earn')   earned   +=d;
+      if(t.type==='use')    used     +=d;
+      if(t.type==='adjust') adjusted +=d;
+    });
+    return {starting,earned,used,adjusted,current:starting+earned-used+adjusted};
+  }
+
+  function renderBalance(){
+    const el=document.getElementById('balanceView');
+    if(!_lieu){
+      el.innerHTML='<span style="color:#94a3b8;font-size:12px;">No lieu day record found. Contact your manager.</span>';
       return;
     }
-    const b  = calcBalance(_lieu);
-    const adjSign = b.adjusted >= 0 ? '' : '−';
-    const curColor = b.current > 0 ? '#166534' : b.current < 0 ? '#dc2626' : '#64748b';
-    el.innerHTML = `
+    const b=calcBalance(_lieu);
+    const adjSign=b.adjusted>=0?'':'−';
+    el.innerHTML=`
       <div class="bal-row">
         <div class="bf-block">
           <div class="bf-val" style="color:#1a4f8b;">${fmtDays(b.starting)}</div>
@@ -290,33 +414,76 @@
       </div>`;
   }
 
-  // ── Render request history ───────────────────────────────────────────────
-  function renderRequests() {
-    const el = document.getElementById('reqList');
-    const pending = _requests.filter(r=>r.status==='pending');
-    const bannerEl = document.getElementById('pendingBanner');
-    const countEl  = document.getElementById('pendingCount');
-    if (pending.length) {
-      countEl.textContent = `You have ${pending.length} pending request${pending.length>1?'s':''} awaiting review by your manager.`;
-      bannerEl.style.display = '';
+  // ── Merge & render all requests ──────────────────────────────────────────
+  function allRequestsSorted(){
+    const rows=[];
+    _lieuReqs.forEach(r=>rows.push({
+      _kind:'lieu', _id:r._id, submittedAt:r.submittedAt||'',
+      catLabel: r.type==='earn'?'Lieu Addition':'Lieu Use',
+      catClass: r.type==='earn'?'c-earn':'c-use',
+      dates:   fd(r.date),
+      info:    fmtDays(r.days)+' day'+(Number(r.days)===1?'':'s'),
+      reason:  r.reason||'—',
+      status:  r.status||'pending',
+      reviewNote: r.reviewNote||''
+    }));
+    _vacReqs.forEach(r=>rows.push({
+      _kind:'vac', _id:r._id, submittedAt:r.submittedAt||'',
+      catLabel:'Vacation',
+      catClass:'c-vac',
+      dates:   r.startDate===r.endDate ? fd(r.startDate) : fd(r.startDate)+' – '+fd(r.endDate),
+      info:    esc(r.leaveType||'Leave')+(r.days?' · '+r.days+' day'+(Number(r.days)===1?'':'s'):''),
+      reason:  r.reason||'—',
+      status:  r.status||'pending',
+      reviewNote: r.reviewNote||''
+    }));
+    _dutyReqs.forEach(r=>rows.push({
+      _kind:'duty', _id:r._id, submittedAt:r.submittedAt||'',
+      catLabel:'Duty Request',
+      catClass:'c-duty',
+      dates:   r.startDate===r.endDate ? fd(r.startDate) : fd(r.startDate)+' – '+fd(r.endDate||r.startDate),
+      info:    esc(r.areaLabel||r.area||'—')+' · '+esc(r.dutyName||r.dutyCode||'—'),
+      reason:  r.reason||'—',
+      status:  r.status||'pending',
+      reviewNote: r.reviewNote||''
+    }));
+    return rows.sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt));
+  }
+
+  function renderRequests(){
+    const el=document.getElementById('reqList');
+    const all=allRequestsSorted();
+
+    // Pending banner
+    const pending=all.filter(r=>r.status==='pending');
+    const bannerEl=document.getElementById('pendingBanner');
+    const countEl =document.getElementById('pendingCount');
+    if(pending.length){
+      countEl.textContent=`You have ${pending.length} pending request${pending.length>1?'s':''} awaiting review by your charge person.`;
+      bannerEl.style.display='';
     } else {
-      bannerEl.style.display = 'none';
+      bannerEl.style.display='none';
     }
 
-    if (!_requests.length) {
-      el.innerHTML = '<div class="empty">No requests submitted yet.</div>';
+    if(!all.length){
+      el.innerHTML='<div class="empty">No requests submitted yet.</div>';
       return;
     }
 
-    const sorted = [..._requests].sort((a,b)=>(b.submittedAt||'').localeCompare(a.submittedAt||''));
-    el.innerHTML = `
+    const statusChip=s=>s==='approved'
+      ?'<span class="chip c-approved">Approved</span>'
+      :s==='rejected'
+        ?'<span class="chip c-rejected">Rejected</span>'
+        :'<span class="chip c-pending">Pending</span>';
+
+    el.innerHTML=`
       <div class="req-table-wrap">
         <table class="req-table">
           <thead>
             <tr>
-              <th>Type</th>
-              <th>Date</th>
-              <th style="text-align:center;">Days</th>
+              <th>Category</th>
+              <th>Date(s)</th>
+              <th>Details</th>
               <th>Reason</th>
               <th>Status</th>
               <th>Review Note</th>
@@ -324,23 +491,15 @@
             </tr>
           </thead>
           <tbody>
-            ${sorted.map(r=>{
-              const typeChip = r.type==='earn'
-                ? '<span class="chip c-earn">Addition</span>'
-                : '<span class="chip c-use">Consumption</span>';
-              const statChip = r.status==='approved'
-                ? '<span class="chip c-approved">Approved</span>'
-                : r.status==='rejected'
-                  ? '<span class="chip c-rejected">Rejected</span>'
-                  : '<span class="chip c-pending">Pending</span>';
-              const sub = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+            ${all.map(r=>{
+              const sub=r.submittedAt?new Date(r.submittedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
               return `<tr>
-                <td>${typeChip}</td>
-                <td style="white-space:nowrap;">${fd(r.date)}</td>
-                <td style="text-align:center;font-weight:700;">${fmtDays(r.days)}</td>
-                <td>${esc(r.reason||'—')}</td>
-                <td>${statChip}</td>
-                <td style="font-size:11px;color:#64748b;">${esc(r.reviewNote||'—')}</td>
+                <td><span class="chip ${r.catClass}">${r.catLabel}</span></td>
+                <td style="white-space:nowrap;font-size:11px;">${r.dates}</td>
+                <td style="font-size:11px;">${r.info}</td>
+                <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.reason)}">${esc(r.reason)}</td>
+                <td>${statusChip(r.status)}</td>
+                <td style="font-size:11px;color:#64748b;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.reviewNote)}">${esc(r.reviewNote||'—')}</td>
                 <td style="white-space:nowrap;font-size:11px;color:#64748b;">${sub}</td>
               </tr>`;
             }).join('')}
@@ -349,135 +508,228 @@
       </div>`;
   }
 
-  // ── Request modal ────────────────────────────────────────────────────────
-  const EARN_GRADIENT = 'linear-gradient(135deg,#16a34a,#0f766e)';
-  const USE_GRADIENT  = 'linear-gradient(135deg,#1a4f8b,#0f766e)';
+  // ── Lieu modal ───────────────────────────────────────────────────────────
+  const EARN_GRAD='linear-gradient(135deg,#16a34a,#0f766e)';
+  const USE_GRAD ='linear-gradient(135deg,#1a4f8b,#0f766e)';
 
-  window.openReqModal = function(type) {
-    _reqType = type;
-    const isEarn = type === 'earn';
-    document.getElementById('mReqHd').style.background   = isEarn ? EARN_GRADIENT : USE_GRADIENT;
-    document.getElementById('mReqTitle').textContent      = isEarn ? '➕ Request Lieu Day Addition' : '➖ Request Lieu Day Consumption';
-    document.getElementById('mReqSubmitBtn').className    = isEarn ? 'btn-green' : 'btn-navy';
-    document.getElementById('mReqDesc').innerHTML         = isEarn
-      ? 'Submit this form to request that lieu days be added to your balance.<br>Your manager will review and approve.'
-      : 'Submit this form to request consumption of lieu days from your balance.<br>Your manager will review and approve.';
-    document.getElementById('rDate').value   = today();
-    document.getElementById('rDays').value   = '';
-    document.getElementById('rReason').value = '';
-    document.getElementById('rNote').value   = '';
+  window.openReqModal=function(type){
+    _reqType=type;
+    const isEarn=type==='earn';
+    document.getElementById('mReqHd').style.background  =isEarn?EARN_GRAD:USE_GRAD;
+    document.getElementById('mReqTitle').textContent     =isEarn?'➕ Request Lieu Day Addition':'➖ Request Lieu Day Consumption';
+    document.getElementById('mReqSubmitBtn').className   =isEarn?'btn-green':'btn-navy';
+    document.getElementById('mReqDesc').innerHTML        =isEarn
+      ?'Submit this form to request that lieu days be added to your balance.<br>Your charge person will review and approve.'
+      :'Submit this form to request consumption of lieu days from your balance.<br>Your charge person will review and approve.';
+    document.getElementById('rDate').value  =today();
+    document.getElementById('rDays').value  ='';
+    document.getElementById('rReason').value='';
+    document.getElementById('rNote').value  ='';
     document.getElementById('mReq').classList.add('show');
-    setTimeout(()=>document.getElementById('rDays').focus(), 120);
+    setTimeout(()=>document.getElementById('rDays').focus(),120);
   };
 
-  window.closeModal = function() {
-    document.getElementById('mReq').classList.remove('show');
+  window.closeModal=function(id){
+    document.getElementById(id).classList.remove('show');
   };
 
-  window.submitReq = async function() {
-    const date   = document.getElementById('rDate').value;
-    const days   = parseFloat(document.getElementById('rDays').value);
-    const reason = document.getElementById('rReason').value.trim();
-    const note   = document.getElementById('rNote').value.trim();
-    if (!date)        { ss('Please select a date.',false); return; }
-    if (!days||days<=0){ ss('Enter a valid number of days.',false); return; }
-    if (!reason)      { ss('Reason is required.',false); return; }
+  window.submitReq=async function(){
+    const date  =document.getElementById('rDate').value;
+    const days  =parseFloat(document.getElementById('rDays').value);
+    const reason=document.getElementById('rReason').value.trim();
+    const note  =document.getElementById('rNote').value.trim();
+    if(!date)       {ss('Please select a date.',false);return;}
+    if(!days||days<=0){ss('Enter a valid number of days.',false);return;}
+    if(!reason)     {ss('Reason is required.',false);return;}
+    const entry={badge:_badge,staffName:_sess.name||'',type:_reqType,days,date,reason,note,
+      status:'pending',submittedAt:new Date().toISOString()};
+    try{
+      const ref=await addDoc(lieuReqColl(),entry);
+      _lieuReqs.push({_id:ref.id,...entry});
+      closeModal('mReq'); renderRequests();
+      ss('Request submitted ✅ — awaiting charge person review.');
+    }catch(e){ss('Submit failed: '+(e?.message||e),false);}
+  };
 
-    const entry = {
-      badge:       _badge,
-      staffName:   _sess.name || '',
-      type:        _reqType,
-      days,
-      date,
-      reason,
-      note,
-      status:      'pending',
-      submittedAt: new Date().toISOString()
-    };
+  // ── Vacation modal ───────────────────────────────────────────────────────
+  window.openVacModal=function(){
+    document.getElementById('vType').value  ='';
+    document.getElementById('vStart').value =today();
+    document.getElementById('vEnd').value   =today();
+    document.getElementById('vDays').value  ='1';
+    document.getElementById('vReason').value='';
+    document.getElementById('vNote').value  ='';
+    document.getElementById('mVac').classList.add('show');
+    setTimeout(()=>document.getElementById('vType').focus(),120);
+  };
 
-    try {
-      const ref = await addDoc(reqsColl(), entry);
-      _requests.push({ _id: ref.id, ...entry });
-      closeModal();
-      renderRequests();
-      ss(`Request submitted ✅ — awaiting manager review.`);
-    } catch(e) { ss('Submit failed: '+(e?.message||e), false); }
+  window.updateVacDays=function(){
+    const s=document.getElementById('vStart').value;
+    const e=document.getElementById('vEnd').value;
+    const d=calcDays(s,e);
+    document.getElementById('vDays').value=d>0?String(d):'';
+  };
+
+  window.submitVacation=async function(){
+    const leaveType=document.getElementById('vType').value;
+    const startDate=document.getElementById('vStart').value;
+    const endDate  =document.getElementById('vEnd').value;
+    const days     =calcDays(startDate,endDate);
+    const reason   =document.getElementById('vReason').value.trim();
+    const note     =document.getElementById('vNote').value.trim();
+    if(!leaveType){ss('Please select a leave type.',false);return;}
+    if(!startDate||!endDate){ss('Please select start and end dates.',false);return;}
+    if(days<=0){ss('End date must be on or after start date.',false);return;}
+    if(!reason){ss('Reason is required.',false);return;}
+    const entry={badge:_badge,staffName:_sess.name||'',leaveType,startDate,endDate,days,
+      reason,note,status:'pending',submittedAt:new Date().toISOString()};
+    try{
+      const ref=await addDoc(vacReqColl(),entry);
+      _vacReqs.push({_id:ref.id,...entry});
+      closeModal('mVac'); renderRequests();
+      ss(`Vacation request submitted ✅ — ${days} day${days===1?'':'s'} pending review.`);
+    }catch(e){ss('Submit failed: '+(e?.message||e),false);}
+  };
+
+  // ── Duty modal ───────────────────────────────────────────────────────────
+  window.openDutyModal=function(){
+    // Populate area dropdown from localStorage
+    const areasSel=document.getElementById('dArea');
+    areasSel.innerHTML='<option value="">— Select area —</option>';
+    const areas=(() => {try{return JSON.parse(localStorage.getItem('BCOT_AREAS_LIST_V1')||'[]');}catch{return [];}})();
+    areas.forEach(a=>{
+      const id   =String(a.id||a.key||'').trim();
+      const label=String(a.label||a.name||id).trim();
+      if(!id) return;
+      const opt=document.createElement('option');
+      opt.value=id; opt.textContent=label; opt.dataset.label=label;
+      areasSel.appendChild(opt);
+    });
+    if(!areas.length){
+      const opt=document.createElement('option');
+      opt.disabled=true; opt.textContent='(No areas found — sync areas first)';
+      areasSel.appendChild(opt);
+    }
+
+    // Populate duty dropdown from localStorage
+    const dutySel=document.getElementById('dDuty');
+    dutySel.innerHTML='<option value="">— Select duty —</option>';
+    const duties=(() => {try{return JSON.parse(localStorage.getItem('BCOT_DUTIES_ALL_V1')||'{}');}catch{return {};}})();
+    const codes=Object.keys(duties).sort();
+    codes.forEach(code=>{
+      const d=duties[code];
+      const label=String(d.name||d.label||code).trim();
+      const opt=document.createElement('option');
+      opt.value=code; opt.textContent=`${code} — ${label}`; opt.dataset.name=label;
+      dutySel.appendChild(opt);
+    });
+    if(!codes.length){
+      const opt=document.createElement('option');
+      opt.disabled=true; opt.textContent='(No duties found — duties list not loaded)';
+      dutySel.appendChild(opt);
+    }
+
+    document.getElementById('dStart').value =today();
+    document.getElementById('dEnd').value   ='';
+    document.getElementById('dReason').value='';
+    document.getElementById('dNote').value  ='';
+    document.getElementById('mDuty').classList.add('show');
+    setTimeout(()=>document.getElementById('dArea').focus(),120);
+  };
+
+  window.submitDuty=async function(){
+    const areaSel   =document.getElementById('dArea');
+    const dutySel   =document.getElementById('dDuty');
+    const area      =areaSel.value;
+    const areaLabel =areaSel.selectedOptions[0]?.dataset.label||area;
+    const dutyCode  =dutySel.value;
+    const dutyName  =dutySel.selectedOptions[0]?.dataset.name||dutyCode;
+    const startDate =document.getElementById('dStart').value;
+    const endDateRaw=document.getElementById('dEnd').value;
+    const endDate   =endDateRaw||startDate;
+    const reason    =document.getElementById('dReason').value.trim();
+    const note      =document.getElementById('dNote').value.trim();
+    if(!area)      {ss('Please select an area.',false);return;}
+    if(!dutyCode)  {ss('Please select a duty.',false);return;}
+    if(!startDate) {ss('Please select a start date.',false);return;}
+    if(!reason)    {ss('Reason is required.',false);return;}
+    const entry={badge:_badge,staffName:_sess.name||'',area,areaLabel,dutyCode,dutyName,
+      startDate,endDate,reason,note,status:'pending',submittedAt:new Date().toISOString()};
+    try{
+      const ref=await addDoc(dutyReqColl(),entry);
+      _dutyReqs.push({_id:ref.id,...entry});
+      closeModal('mDuty'); renderRequests();
+      ss(`Duty request submitted ✅ — awaiting charge person review.`);
+    }catch(e){ss('Submit failed: '+(e?.message||e),false);}
   };
 
   // ── Sign out ─────────────────────────────────────────────────────────────
-  window.doSignOut = function() {
+  window.doSignOut=function(){
     localStorage.removeItem('BCOT_AUTH_SESSION_V1');
-    window.location.href = 'index.html';
+    window.location.href='index.html';
   };
 
   // ── Load ─────────────────────────────────────────────────────────────────
-  async function loadData() {
-    const k = _key(); if(!k) return;
-    try {
-      const [lieuSnap, reqSnap, precSnap] = await Promise.all([
+  async function loadData(){
+    const k=_key(); if(!k) return;
+    try{
+      const [lieuSnap,lieuReqSnap,vacSnap,dutySnap,precSnap]=await Promise.all([
         getDoc(lieuRef(_badge)),
-        getDocs(query(reqsColl(), where('badge','==',_badge))),
+        getDocs(query(lieuReqColl(), where('badge','==',_badge))),
+        getDocs(query(vacReqColl(),  where('badge','==',_badge))),
+        getDocs(query(dutyReqColl(), where('badge','==',_badge))),
         getDocs(collection(db,'bcot_overtime_secure',k,'preceptors'))
       ]);
-      _lieu = lieuSnap.exists() ? lieuSnap.data() : null;
-      _requests = [];
-      reqSnap.forEach(d => _requests.push({ _id:d.id, ...d.data() }));
 
-      // Check preceptor status
-      const sessName = (_sess.name||'').toLowerCase().trim();
-      const isPreceptor = (() => {
-        let found = false;
-        precSnap.forEach(d => {
-          const p = d.data();
-          if (p.active===false) return;
-          if (_badge && String(p.badge||'').trim()===_badge) { found=true; }
-          if (sessName && String(p.name||'').toLowerCase().trim()===sessName) { found=true; }
-        });
-        return found;
-      })();
-      if (isPreceptor) document.getElementById('precBtn').style.display = '';
-    } catch(e) {
+      _lieu     =lieuSnap.exists()?lieuSnap.data():null;
+      _lieuReqs =[];
+      _vacReqs  =[];
+      _dutyReqs =[];
+      lieuReqSnap.forEach(d=>_lieuReqs.push({_id:d.id,...d.data()}));
+      vacSnap.forEach(d=>_vacReqs.push({_id:d.id,...d.data()}));
+      dutySnap.forEach(d=>_dutyReqs.push({_id:d.id,...d.data()}));
+
+      // Preceptor check
+      const sessName=(_sess.name||'').toLowerCase().trim();
+      let isPreceptor=false;
+      precSnap.forEach(d=>{
+        const p=d.data(); if(p.active===false) return;
+        if(_badge && String(p.badge||'').trim()===_badge) isPreceptor=true;
+        if(sessName && String(p.name||'').toLowerCase().trim()===sessName) isPreceptor=true;
+      });
+      if(isPreceptor) document.getElementById('precBtn').style.display='';
+    }catch(e){
       console.error(e);
       ss('Failed to load data — check connection.',false);
     }
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────
-  async function init() {
-    // Session check
-    try {
-      const raw = localStorage.getItem('BCOT_AUTH_SESSION_V1');
-      const s   = JSON.parse(raw||'{}');
-      if (!s.ts || Date.now()-s.ts > 43200000) { window.location.href='index.html'; return; }
-      if (s.app_role==='admin'||s.app_role==='charge') { window.location.href='index.html'; return; }
-      _sess = s;
-    } catch { window.location.href='index.html'; return; }
+  async function init(){
+    try{
+      const s=JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'{}');
+      if(!s.ts||Date.now()-s.ts>43200000){window.location.href='index.html';return;}
+      if(s.app_role==='admin'||s.app_role==='charge'){window.location.href='index.html';return;}
+      _sess=s;
+    }catch{window.location.href='index.html';return;}
 
-    // Resolve badge: stored in session (after auth.js fix), else look up in staff records
-    _badge = (_sess.badge||'').trim();
-    if (!_badge) {
-      const sessName = (_sess.name||'').trim().toLowerCase();
-      const staff    = (() => { try{ return JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]'); }catch{return[];} })();
-      const found    = staff.find(r=>String(r.name||'').toLowerCase().trim()===sessName);
-      if (found) _badge = found.badge||'';
+    _badge=(_sess.badge||'').trim();
+    if(!_badge){
+      const sessName=(_sess.name||'').trim().toLowerCase();
+      const staff=(()=>{try{return JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]');}catch{return[];}})();
+      const found=staff.find(r=>String(r.name||'').toLowerCase().trim()===sessName);
+      if(found) _badge=found.badge||'';
     }
 
-    // Populate topbar
-    const dispName = [_sess.nameTitle, _sess.name].filter(Boolean).join(' ') || _sess.name || 'User';
-    document.getElementById('topbarName').textContent = dispName + (_badge ? '  ·  ' + _badge : '');
-    document.getElementById('topbarSub').textContent  =
-      [_sess.position, 'KAMC-WR'].filter(Boolean).join(' · ') || 'KAMC-WR · Pharmaceutical Care';
+    const dispName=[_sess.nameTitle,_sess.name].filter(Boolean).join(' ')||_sess.name||'User';
+    document.getElementById('topbarName').textContent=dispName+(_badge?'  ·  '+_badge:'');
+    document.getElementById('topbarSub').textContent=[_sess.position,'KAMC-WR'].filter(Boolean).join(' · ')||'KAMC-WR · Pharmaceutical Care';
 
-    // Load Firebase data
     await loadData();
-
-    // Render
     renderBalance();
     renderRequests();
-
-    // Show page
-    document.getElementById('authOv').style.display = 'none';
-    document.getElementById('main').style.display   = '';
+    document.getElementById('authOv').style.display='none';
+    document.getElementById('main').style.display='';
   }
 
   init();

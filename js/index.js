@@ -430,10 +430,14 @@
         standard        = Math.round(mStd * (rem / denom) * 10) / 10;
         tipDetail = `Std: ${mStd}h | Holidays: ${holDays} | Off-days: ${leave.all} | Ratio: ${rem}/${denom} = ${standard}h`;
       } else if (schedType==='BC') {
-        // Business Center — all hours are overtime, no standard deduction
-        val.textContent = (totalHours>0?'+':'')+totalHours;
-        val.className   = 'ot-val'+(totalHours>0?' ot-positive':'');
-        otCell.title    = `BC — all ${totalHours}h are overtime (charged to Business Center)`;
+        // Business Center — all hours are overtime; include extension hours to match pre-approval
+        const extHours = Number(row.querySelector('.ext-cell input')?.value) || 0;
+        const bcOT = extHours > 0 ? Math.ceil(totalHours + extHours) : totalHours;
+        val.textContent = (bcOT>0?'+':'')+bcOT;
+        val.className   = 'ot-val'+(bcOT>0?' ot-positive':'');
+        otCell.title    = extHours > 0
+          ? `BC — ${totalHours}h scheduled + ${extHours}h extension = ${bcOT}h OT`
+          : `BC — all ${totalHours}h are overtime (Business Center)`;
         return;
       }
       const rawOT = totalHours - standard;
