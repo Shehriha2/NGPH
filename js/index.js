@@ -226,7 +226,9 @@
           compHours += ot;
         } else {
           const hrr = hrrByName[name] || 0;
-          if (hrr) otAmount += ot * hrr * 1.5;
+          const schedType = row.querySelector('.sched-cell select')?.value || '';
+          const mult = schedType === 'On Call' ? 0.1 : 1.5;
+          if (hrr) otAmount += ot * hrr * mult;
         }
       });
 
