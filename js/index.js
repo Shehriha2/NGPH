@@ -551,9 +551,10 @@
             showStatusMessage('Invalid OT value — restored previous.', 'error');
             return;
           }
-          // Set manual override — password required (shows masked modal)
+          // Set manual override — admin bypasses password; others use modal
+          if (_getAppRole() === 'admin') _setOTUnlocked(true);
           const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
-          if (pwd && td.dataset.override !== 'true') {
+          if (pwd && td.dataset.override !== 'true' && !_otUnlocked) {
             span.textContent = saved || '—';  // restore while modal is open
             _askOTPwd(
               () => {
@@ -1507,6 +1508,7 @@
         e.preventDefault();
         const name = this.value.trim();
         if (!name) return;
+        if (_getAppRole() === 'admin') { SM.openEditByName(name); return; }
         const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
         if (!pwd) { SM.openEditByName(name); return; }
         BCOT_AUTH.prompt(
@@ -2103,6 +2105,7 @@
         if(!DUTIES[base])return;
         if(e.ctrlKey){
           e.preventDefault();
+          if(_getAppRole()==='admin'){DM.openEditByCode(base);return;}
           const pwd=(window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
           if(!pwd){DM.openEditByCode(base);return;}
           BCOT_AUTH.prompt('Enter the administrator password to edit duty properties.',{title:'🔑 Duty Properties',placeholder:'Admin password',type:'password',confirmLabel:'Unlock'})
