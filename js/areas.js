@@ -69,6 +69,17 @@ function _loadConsumptionLocal() {
   try { return JSON.parse(localStorage.getItem(CONSUMPTION_KEY) || '[]') || []; }
   catch { return []; }
 }
+function _saveConsumptionLocal(recs) {
+  localStorage.setItem(CONSUMPTION_KEY, JSON.stringify(recs));
+}
+async function _saveConsumptionCloud(recs) {
+  const key = _ccKey(); if (!key) return;
+  if (!await _waitFB()) return;
+  await window.FB.setDoc(
+    window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'area_consumption', 'RECORDS'),
+    { records: recs, savedAt: new Date().toISOString() }
+  );
+}
 async function _loadConsumptionCloud() {
   const key = _ccKey(); if (!key) return null;
   if (!await _waitFB()) return null;
@@ -196,25 +207,84 @@ function _otForAreas(areas, savedMap, month, year) {
   const fmt2 = v => Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   (areas || []).forEach(a => {
     const rec = savedMap[`${a}|${year}|${month}`];
+    const editBtn = `<button onclick="ccManualEntry('${_esc(a)}','${month}','${year}')"
+      title="Enter amount manually"
+      style="margin-left:auto;padding:1px 7px;font-size:9px;border:1px solid #cbd5e1;border-radius:4px;
+             background:#f8fafc;color:#475569;cursor:pointer;line-height:1.6;">✏️</button>`;
     if (rec) {
       const ot = Number(rec.otAmount) || 0, comp = Number(rec.compHours) || 0;
       totalOT += ot; totalComp += comp;
       const ts = rec.savedAt
         ? new Date(rec.savedAt).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
         : '';
-      rows.push(`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;border-top:1px solid #f1f5f9;font-size:10px;">
+      const isManual = rec.manual ? `<span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700;">Manual</span>` : '';
+      rows.push(`<div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;border-top:1px solid #f1f5f9;font-size:10px;align-items:center;">
         <span style="font-weight:700;min-width:40px;color:#0f172a;">${_esc(a)}</span>
         <span style="color:#1a4f8b;">💰 ${fmt2(ot)} SAR${comp>0?` &nbsp;📅 ${comp.toFixed(1)} hrs`:''}</span>
+        ${isManual}
         ${ts?`<span style="color:#9ca3af;font-size:9px;">⏱ ${ts}</span>`:''}
+        ${editBtn}
       </div>`);
     } else {
-      rows.push(`<div style="display:flex;gap:4px;padding:4px 0;border-top:1px solid #f1f5f9;font-size:10px;">
+      rows.push(`<div style="display:flex;gap:4px;padding:4px 0;border-top:1px solid #f1f5f9;font-size:10px;align-items:center;">
         <span style="font-weight:700;min-width:40px;color:#9ca3af;">${_esc(a)}</span>
         <span style="color:#d1d5db;">— no data for ${month}/${year}</span>
+        ${editBtn}
       </div>`);
     }
   });
   return { totalOT, totalComp, rows };
+}
+
+// ── Manual amount entry ───────────────────────────────────────────────────
+let _manualEntryCtx = null;
+
+function ccManualEntry(area, month, year) {
+  _manualEntryCtx = { area, month, year };
+  const rec = _consumption.find(r =>
+    r.area === area &&
+    String(r.year) === String(year) &&
+    String(r.month).padStart(2,'0') === String(month).padStart(2,'0')
+  );
+  document.getElementById('meArea').textContent  = area;
+  document.getElementById('mePeriod').textContent = `${month}/${year}`;
+  document.getElementById('meAmount').value = rec ? (Number(rec.otAmount)||0) : '';
+  document.getElementById('meComp').value   = rec ? (Number(rec.compHours)||0) : '';
+  document.getElementById('meModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('meAmount').focus(), 30);
+}
+
+function meClose() {
+  document.getElementById('meModal').style.display = 'none';
+  _manualEntryCtx = null;
+}
+
+async function meSave() {
+  const { area, month, year } = _manualEntryCtx || {};
+  if (!area) return;
+  const ot   = parseFloat(document.getElementById('meAmount').value) || 0;
+  const comp = parseFloat(document.getElementById('meComp').value)   || 0;
+
+  const recs = _consumption.filter(r => !(
+    r.area === area &&
+    String(r.year) === String(year) &&
+    String(r.month).padStart(2,'0') === String(month).padStart(2,'0')
+  ));
+  const newRec = { area, month: String(month).padStart(2,'0'), year: String(year),
+                   otAmount: ot, compHours: comp, savedAt: new Date().toISOString(), manual: true };
+  recs.push(newRec);
+
+  _consumption = recs;
+  _saveConsumptionLocal(recs);
+  meClose();
+  _ccStatus('Saving…');
+  try {
+    await _saveConsumptionCloud(recs);
+    _ccStatus(`${area} ${month}/${year} — manually set to ${ot.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} SAR ✅`);
+  } catch(e) {
+    _ccStatus('Saved locally. Cloud sync failed: ' + (e?.message||e), true);
+  }
+  _ccRender();
 }
 
 /** Recursively accumulate OT from a CC and all its descendants. */
