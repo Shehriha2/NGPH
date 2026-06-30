@@ -439,6 +439,12 @@
           ? `BC — ${totalHours}h scheduled + ${extHours}h extension = ${bcOT}h OT`
           : `BC — all ${totalHours}h are overtime (Business Center)`;
         return;
+      } else if (schedType==='On Call') {
+        // On Call — all scheduled hours are OT, costed at HRR × hours × 0.1
+        val.textContent = totalHours > 0 ? '+' + totalHours : '0';
+        val.className   = 'ot-val' + (totalHours > 0 ? ' ot-positive' : '');
+        otCell.title    = `On Call — all ${totalHours}h are OT (rate: ×0.1)`;
+        return;
       }
       const rawOT = totalHours - standard;
       const ot = Math.max(0, schedType === '12 Hours' ? Math.ceil(rawOT) : Math.round(rawOT * 10) / 10);
@@ -1957,7 +1963,8 @@
         + '<option value="Regular">Regular</option>'
         + '<option value="12 Hours">12 Hours</option>'
         + '<option value="Mixed">Mixed</option>'
-        + '<option value="BC">BC</option>';
+        + '<option value="BC">BC</option>'
+        + '<option value="On Call">On Call</option>';
       sel.value = value;
       sel.addEventListener('change', () => calcOT(td.parentElement));
       td.appendChild(sel);
@@ -2934,7 +2941,9 @@
         const staffAreas = areasByName[name] || [];
         if (!staffAreas.some(a => a === area.toUpperCase())) return;
         const ot = parseFloat((row.querySelector('.ot-val')?.textContent || '').replace('+', ''));
-        if (Number.isFinite(ot) && ot > 0) areaLive += ot * hrr * 1.5;
+        const schedType = row.querySelector('.sched-cell select')?.value || '';
+        const mult = schedType === 'On Call' ? 0.1 : 1.5;
+        if (Number.isFinite(ot) && ot > 0) areaLive += ot * hrr * mult;
       });
 
       // Cost center total = current area live + other areas from saved snapshots

@@ -107,7 +107,8 @@
   // ── OT cost split across areas ──────────────────────────────────────────────
   function splitOTCost(rec, otHours, hrr, DUTIES) {
     if (otHours <= 0 || hrr <= 0) return {};
-    const otCost = otHours * hrr * 1.5;   // OT rate = HRR × 1.5 × hours
+    const otMult = (rec.schedType === 'On Call') ? 0.1 : 1.5;
+    const otCost = otHours * hrr * otMult;
 
     const pureOTHByArea = {};   // from _O cells → charged directly
     const propHByArea   = {};   // from normal cells → proportional split
@@ -130,7 +131,7 @@
     const result={};
     let directTotal=0;
     Object.entries(pureOTHByArea).forEach(([area,h]) => {
-      const cost=h*scale*hrr*1.5;   // direct OT cost for this area (×1.5 rate)
+      const cost=h*scale*hrr*otMult;
       result[area]=(result[area]||0)+cost;
       directTotal+=cost;
     });
@@ -272,7 +273,8 @@
         areaCosts[ar] = (areaCosts[ar]||0) + cost;
       });
 
-      staffRows.push({ name, hrr, otHours, otCost: otHours*hrr*1.5, split });   // ×1.5 OT rate
+      const rowMult = (rec.schedType === 'On Call') ? 0.1 : 1.5;
+      staffRows.push({ name, hrr, otHours, otCost: otHours*hrr*rowMult, split });
     });
 
     renderReport({ payload, month, year, area, areaCosts, budgets, staffRows, DUTIES });
