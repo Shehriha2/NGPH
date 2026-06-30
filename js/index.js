@@ -1966,7 +1966,7 @@
         + '<option value="BC">BC</option>'
         + '<option value="On Call">On Call</option>';
       sel.value = value;
-      sel.addEventListener('change', () => calcOT(td.parentElement));
+      sel.addEventListener('change', () => { calcOT(td.parentElement); updateBannerBudget(); });
       td.appendChild(sel);
       return td;
     }
