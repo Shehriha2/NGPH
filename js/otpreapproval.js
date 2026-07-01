@@ -682,13 +682,14 @@
   }
 
   // ── Master summary page (across all areas) ────────────────────────────────
-  function masterSummaryHtml(items, month, year) {
+  function masterSummaryHtml(items, month, year, extraRows = []) {
     const monthName  = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
     let _ameta = {};
     try { _ameta = JSON.parse(localStorage.getItem('BCOT_AREAS_META_V1') || '{}') || {}; } catch {}
-    const grandStaff = items.reduce((s,i) => s + i.staffCount, 0);
-    const grandHours = items.reduce((s,i) => s + i.totalHours, 0);
-    const grandCost  = items.reduce((s,i) => s + i.totalCost,  0);
+    const allItems   = [...items, ...extraRows];
+    const grandStaff = allItems.every(i => i.staffCount == null) ? null : allItems.reduce((s,i) => s + (i.staffCount||0), 0);
+    const grandHours = allItems.every(i => i.totalHours == null) ? null : allItems.reduce((s,i) => s + (i.totalHours||0), 0);
+    const grandCost  = allItems.reduce((s,i) => s + (i.totalCost||0), 0);
     const rowsHtml   = items.map(it => {
       const lbl = _ameta[it.area]?.label || '';
       const areaCell = lbl ? `${esc(it.area)} <span style="font-size:9px;color:#555;font-weight:400;">(${esc(lbl)})</span>` : esc(it.area);
@@ -699,6 +700,12 @@
         <td class="num" style="padding:6px 8px;border:1px solid #333;">${fmt(it.totalCost)}</td>
       </tr>`;
     }).join('');
+    const extraHtml = extraRows.map(r => `<tr>
+        <td style="padding:6px 8px;border:1px solid #333;">${esc(r.area)}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${r.staffCount||'—'}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${r.totalHours||'—'}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${fmt(r.totalCost||0)}</td>
+      </tr>`).join('');
     return `<div class="print-page page-break-after">
       <div class="form-title">
         <div class="main-title">Monthly Overtime Pre-Approval — Grand Summary</div>
@@ -716,10 +723,11 @@
         </tr></thead>
         <tbody>
           ${rowsHtml}
+          ${extraHtml}
           <tr class="total-row" style="background:#fef9c3;">
             <td style="padding:7px 8px;font-weight:900;border:1px solid #333;text-align:center;">Grand Total</td>
-            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandStaff}</td>
-            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandHours}</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandStaff||'—'}</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandHours||'—'}</td>
             <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${fmt(grandCost)}</td>
           </tr>
         </tbody>
@@ -728,7 +736,7 @@
   }
 
   // ── All-Areas print orchestrator ──────────────────────────────────────────
-  async function buildAndPrintAllAreas(selectedAreas, month, year, zeroAction) {
+  async function buildAndPrintAllAreas(selectedAreas, month, year, zeroAction, extraRows = []) {
     const key = (window.BCOT_APP_KEY||'').trim();
     if (!key) { showStatus('config.js not found.', false); return; }
 
@@ -788,7 +796,7 @@
 
     const wrapper = document.getElementById('formWrapper');
     const prevHtml = wrapper.innerHTML;
-    wrapper.innerHTML = fullHtml + masterSummaryHtml(summaryItems, month, year) + formFooterHtml();
+    wrapper.innerHTML = fullHtml + masterSummaryHtml(summaryItems, month, year, extraRows) + formFooterHtml();
     window.print();
     wrapper.innerHTML = prevHtml;
 
@@ -843,7 +851,7 @@
             ${chkHtml}
           </div>
 
-          <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;border:1px solid #e2e8f0;">
+          <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;border:1px solid #e2e8f0;margin-bottom:14px;">
             <span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:9px;">Areas with no overtime this month</span>
             <label style="display:flex;align-items:center;gap:9px;margin-bottom:7px;cursor:pointer;">
               <input type="radio" name="_zeroAct" value="skip" checked style="cursor:pointer;accent-color:#1a4f8b;"/>
@@ -853,6 +861,17 @@
               <input type="radio" name="_zeroAct" value="zeros" style="cursor:pointer;accent-color:#1a4f8b;"/>
               <span style="font-size:13px;">Include with zeros</span>
             </label>
+          </div>
+
+          <div style="background:#fffbeb;border-radius:8px;padding:12px 14px;border:1px solid #fde68a;">
+            <span style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:9px;">➕ Extra rows in Grant Summary</span>
+            <div id="_aaExtraList" style="margin-bottom:8px;display:flex;flex-direction:column;gap:6px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 70px 80px auto;gap:6px;align-items:center;">
+              <input id="_aaExArea"  type="text"   placeholder="Area / Label" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;"/>
+              <input id="_aaExHrs"   type="number" placeholder="Hours" min="0" style="padding:5px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;"/>
+              <input id="_aaExCost"  type="number" placeholder="Cost ﷼" min="0" style="padding:5px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;"/>
+              <button id="_aaExAdd" style="background:#2e8b57;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">Add</button>
+            </div>
           </div>
 
         </div>
@@ -871,12 +890,42 @@
     $('#_aaAll').addEventListener('click',  () => bd.querySelectorAll('._aChk').forEach(c => c.checked=true));
     $('#_aaNone').addEventListener('click', () => bd.querySelectorAll('._aChk').forEach(c => c.checked=false));
 
+    // Extra rows management
+    let _extraRows = [];
+    function _renderExtraList() {
+      const list = $('#_aaExtraList');
+      if (!list) return;
+      if (!_extraRows.length) { list.innerHTML = ''; return; }
+      list.innerHTML = _extraRows.map((r, i) => `
+        <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:4px 8px;font-size:11px;">
+          <span style="flex:1;font-weight:700;color:#0f172a;">${esc(r.area)}</span>
+          <span style="color:#374151;">${r.totalHours != null ? r.totalHours + 'h' : '—'}</span>
+          <span style="color:#1a4f8b;">${fmt(r.totalCost||0)} ﷼</span>
+          <button data-idx="${i}" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;">✕</button>
+        </div>`).join('');
+      list.querySelectorAll('button[data-idx]').forEach(btn => {
+        btn.addEventListener('click', () => { _extraRows.splice(Number(btn.dataset.idx), 1); _renderExtraList(); });
+      });
+    }
+    $('#_aaExAdd').addEventListener('click', () => {
+      const area  = bd.querySelector('#_aaExArea')?.value.trim();
+      const hrs   = bd.querySelector('#_aaExHrs')?.value.trim();
+      const cost  = parseFloat(bd.querySelector('#_aaExCost')?.value) || 0;
+      if (!area) { bd.querySelector('#_aaExArea').focus(); return; }
+      _extraRows.push({ area, staffCount: null, totalHours: hrs ? Number(hrs) : null, totalCost: cost });
+      bd.querySelector('#_aaExArea').value = '';
+      bd.querySelector('#_aaExHrs').value  = '';
+      bd.querySelector('#_aaExCost').value = '';
+      _renderExtraList();
+      bd.querySelector('#_aaExArea').focus();
+    });
+
     $('#_aaBuild').addEventListener('click', async () => {
       const selected = [...bd.querySelectorAll('._aChk:checked')].map(c => c.value);
-      if (!selected.length) { showStatus('Select at least one area.', false); return; }
+      if (!selected.length && !_extraRows.length) { showStatus('Select at least one area.', false); return; }
       const zeroAction = bd.querySelector('input[name="_zeroAct"]:checked')?.value || 'skip';
       dismiss();
-      await buildAndPrintAllAreas(selected, month, year, zeroAction);
+      await buildAndPrintAllAreas(selected, month, year, zeroAction, _extraRows);
     });
   }
 
