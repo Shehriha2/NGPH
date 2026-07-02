@@ -472,6 +472,78 @@
   <!-- ▲ BOOTSTRAP ICONS ▲ -->
 </head>
 <body>
+
+  <!-- ── Splash Screen ─────────────────────────────────────────────────── -->
+  <div id="splashScreen" style="
+    position:fixed;inset:0;z-index:99999;
+    background:linear-gradient(150deg,#0f2d55 0%,#1a4f8b 45%,#2e8b57 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:18px;
+    transition:opacity .8s ease;
+    font-family:Arial,sans-serif;
+  ">
+    <!-- Emblem ring -->
+    <div style="
+      width:110px;height:110px;border-radius:50%;
+      background:rgba(255,255,255,.12);
+      border:3px solid rgba(255,255,255,.35);
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 40px rgba(255,255,255,.15);
+    ">
+      <div style="font-size:52px;line-height:1;">💊</div>
+    </div>
+
+    <!-- Title block -->
+    <div style="text-align:center;color:#fff;padding:0 24px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;
+                  color:rgba(255,255,255,.65);margin-bottom:6px;">
+        Ministry of National Guard Health Affairs
+      </div>
+      <div style="font-size:22px;font-weight:900;letter-spacing:.5px;margin-bottom:4px;">
+        KAMC-WR
+      </div>
+      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.85);margin-bottom:16px;">
+        Pharmaceutical Care Department
+      </div>
+      <div style="width:60px;height:2px;background:rgba(255,255,255,.4);border-radius:2px;
+                  margin:0 auto 16px;"></div>
+      <div style="font-size:26px;font-weight:900;letter-spacing:1px;
+                  background:linear-gradient(90deg,#a7f3d0,#ffffff);
+                  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                  background-clip:text;">
+        Pharmacy Rota System
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:8px;letter-spacing:.5px;">
+        Workforce Scheduling &amp; OT Management
+      </div>
+    </div>
+
+    <!-- Loading dots -->
+    <div style="display:flex;gap:8px;margin-top:8px;" id="splashDots">
+      <div class="sdot"></div><div class="sdot"></div><div class="sdot"></div>
+    </div>
+  </div>
+
+  <style>
+    .sdot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5);
+          animation:sdotPulse 1.2s ease-in-out infinite;}
+    .sdot:nth-child(2){animation-delay:.2s;}
+    .sdot:nth-child(3){animation-delay:.4s;}
+    @keyframes sdotPulse{0%,100%{opacity:.3;transform:scale(.8);}50%{opacity:1;transform:scale(1.2);}}
+  </style>
+
+  <script>
+    (function(){
+      var sp = document.getElementById('splashScreen');
+      if (!sp) return;
+      // Fade out after 2.5s, then remove from DOM
+      setTimeout(function(){
+        sp.style.opacity = '0';
+        setTimeout(function(){ sp.remove(); }, 900);
+      }, 2500);
+    })();
+  </script>
+
   <div class="page-top">
     <div class="header-banner">
       <div style="display:flex;flex-direction:column;align-items:center;">
@@ -518,6 +590,7 @@
           <button id="btn-areas" onclick="AM.open()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-map"></i> Areas</button>
           <button onclick="clearAllTable()" style="background:#991b1b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-printer-fill"></i> Print</button>
+          <button onclick="window.location.href='ChargeRequests.html'" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard2-check-fill"></i> Staff Requests</button>
         </div>
         <!-- Print: area filter info -->
         <div class="print-only">
@@ -697,6 +770,7 @@
               <button type="button" onclick="openAuthAdmin();" style="background:#1a4f8b;"><i class="bi bi-shield-lock"></i> Manage Login Users</button>
               <button type="button" onclick="openIPAdmin();" style="background:#1a4f8b;"><i class="bi bi-globe"></i> Manage IP Access</button>
               <button type="button" onclick="AM.open();" style="background:#1a4f8b;"><i class="bi bi-folder2-open"></i> Manage Areas</button>
+              <button type="button" onclick="bumpAppVersion();" style="background:#7c3aed;"><i class="bi bi-arrow-clockwise"></i> Publish Version</button>
             </div>
             <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">Manage login users, device access, and areas (including per-area user permissions). All require the OT override password.</p>
           </div>
@@ -1036,6 +1110,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="js/version-check.js"></script>
   <script src="js/auth.js?v=7"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module">
@@ -1338,5 +1413,6 @@ window.addEventListener('bcotAuth', function (e) {
   }
 });
 </script>
+<script src="js/version-admin.js"></script>
 </body>
 </html>
