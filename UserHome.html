@@ -592,11 +592,48 @@
   };
 
   // ── Duty modal ───────────────────────────────────────────────────────────
+  function _populateDutyDropdown(selectedArea){
+    const dutySel=document.getElementById('dDuty');
+    dutySel.innerHTML='<option value="">— Select duty —</option>';
+    const duties=(() => {try{return JSON.parse(localStorage.getItem('BCOT_DUTIES_ALL_V1')||'{}');}catch{return {};}})();
+    const codes=Object.keys(duties).sort();
+    const filtered=selectedArea
+      ? codes.filter(c=>String(duties[c].area||'').trim()===selectedArea)
+      : codes;
+    filtered.forEach(code=>{
+      const d=duties[code];
+      const label=String(d.name||d.label||code).trim();
+      const opt=document.createElement('option');
+      opt.value=code; opt.textContent=`${code} — ${label}`; opt.dataset.name=label;
+      dutySel.appendChild(opt);
+    });
+    if(!filtered.length){
+      const opt=document.createElement('option');
+      opt.disabled=true;
+      opt.textContent=selectedArea?'(No duties found for this area)':'(Select an area first)';
+      dutySel.appendChild(opt);
+    }
+  }
+
   window.openDutyModal=function(){
-    // Populate area dropdown from localStorage
+    // Get staff's assigned areas from their record
+    const staffRecords=(() => {try{return JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]');}catch{return [];}})();
+    const sessName=(_sess.name||'').toLowerCase().trim();
+    const sessBadge=(_badge||'').trim();
+    const staffRec=staffRecords.find(s=>{
+      const recBadge=String(s.badge||'').trim();
+      const recName=String(s.name||'').toLowerCase().trim();
+      return (sessBadge && recBadge===sessBadge)||(sessName && recName===sessName);
+    });
+    const assignedAreas=(staffRec?.area||'').split(',').map(a=>a.trim()).filter(Boolean);
+
+    // Populate area dropdown filtered to staff's assigned areas
     const areasSel=document.getElementById('dArea');
     areasSel.innerHTML='<option value="">— Select area —</option>';
-    const areas=(() => {try{return JSON.parse(localStorage.getItem('BCOT_AREAS_LIST_V1')||'[]');}catch{return [];}})();
+    const allAreas=(() => {try{return JSON.parse(localStorage.getItem('BCOT_AREAS_LIST_V1')||'[]');}catch{return [];}})();
+    const areas=assignedAreas.length
+      ? allAreas.filter(a=>{const id=String(a.id||a.key||'').trim(); return assignedAreas.includes(id);})
+      : allAreas;
     areas.forEach(a=>{
       const id   =String(a.id||a.key||'').trim();
       const label=String(a.label||a.name||id).trim();
@@ -607,27 +644,15 @@
     });
     if(!areas.length){
       const opt=document.createElement('option');
-      opt.disabled=true; opt.textContent='(No areas found — sync areas first)';
+      opt.disabled=true; opt.textContent='(No areas assigned — contact admin)';
       areasSel.appendChild(opt);
     }
 
-    // Populate duty dropdown from localStorage
-    const dutySel=document.getElementById('dDuty');
-    dutySel.innerHTML='<option value="">— Select duty —</option>';
-    const duties=(() => {try{return JSON.parse(localStorage.getItem('BCOT_DUTIES_ALL_V1')||'{}');}catch{return {};}})();
-    const codes=Object.keys(duties).sort();
-    codes.forEach(code=>{
-      const d=duties[code];
-      const label=String(d.name||d.label||code).trim();
-      const opt=document.createElement('option');
-      opt.value=code; opt.textContent=`${code} — ${label}`; opt.dataset.name=label;
-      dutySel.appendChild(opt);
-    });
-    if(!codes.length){
-      const opt=document.createElement('option');
-      opt.disabled=true; opt.textContent='(No duties found — duties list not loaded)';
-      dutySel.appendChild(opt);
-    }
+    // Duty dropdown: empty until area selected
+    _populateDutyDropdown('');
+
+    // Filter duties when area changes
+    areasSel.onchange=function(){ _populateDutyDropdown(this.value); };
 
     document.getElementById('dStart').value =today();
     document.getElementById('dEnd').value   ='';
