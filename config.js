@@ -6,3 +6,5 @@
 window.BCOT_APP_KEY              = "KAMC_WR_BCOT_ROTA_2026_PHARM_TANOMAH";
 window.BCOT_OT_OVERRIDE_PASSWORD  = "H9155466%";
 window.BCOT_ADMIN_BOOTSTRAP_PWD   = "Hassan9155466%";
+window.BCOT_FB_API_KEY            = "AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw";
+window.BCOT_FB_PROJECT_ID         = "bcotrota";
