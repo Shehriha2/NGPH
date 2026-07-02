@@ -586,6 +586,13 @@
 
   /** Called from "Administrator?" link on the pending / blocked screens. */
   async function _adminBypass() {
+    // If the user already has a valid admin session, let them straight in
+    const sess = getSession();
+    if (sess && (sess.app_role === 'admin')) {
+      await openIPManager();
+      return;
+    }
+
     const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
     if (!pwd) {
       await _bcotAlert('Override password is not configured on this page.', 'Error');
