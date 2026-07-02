@@ -642,23 +642,27 @@
       'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
 
     modal.innerHTML = `
-<div style="background:#fff;border-radius:14px;padding:28px 28px 22px;width:480px;
-            max-width:94vw;max-height:86vh;overflow-y:auto;
+<div style="background:#fff;border-radius:14px;padding:28px 32px 22px;width:720px;
+            max-width:96vw;max-height:90vh;display:flex;flex-direction:column;
             box-shadow:0 8px 32px rgba(0,0,0,.2);">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-    <h3 style="margin:0;font-size:16px;color:#1a4f8b;">👥 Login Users</h3>
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-shrink:0;">
+    <h3 style="margin:0;font-size:17px;color:#1a4f8b;">👥 Login Users</h3>
     <button onclick="document.getElementById('bcot-um-modal').remove();"
-      style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;
-             line-height:1;padding:0 4px;">&times;</button>
+      style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;
+             line-height:1;padding:0 6px;">&times;</button>
   </div>
 
-  <div id="bcot-um-list" style="margin-bottom:20px;"></div>
+  <!-- Scrollable user list -->
+  <div id="bcot-um-list" style="flex:1;overflow-y:auto;margin-bottom:20px;min-height:0;"></div>
 
-  <div style="border-top:1px solid #e5e7eb;padding-top:16px;">
+  <!-- Add user form -->
+  <div style="border-top:1px solid #e5e7eb;padding-top:16px;flex-shrink:0;">
     <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">ADD USER</div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
       <input id="bcot-um-newbadge" type="text" placeholder="Badge no. *"
-        style="width:90px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;" />
+        style="width:100px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;" />
       <select id="bcot-um-nametitle"
         style="padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;background:#fff;min-width:90px;">
         <option value="">Title *</option>
@@ -669,19 +673,34 @@
         <option value="R.Ph.">R.Ph.</option>
       </select>
       <input id="bcot-um-newname" type="text" placeholder="Full name *"
-        style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;"
+        style="flex:1;min-width:160px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;"
         onkeydown="if(event.key==='Enter') BCOT_AUTH.umAddUser();" />
       <button onclick="BCOT_AUTH.umAddUser();"
-        style="padding:8px 16px;background:#1a4f8b;color:#fff;border:none;
+        style="padding:8px 18px;background:#1a4f8b;color:#fff;border:none;
                border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
         + Add
       </button>
     </div>
     <div id="bcot-um-err"
-      style="color:#dc2626;font-size:11px;min-height:16px;margin-top:5px;"></div>
-    <p style="margin:10px 0 0;font-size:11px;color:#9ca3af;">
+      style="color:#dc2626;font-size:11px;min-height:16px;margin-top:4px;"></div>
+    <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">
       New users get default password <strong>12345</strong> and are asked to change it on first login.
     </p>
+  </div>
+
+  <!-- Footer buttons -->
+  <div style="border-top:1px solid #e5e7eb;padding-top:14px;margin-top:14px;
+              display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;">
+    <button onclick="document.getElementById('bcot-um-modal').remove();"
+      style="padding:9px 24px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;
+             border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+      ✕ Close
+    </button>
+    <button onclick="BCOT_AUTH.umSaveAll();"
+      style="padding:9px 28px;background:#2e8b57;color:#fff;border:none;
+             border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+      💾 Save
+    </button>
   </div>
 </div>`;
 
@@ -853,6 +872,14 @@
     try {
       await saveUsers();
       _renderUserList();
+    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+  }
+
+  async function umSaveAll() {
+    try {
+      await saveUsers();
+      const el = document.getElementById('bcot-um-modal');
+      if (el) el.remove();
     } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
   }
 
@@ -1649,6 +1676,7 @@
     umRemoveUser,
     umSaveExt,
     umSaveRole,
+    umSaveAll,
     fetchExtUsers,
     // IP manager
     openIPManager,
