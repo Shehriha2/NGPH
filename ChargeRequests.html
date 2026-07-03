@@ -198,7 +198,7 @@
 <script src="config.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, collection, doc, getDocs, updateDoc }
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc }
     from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const app = initializeApp({
@@ -224,6 +224,78 @@
   const vacColl   = () => collection(db, 'bcot_overtime_secure', _key(), 'vacation_requests');
   const dutyColl  = () => collection(db, 'bcot_overtime_secure', _key(), 'duty_requests');
   const reqDocRef = (coll, id) => doc(db, 'bcot_overtime_secure', _key(), coll, id);
+
+  // ── Apply an approved duty request onto the area's rota ────────────────────
+  // Writes the duty code into the same dates on the *latest release* of that
+  // area (falling back to the legacy monthly working copy if no release
+  // exists yet). Hours/OT are left as-is — they're recalculated from
+  // daysData automatically the next time the release is opened in index.html.
+  function _pad2(n){ return String(n).padStart(2,'0'); }
+  function _eachDate(start,end){
+    const out=[];
+    let d=new Date(start+'T00:00:00');
+    const e=new Date((end||start)+'T00:00:00');
+    while(d<=e){ out.push(new Date(d)); d.setDate(d.getDate()+1); }
+    return out;
+  }
+  function _monthDocId(d){ return `${d.getFullYear()}-${_pad2(d.getMonth()+1)}`; }
+
+  async function applyDutyToRota(entry){
+    const key       = _key();
+    const area      = (entry.area||'').trim();
+    const code      = (entry.dutyCode||'').trim().toUpperCase();
+    const staffName = (entry.staffName||'').trim();
+    if(!key||!area||!code||!staffName||!entry.startDate){
+      return {ok:false, msg:'Duty request is missing area/duty/staff info — could not update the rota.'};
+    }
+
+    const byMonth={};
+    _eachDate(entry.startDate, entry.endDate).forEach(d=>{
+      const mId=_monthDocId(d);
+      (byMonth[mId]=byMonth[mId]||[]).push(d.getDate());
+    });
+
+    let daysTouched=0;
+    for(const docId of Object.keys(byMonth)){
+      const days=byMonth[docId];
+
+      // Find the latest release for this area+month (release_index is sorted
+      // ascending by releaseNum, so the last entry is the newest).
+      const idxSnap = await getDoc(doc(db,'bcot_overtime_secure',key,'areas',area,'release_index',docId));
+      const rels = idxSnap.exists() ? (idxSnap.data().releases||[]) : [];
+      const releaseRef = rels.length
+        ? doc(db,'bcot_overtime_secure',key,'areas',area,'releases',rels[rels.length-1].id)
+        : null;
+      const monthRef = doc(db,'bcot_overtime_secure',key,'areas',area,'months',docId);
+
+      // Patch whichever doc(s) actually exist — never fabricate a rota that
+      // was never saved.
+      const targets = (releaseRef ? [releaseRef] : []).concat([monthRef]);
+      let patchedAny = false;
+      for(const ref of targets){
+        const snap = await getDoc(ref);
+        if(!snap.exists()) continue;
+        patchedAny = true;
+        const payload = snap.data();
+        const records = Array.isArray(payload.records) ? payload.records : [];
+        let row = records.find(r=>String(r.staffName||'').trim().toLowerCase()===staffName.toLowerCase());
+        if(!row){
+          row = {staffName, hours:0, daysData:{}, schedType:'', otOverride:null, otCalc:null, extension:0, compType:'OT', note:''};
+          records.push(row);
+        }
+        row.daysData = row.daysData || {};
+        days.forEach(dayNum => { row.daysData['day'+dayNum] = code; });
+        payload.records = records;
+        await setDoc(ref, payload, {merge:true});
+      }
+      if(patchedAny) daysTouched += days.length;
+    }
+
+    if(!daysTouched){
+      return {ok:false, msg:`No saved rota found for ${area} — save a release for this area, then approve again.`};
+    }
+    return {ok:true, msg:`Rota updated: ${code} set for ${daysTouched} day${daysTouched===1?'':'s'} in ${area}.`};
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -408,7 +480,19 @@
     }
     const isApprove = _actionKind==='approve';
     const reviewerName = [_sess.nameTitle,_sess.name].filter(Boolean).join(' ')||_sess.name||'Charge';
+    const arr = _actionColl==='vacation_requests'?_vacReqs:_dutyReqs;
+    const rec = arr.find(r=>r._id===_actionId);
     try{
+      // Duty approvals must land on an actual saved rota. If no release/month
+      // exists yet for this area, block the approval (request stays pending)
+      // and tell the charge person to save a release first.
+      let rotaMsg='';
+      if(isApprove && _actionColl==='duty_requests' && rec){
+        const result=await applyDutyToRota(rec);
+        if(!result.ok){ ss(result.msg,false); return; }
+        rotaMsg=' — '+result.msg;
+      }
+
       await updateDoc(reqDocRef(_actionColl, _actionId),{
         status:     isApprove?'approved':'rejected',
         reviewedBy: reviewerName,
@@ -416,17 +500,16 @@
         reviewNote: note
       });
       // Update local state
-      const arr = _actionColl==='vacation_requests'?_vacReqs:_dutyReqs;
-      const rec = arr.find(r=>r._id===_actionId);
       if(rec){
         rec.status     = isApprove?'approved':'rejected';
         rec.reviewedBy = reviewerName;
         rec.reviewedAt = new Date().toISOString();
         rec.reviewNote = note;
       }
+
       closeActionModal();
       render();
-      ss(isApprove?'Request approved ✅':'Request rejected.',(isApprove));
+      ss((isApprove?'Request approved ✅':'Request rejected.')+rotaMsg, true);
     }catch(e){
       ss('Update failed: '+(e?.message||e),false);
     }
