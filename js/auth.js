@@ -442,6 +442,13 @@
     _addLogoutButton(user.name);
     _initIdleTimer();
     _pendingUser = null;
+    // Marks this bcotAuth dispatch as coming from a login just submitted on
+    // *this* page load, as opposed to an existing session picked up on
+    // arrival — index.html uses this to tell "just logged in here, about to
+    // be redirected" apart from "already had a session, came back here".
+    // A plain in-memory flag (not persisted) so it can never leak into a
+    // later page load, including one that finished logging in elsewhere.
+    window.__bcotFreshLogin = true;
     window.dispatchEvent(new CustomEvent('bcotAuth', { detail: getSession() }));
   }
 

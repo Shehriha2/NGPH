@@ -1306,9 +1306,18 @@ window.addEventListener('bcotAuth', function (e) {
     hide('btn-areas');
   }
 
-  // ── User: redirect to personal portal ───────────────────────────────────
+  // ── User role must never land on index.html. A fresh login submitted
+  // right here still needs its normal redirect to UserHome.html — but if a
+  // 'user' arrives with an *already-existing* session (direct URL, stale
+  // bookmark, browser back button), that's a disallowed attempt to reach
+  // index.html and we force a full logout instead of just bouncing them.
   if (role === 'user') {
-    window.location.href = 'UserHome.html';
+    if (window.__bcotFreshLogin) {
+      window.location.href = 'UserHome.html';
+    } else {
+      localStorage.removeItem('BCOT_AUTH_SESSION_V1');
+      window.location.href = 'index.html';
+    }
     return;
   }
 
