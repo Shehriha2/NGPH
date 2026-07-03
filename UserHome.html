@@ -622,50 +622,60 @@
     }
   }
 
-  window.openDutyModal=function(){
-    // Get staff's assigned areas from their record
-    const staffRecords=(() => {try{return JSON.parse(localStorage.getItem('BCOT_STAFF_RECORDS_V2')||'[]');}catch{return [];}})();
-    const sessName=(_sess.name||'').toLowerCase().trim();
-    const sessBadge=(_badge||'').trim();
-    const staffRec=staffRecords.find(s=>{
-      const recBadge=String(s.badge||'').trim();
-      const recName=String(s.name||'').toLowerCase().trim();
-      return (sessBadge && recBadge===sessBadge)||(sessName && recName===sessName);
-    });
-    const assignedAreas=(staffRec?.area||'').split(',').map(a=>a.trim()).filter(Boolean);
-
-    // Populate area dropdown filtered to staff's assigned areas
-    const areasSel=document.getElementById('dArea');
-    areasSel.innerHTML='<option value="">— Select area —</option>';
-    const allAreas=(() => {try{return JSON.parse(localStorage.getItem('BCOT_AREAS_LIST_V1')||'[]');}catch{return [];}})();
-    const areas=assignedAreas.length
-      ? allAreas.filter(a=>{const id=String(a.id||a.key||'').trim(); return assignedAreas.includes(id);})
-      : allAreas;
-    areas.forEach(a=>{
-      const id   =String(a.id||a.key||'').trim();
-      const label=String(a.label||a.name||id).trim();
-      if(!id) return;
-      const opt=document.createElement('option');
-      opt.value=id; opt.textContent=label; opt.dataset.label=label;
-      areasSel.appendChild(opt);
-    });
-    if(!areas.length){
-      const opt=document.createElement('option');
-      opt.disabled=true; opt.textContent='(No areas assigned — contact admin)';
-      areasSel.appendChild(opt);
-    }
-
-    // Duty dropdown: empty until area selected
-    _populateDutyDropdown('');
-
-    // Filter duties when area changes
-    areasSel.onchange=function(){ _populateDutyDropdown(this.value); };
-
+  window.openDutyModal=async function(){
     document.getElementById('dStart').value =today();
     document.getElementById('dEnd').value   ='';
     document.getElementById('dReason').value='';
     document.getElementById('dNote').value  ='';
     document.getElementById('mDuty').classList.add('show');
+
+    const areasSel=document.getElementById('dArea');
+    areasSel.disabled=true;
+    areasSel.innerHTML='<option value="">Loading your areas…</option>';
+    _populateDutyDropdown('');
+
+    // Look up this staff's own record (by badge, falling back to name) straight
+    // from the cloud staff pool — the local cache is often empty/stale here
+    // since regular staff never load the full staff sync that index.html does.
+    let staffRec=null, loadError=false;
+    try{
+      const snap=await getDoc(doc(db,'bcot_overtime_secure',_key(),'staff_named','STAFF_POOL'));
+      const records=snap.exists()?(snap.data()?.records||[]):[];
+      const sessName =(_sess.name||'').toLowerCase().trim();
+      const sessBadge=(_badge||'').trim();
+      staffRec=records.find(s=>{
+        const recBadge=String(s.badge||'').trim();
+        const recName =String(s.name ||'').toLowerCase().trim();
+        return (sessBadge && recBadge===sessBadge)||(sessName && recName===sessName);
+      });
+    }catch(e){ loadError=true; }
+
+    const assignedAreas=(staffRec?.area||'').split(',').map(a=>a.trim().toUpperCase()).filter(Boolean);
+
+    areasSel.innerHTML='<option value="">— Select area —</option>';
+    assignedAreas.forEach(code=>{
+      const opt=document.createElement('option');
+      opt.value=code; opt.textContent=code; opt.dataset.label=code;
+      areasSel.appendChild(opt);
+    });
+    areasSel.disabled=false;
+
+    if(loadError){
+      ss('Could not load your assigned areas — check your connection and try again.',false);
+      const opt=document.createElement('option'); opt.disabled=true; opt.textContent='(Failed to load — retry)'; areasSel.appendChild(opt);
+    }else if(!staffRec){
+      ss(`No staff record found for badge ${_badge||'—'} — contact admin.`,false);
+      const opt=document.createElement('option'); opt.disabled=true; opt.textContent='(Staff record not found)'; areasSel.appendChild(opt);
+    }else if(!assignedAreas.length){
+      ss('You have no areas assigned yet — contact admin.',false);
+      const opt=document.createElement('option'); opt.disabled=true; opt.textContent='(No areas assigned — contact admin)'; areasSel.appendChild(opt);
+    }else{
+      ss(`Loaded ${assignedAreas.length} assigned area${assignedAreas.length===1?'':'s'}: ${assignedAreas.join(', ')}`);
+    }
+
+    // Filter duties when area changes
+    areasSel.onchange=function(){ _populateDutyDropdown(this.value); };
+
     setTimeout(()=>document.getElementById('dArea').focus(),120);
   };
 
