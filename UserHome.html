@@ -16,8 +16,14 @@
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:Arial,sans-serif;background:var(--bg);color:#1e293b;font-size:13px;}
 
+    /* Inline SVG icons — self-contained, no external font/CDN to fail to load */
+    .icon{width:1em;height:1em;display:inline-block;vertical-align:-0.15em;flex-shrink:0;
+      fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
     /* ── Auth overlay ── */
     #authOv{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+    .spinner{width:34px;height:34px;border:3px solid #dbe4ee;border-top-color:var(--navy);border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
 
     /* ── TopBar ── */
     .topbar{background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);}
@@ -27,15 +33,18 @@
     .topbar-name{font-size:12px;font-weight:700;opacity:.85;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px;white-space:nowrap;}
 
     /* ── Buttons ── */
-    button{cursor:pointer;border:none;border-radius:7px;font-size:12px;font-weight:700;padding:6px 14px;transition:background .15s;font-family:Arial,sans-serif;}
-    .btn-navy{background:var(--navy);color:#fff;} .btn-navy:hover{background:#163e70;}
-    .btn-teal{background:var(--teal);color:#fff;} .btn-teal:hover{background:#0b5c56;}
-    .btn-green{background:var(--green);color:#fff;} .btn-green:hover{background:#15803d;}
-    .btn-red{background:var(--red);color:#fff;} .btn-red:hover{background:#b91c1c;}
-    .btn-amber{background:var(--amber);color:#fff;} .btn-amber:hover{background:#b45309;}
-    .btn-purple{background:var(--purple);color:#fff;} .btn-purple:hover{background:#6d28d9;}
+    button{cursor:pointer;border:none;border-radius:8px;font-size:12px;font-weight:700;padding:7px 15px;font-family:Arial,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .05s ease;}
+    button:active{transform:translateY(1px);}
+    .btn-navy{background:var(--navy);color:#fff;box-shadow:0 1px 2px rgba(26,79,139,.3);} .btn-navy:hover{background:#163e70;}
+    .btn-teal{background:var(--teal);color:#fff;box-shadow:0 1px 2px rgba(15,118,110,.3);} .btn-teal:hover{background:#0b5c56;}
+    .btn-green{background:var(--green);color:#fff;box-shadow:0 1px 2px rgba(22,163,74,.3);} .btn-green:hover{background:#15803d;}
+    .btn-red{background:var(--red);color:#fff;box-shadow:0 1px 2px rgba(220,38,38,.3);} .btn-red:hover{background:#b91c1c;}
+    .btn-amber{background:var(--amber);color:#fff;box-shadow:0 1px 2px rgba(217,119,6,.3);} .btn-amber:hover{background:#b45309;}
+    .btn-purple{background:var(--purple);color:#fff;box-shadow:0 1px 2px rgba(124,58,237,.3);} .btn-purple:hover{background:#6d28d9;}
     .btn-ghost{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);} .btn-ghost:hover{background:rgba(255,255,255,.28);}
-    .btn-sm{padding:4px 11px;font-size:11px;}
+    .btn-outline{background:#fff;color:#334155;border:1px solid var(--border);} .btn-outline:hover{background:#f8fafc;border-color:#cbd5e1;}
+    .btn-outline-red{background:#fff;color:var(--red);border:1px solid #fecaca;} .btn-outline-red:hover{background:#fef2f2;border-color:var(--red);}
+    .btn-sm{padding:5px 12px;font-size:11px;}
 
     /* ── Layout ── */
     .page{max-width:960px;margin:0 auto;padding:16px 14px;}
@@ -60,7 +69,11 @@
     .action-use{border-color:#93c5fd;} .action-use:hover{border-color:var(--navy);background:#eff6ff;}
     .action-vac{border-color:#fcd34d;} .action-vac:hover{border-color:var(--amber);background:#fffbeb;}
     .action-duty{border-color:#c4b5fd;} .action-duty:hover{border-color:var(--purple);background:#f5f3ff;}
-    .action-icon{font-size:30px;margin-bottom:7px;}
+    .action-icon{font-size:26px;margin-bottom:8px;}
+    .action-earn .action-icon{color:var(--green);}
+    .action-use .action-icon{color:var(--navy);}
+    .action-vac .action-icon{color:var(--amber);}
+    .action-duty .action-icon{color:var(--purple);}
     .action-label{font-size:13px;font-weight:800;color:#0f172a;margin-bottom:4px;}
     .action-desc{font-size:11px;color:var(--muted);line-height:1.5;}
 
@@ -128,7 +141,7 @@
       .bf-cur{padding:6px 10px;}
 
       .action-card{padding:14px 12px;}
-      .action-icon{font-size:26px;margin-bottom:5px;}
+      .action-icon{font-size:22px;margin-bottom:5px;}
 
       /* Table → card list for request history */
       .req-table-wrap{display:none;}
@@ -152,10 +165,63 @@
 </head>
 <body>
 
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <symbol id="i-mortarboard" viewBox="0 0 24 24">
+      <path d="M12 3 2 8l10 5 10-5-10-5Z"/>
+      <path d="M6 10.5V16c0 1.5 2.5 3 6 3s6-1.5 6-3v-5.5"/>
+      <path d="M22 8v6"/>
+    </symbol>
+    <symbol id="i-signout" viewBox="0 0 24 24">
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+      <path d="M10 17l5-5-5-5"/>
+      <path d="M15 12H3"/>
+    </symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24">
+      <path d="M6 3h12"/>
+      <path d="M6 21h12"/>
+      <path d="M6 3c0 5 4 6 6 9-2 3-6 4-6 9"/>
+      <path d="M18 3c0 5-4 6-6 9 2 3 6 4 6 9"/>
+    </symbol>
+    <symbol id="i-cal-plus" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="16" rx="2"/>
+      <path d="M3 10h18"/>
+      <path d="M8 3v4"/>
+      <path d="M16 3v4"/>
+      <path d="M12 13v6"/>
+      <path d="M9 16h6"/>
+    </symbol>
+    <symbol id="i-cal-minus" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="16" rx="2"/>
+      <path d="M3 10h18"/>
+      <path d="M8 3v4"/>
+      <path d="M16 3v4"/>
+      <path d="M9 16h6"/>
+    </symbol>
+    <symbol id="i-umbrella" viewBox="0 0 24 24">
+      <path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9Z"/>
+      <path d="M12 12v7a2 2 0 0 1-2 2"/>
+      <path d="M12 3v2"/>
+    </symbol>
+    <symbol id="i-duty" viewBox="0 0 24 24">
+      <rect x="5" y="4" width="14" height="18" rx="2"/>
+      <path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/>
+      <path d="M7 14h3l2-4 2 8 2-4h1"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="M6 6l12 12"/>
+      <path d="M18 6L6 18"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="M4 12l6 6L20 6"/>
+    </symbol>
+  </defs>
+</svg>
+
 <!-- Auth overlay -->
 <div id="authOv">
   <div style="text-align:center;color:#64748b;font-family:Arial,sans-serif;">
-    <div style="font-size:40px;margin-bottom:12px;">🏠</div>
+    <div class="spinner"></div>
     <div style="font-size:14px;" id="authMsg">Verifying access…</div>
   </div>
 </div>
@@ -167,15 +233,15 @@
     <div style="display:flex;align-items:center;gap:12px;">
       <img src="MNGHA-Logo.png" alt="MNGHA" style="height:42px;width:42px;border-radius:50%;background:#fff;object-fit:contain;padding:3px;flex-shrink:0;"/>
       <div>
-        <div class="topbar-title">🏠 My Portal</div>
+        <div class="topbar-title">My Portal</div>
         <div class="topbar-sub" id="topbarSub">KAMC-WR · Pharmaceutical Care</div>
       </div>
     </div>
     <div class="topbar-right">
       <span class="topbar-name" id="topbarName"></span>
       <button id="precBtn" class="btn-ghost btn-sm" style="display:none;"
-        onclick="window.location.href='Preceptor.html'">🎓 Preceptorship</button>
-      <button class="btn-red btn-sm" onclick="doSignOut()">Sign Out</button>
+        onclick="window.location.href='Preceptor.html'"><svg class="icon"><use href="#i-mortarboard"/></svg> Preceptorship</button>
+      <button class="btn-outline-red btn-sm" onclick="doSignOut()"><svg class="icon"><use href="#i-signout"/></svg> Sign Out</button>
     </div>
   </div>
 
@@ -188,7 +254,7 @@
         <span style="color:#94a3b8;font-size:12px;">Loading…</span>
       </div>
       <div id="pendingBanner" style="display:none;margin-top:12px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#92400e;">
-        ⏳ <span id="pendingCount"></span>
+        <svg class="icon"><use href="#i-hourglass"/></svg> <span id="pendingCount"></span>
       </div>
     </div>
 
@@ -197,22 +263,22 @@
       <div class="card-title">Submit a Request</div>
       <div class="action-grid">
         <div class="action-card action-earn" onclick="openReqModal('earn')">
-          <div class="action-icon">➕</div>
+          <div class="action-icon"><svg class="icon"><use href="#i-cal-plus"/></svg></div>
           <div class="action-label">Lieu Day Addition</div>
           <div class="action-desc">I worked on a day off or public holiday that qualifies for a lieu day</div>
         </div>
         <div class="action-card action-use" onclick="openReqModal('use')">
-          <div class="action-icon">➖</div>
+          <div class="action-icon"><svg class="icon"><use href="#i-cal-minus"/></svg></div>
           <div class="action-label">Lieu Day Consumption</div>
           <div class="action-desc">I would like to use accumulated lieu days to take time off</div>
         </div>
         <div class="action-card action-vac" onclick="openVacModal()">
-          <div class="action-icon">📅</div>
+          <div class="action-icon"><svg class="icon"><use href="#i-umbrella"/></svg></div>
           <div class="action-label">Vacation Plan</div>
           <div class="action-desc">Submit a vacation or leave request for review by your charge person</div>
         </div>
         <div class="action-card action-duty" onclick="openDutyModal()">
-          <div class="action-icon">🏥</div>
+          <div class="action-icon"><svg class="icon"><use href="#i-duty"/></svg></div>
           <div class="action-label">Request a Duty</div>
           <div class="action-desc">Request to be assigned a specific duty in a particular area</div>
         </div>
@@ -233,7 +299,7 @@
   <div class="mbox">
     <div class="mhd" id="mReqHd" style="background:linear-gradient(135deg,var(--green),#0f766e);">
       <span id="mReqTitle">Request</span>
-      <button onclick="closeModal('mReq')">&#x2715;</button>
+      <button onclick="closeModal('mReq')"><svg class="icon"><use href="#i-close"/></svg></button>
     </div>
     <div class="mbody">
       <div id="mReqDesc" class="info-box"></div>
@@ -257,8 +323,8 @@
       </div>
     </div>
     <div class="mft">
-      <button style="background:#e2e8f0;color:#334155;" onclick="closeModal('mReq')">Cancel</button>
-      <button id="mReqSubmitBtn" class="btn-green" onclick="submitReq()">Submit Request</button>
+      <button class="btn-outline" onclick="closeModal('mReq')">Cancel</button>
+      <button id="mReqSubmitBtn" class="btn-green" onclick="submitReq()"><svg class="icon"><use href="#i-check"/></svg> Submit Request</button>
     </div>
   </div>
 </div>
@@ -267,8 +333,8 @@
 <div id="mVac" class="mbd">
   <div class="mbox">
     <div class="mhd" style="background:linear-gradient(135deg,var(--amber),var(--orange));">
-      <span>📅 Vacation / Leave Request</span>
-      <button onclick="closeModal('mVac')">&#x2715;</button>
+      <span><svg class="icon"><use href="#i-umbrella"/></svg> Vacation / Leave Request</span>
+      <button onclick="closeModal('mVac')"><svg class="icon"><use href="#i-close"/></svg></button>
     </div>
     <div class="mbody">
       <div class="info-box">Submit your planned leave for review by your charge person. All fields marked * are required.</div>
@@ -308,8 +374,8 @@
       </div>
     </div>
     <div class="mft">
-      <button style="background:#e2e8f0;color:#334155;" onclick="closeModal('mVac')">Cancel</button>
-      <button class="btn-amber" onclick="submitVacation()">Submit Request</button>
+      <button class="btn-outline" onclick="closeModal('mVac')">Cancel</button>
+      <button class="btn-amber" onclick="submitVacation()"><svg class="icon"><use href="#i-check"/></svg> Submit Request</button>
     </div>
   </div>
 </div>
@@ -318,8 +384,8 @@
 <div id="mDuty" class="mbd">
   <div class="mbox">
     <div class="mhd" style="background:linear-gradient(135deg,var(--purple),var(--navy));">
-      <span>🏥 Duty Assignment Request</span>
-      <button onclick="closeModal('mDuty')">&#x2715;</button>
+      <span><svg class="icon"><use href="#i-duty"/></svg> Duty Assignment Request</span>
+      <button onclick="closeModal('mDuty')"><svg class="icon"><use href="#i-close"/></svg></button>
     </div>
     <div class="mbody">
       <div class="info-box">Request to be assigned a specific duty. Your charge person will review and arrange the schedule accordingly.</div>
@@ -355,8 +421,8 @@
       </div>
     </div>
     <div class="mft">
-      <button style="background:#e2e8f0;color:#334155;" onclick="closeModal('mDuty')">Cancel</button>
-      <button class="btn-purple" onclick="submitDuty()">Submit Request</button>
+      <button class="btn-outline" onclick="closeModal('mDuty')">Cancel</button>
+      <button class="btn-purple" onclick="submitDuty()"><svg class="icon"><use href="#i-check"/></svg> Submit Request</button>
     </div>
   </div>
 </div>
@@ -585,7 +651,7 @@
     _reqType=type;
     const isEarn=type==='earn';
     document.getElementById('mReqHd').style.background  =isEarn?EARN_GRAD:USE_GRAD;
-    document.getElementById('mReqTitle').textContent     =isEarn?'➕ Request Lieu Day Addition':'➖ Request Lieu Day Consumption';
+    document.getElementById('mReqTitle').textContent     =isEarn?'Request Lieu Day Addition':'Request Lieu Day Consumption';
     document.getElementById('mReqSubmitBtn').className   =isEarn?'btn-green':'btn-navy';
     document.getElementById('mReqDesc').innerHTML        =isEarn
       ?'Submit this form to request that lieu days be added to your balance.<br>Your charge person will review and approve.'
@@ -616,7 +682,7 @@
       const ref=await addDoc(lieuReqColl(),entry);
       _lieuReqs.push({_id:ref.id,...entry});
       closeModal('mReq'); renderRequests();
-      ss('Request submitted ✅ — awaiting charge person review.');
+      ss('Request submitted — awaiting charge person review.');
     }catch(e){ss('Submit failed: '+(e?.message||e),false);}
   };
 
@@ -656,7 +722,7 @@
       const ref=await addDoc(vacReqColl(),entry);
       _vacReqs.push({_id:ref.id,...entry});
       closeModal('mVac'); renderRequests();
-      ss(`Vacation request submitted ✅ — ${days} day${days===1?'':'s'} pending review.`);
+      ss(`Vacation request submitted — ${days} day${days===1?'':'s'} pending review.`);
     }catch(e){ss('Submit failed: '+(e?.message||e),false);}
   };
 
@@ -763,7 +829,7 @@
       const ref=await addDoc(dutyReqColl(),entry);
       _dutyReqs.push({_id:ref.id,...entry});
       closeModal('mDuty'); renderRequests();
-      ss(`Duty request submitted ✅ — awaiting charge person review.`);
+      ss(`Duty request submitted — awaiting charge person review.`);
     }catch(e){ss('Submit failed: '+(e?.message||e),false);}
   };
 
