@@ -35,8 +35,11 @@
         localStorage.setItem(STORE_KEY, latest);  // always update
 
         if (stored && stored !== latest) {
-          // Hard-reload — bypasses cache for the page and all its resources
-          window.location.reload(true);
+          // reload(true) is ignored by modern browsers — use a cache-busting
+          // query param instead to force a real network fetch of the page.
+          var url = window.location.href.split('#')[0];
+          var sep = url.indexOf('?') === -1 ? '?' : '&';
+          window.location.replace(url + sep + '_v=' + Date.now());
         }
       })
       .catch(function () {
