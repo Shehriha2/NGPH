@@ -428,10 +428,11 @@
     }
 
     @media print{
-      /* Top margin is enlarged to reserve room for the fixed header banner
-         below, the same way the bottom margin already reserves room for
-         #printFooter — both repeat on every printed page this way. */
-      @page{ size:landscape; margin:32mm 10mm 18mm; }
+      /* Top margin reserves room for the fixed header banner below, the same
+         way the bottom margin reserves room for #printFooter — both repeat
+         on every printed page this way. Kept taller than the header itself
+         so there's visible breathing room before the table starts. */
+      @page{ size:landscape; margin:40mm 10mm 18mm; }
       body{ padding:0; background:#fff; font-size:8pt; }
       .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,#activeStaffBanner,.print-area-box,#bcot-logout-btn,.header-right,#lockStatusBar{ display:none !important; }
       .print-only{ display:block !important; }
