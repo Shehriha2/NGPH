@@ -4874,9 +4874,45 @@
     // AREA MANAGER  (AM namespace)
     // ══════════════════════════════════════════════════════════════════════════
     const AM = (() => {
+      // Area Management is cloud-authoritative: every open() re-fetches
+      // areasList + areasMeta from Firestore (never trusts whatever is
+      // sitting in localStorage), and every mutation (add/edit/toggle)
+      // awaits a Firestore write before it's considered saved. localStorage
+      // is kept in sync purely as a read cache for other call sites
+      // (e.g. AM.getLabel used by the duty picker), not as a source of truth.
+      function _poolRef() {
+        const key=(window.BCOT_APP_KEY||'').trim();
+        if(!key || !window.FB || !window.FB.db) return null;
+        return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'staff_named','STAFF_POOL');
+      }
+
       function getMeta()    { try{return JSON.parse(localStorage.getItem(AREAS_META_KEY)||'{}')||{};}catch{return{};} }
-      function saveMeta(m)  { localStorage.setItem(AREAS_META_KEY,JSON.stringify(m)); }
+      async function saveMeta(m) {
+        localStorage.setItem(AREAS_META_KEY,JSON.stringify(m));
+        const ref=_poolRef();
+        if(!ref) throw new Error('config.js not found — cannot save to cloud.');
+        const list=JSON.parse(localStorage.getItem(AREAS_LIST_KEY)||'[]')||[];
+        await window.FB.setDoc(ref, { areasList:list, areasMeta:m }, { merge:true });
+      }
       function getLabel(code){ const m=getMeta(); return m[code]?.label||''; }
+
+      async function _loadFromCloud() {
+        const ref=_poolRef();
+        if(!ref){ showStatusMessage('config.js not found — cannot load areas from cloud.','error'); return false; }
+        try {
+          const snap=await window.FB.getDoc(ref);
+          const data=snap.exists()?snap.data():{};
+          const list=Array.isArray(data.areasList)?data.areasList:[];
+          const meta=(data.areasMeta&&typeof data.areasMeta==='object')?data.areasMeta:{};
+          localStorage.setItem(AREAS_LIST_KEY, JSON.stringify(list));
+          localStorage.setItem(AREAS_META_KEY, JSON.stringify(meta));
+          return true;
+        } catch(e) {
+          console.warn('[AM] cloud load failed:', e);
+          showStatusMessage('Could not load areas from cloud: '+(e?.message||e),'error');
+          return false;
+        }
+      }
 
       function _getWho() {
         try{const s=JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'null')||{};return [s.nameTitle,s.name].filter(Boolean).join(' ')||s.name||'—';}catch{return '—';}
@@ -4890,7 +4926,10 @@
         const meta=getMeta();
         let dirty=false;
         raw.forEach(code=>{if(!meta[code]){meta[code]={label:'',enabled:true,createdBy:'—',createdAt:null,remarks:''};dirty=true;}});
-        if(dirty)saveMeta(meta);
+        // Backfill any code missing a meta entry (e.g. added via the simpler
+        // Auth "Area Manager" modal) and push it to Firestore so it converges
+        // without blocking this render.
+        if(dirty)saveMeta(meta).catch(e=>console.warn('[AM] meta backfill save failed:',e));
 
         const active  =raw.filter(c=>meta[c]?.enabled!==false);
         const disabled=raw.filter(c=>meta[c]?.enabled===false);
@@ -4944,13 +4983,18 @@
         }).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#9ca3af;font-style:italic;">No areas yet. Add a new area above.</td></tr>';
       }
 
-      function toggleEnabled(code) {
+      async function toggleEnabled(code) {
         if(!_isAdmin())return;
         const meta=getMeta();
         if(!meta[code])meta[code]={label:'',enabled:true,createdBy:'—',createdAt:null,remarks:''};
         meta[code].enabled=meta[code].enabled===false;
-        saveMeta(meta); render();
-        showStatusMessage(`Area "${code}" ${meta[code].enabled?'enabled':'disabled'} ✅`);
+        render();
+        try {
+          await saveMeta(meta);
+          showStatusMessage(`Area "${code}" ${meta[code].enabled?'enabled':'disabled'} ✅`);
+        } catch(e) {
+          showStatusMessage('Cloud save failed — '+(e?.message||e),'error');
+        }
       }
 
       function editArea(code) {
@@ -4981,17 +5025,22 @@
         ov.querySelector('#_ae_x').addEventListener('click',dismiss);
         ov.querySelector('#_ae_cn').addEventListener('click',dismiss);
         ov.addEventListener('click',e=>{if(e.target===ov)dismiss();});
-        ov.querySelector('#_ae_sv').addEventListener('click',()=>{
+        ov.querySelector('#_ae_sv').addEventListener('click',async ()=>{
           if(!meta[code])meta[code]={label:'',enabled:true,createdBy:'—',createdAt:null,remarks:''};
           meta[code].label  =(ov.querySelector('#_ae_lbl').value||'').trim();
           meta[code].remarks=(ov.querySelector('#_ae_rmk').value||'').trim();
-          saveMeta(meta); dismiss(); render();
-          showStatusMessage(`Area "${code}" updated ✅`);
+          dismiss(); render();
+          try {
+            await saveMeta(meta);
+            showStatusMessage(`Area "${code}" updated ✅`);
+          } catch(e) {
+            showStatusMessage('Cloud save failed — '+(e?.message||e),'error');
+          }
         });
         setTimeout(()=>ov.querySelector('#_ae_lbl').focus(),50);
       }
 
-      function addArea() {
+      async function addArea() {
         if(!_isAdmin())return;
         const codeEl =document.getElementById('am-newCode');
         const labelEl=document.getElementById('am-newLabel');
@@ -5004,16 +5053,26 @@
         localStorage.setItem(AREAS_LIST_KEY,JSON.stringify(raw));
         const meta=getMeta();
         meta[code]={label,enabled:true,createdBy:_getWho(),createdAt:new Date().toISOString(),remarks:''};
-        saveMeta(meta);
         if(codeEl)codeEl.value=''; if(labelEl)labelEl.value='';
-        try{DM.rebuildUI();}catch{}
-        try{BCOT_AUTH.syncAreasList();}catch{}
         render();
-        showStatusMessage(`Area "${code}" added ✅`);
+        try {
+          await saveMeta(meta);
+          try{DM.rebuildUI();}catch{}
+          showStatusMessage(`Area "${code}" added ✅`);
+        } catch(e) {
+          showStatusMessage('Cloud save failed — '+(e?.message||e),'error');
+        }
       }
 
-      function open() {
+      async function open() {
         document.getElementById('areasModal').style.display='block';
+        const tbody=document.getElementById('am-body');
+        if(tbody)tbody.innerHTML='<tr><td colspan="8" style="padding:24px;text-align:center;color:#9ca3af;">⏳ Loading areas from cloud…</td></tr>';
+        const ok=await _loadFromCloud();
+        if(!ok){
+          if(tbody)tbody.innerHTML='<tr><td colspan="8" style="padding:24px;text-align:center;color:#dc2626;">Failed to load areas from cloud. Check your connection and reopen.</td></tr>';
+          return;
+        }
         render();
       }
       function close() {

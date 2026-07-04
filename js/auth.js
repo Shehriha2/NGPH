@@ -1273,8 +1273,9 @@
   /* ══════════════════════════════════════════════════════════════════════════
      Area Manager — manage areas list + per-area user access
      ══════════════════════════════════════════════════════════════════════════ */
-  const _AREAS_LS   = 'BCOT_AREAS_LIST_V1';
-  const _STAFF_LS   = 'BCOT_STAFF_RECORDS_V2';
+  const _AREAS_LS      = 'BCOT_AREAS_LIST_V1';
+  const _AREAS_META_LS = 'BCOT_AREAS_META_V1';
+  const _STAFF_LS      = 'BCOT_STAFF_RECORDS_V2';
 
   function _getLocalAreas() {
     try { return JSON.parse(localStorage.getItem(_AREAS_LS) || '[]') || []; } catch { return []; }
@@ -1282,12 +1283,24 @@
   function _setLocalAreas(list) {
     localStorage.setItem(_AREAS_LS, JSON.stringify(list.sort()));
   }
+  function _getLocalAreasMeta() {
+    try { return JSON.parse(localStorage.getItem(_AREAS_META_LS) || '{}') || {}; } catch { return {}; }
+  }
+  function _setLocalAreasMeta(meta) {
+    localStorage.setItem(_AREAS_META_LS, JSON.stringify(meta));
+  }
 
-  async function _saveAreasToCloud(areas) {
+  // areasMeta is optional — pass it whenever a rename/remove/add needs to
+  // carry per-area metadata (label, enabled, createdBy, remarks) along with
+  // the bare code list, so Area Management (index.js AM namespace) never
+  // ends up with an orphaned or missing metadata entry after this runs.
+  async function _saveAreasToCloud(areas, areasMeta) {
     if (!window.FB || typeof window.FB.setDoc !== 'function' || !_key) return;
+    const payload = { areasList: areas };
+    if (areasMeta) payload.areasMeta = areasMeta;
     await window.FB.setDoc(
       window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'staff_named', 'STAFF_POOL'),
-      { areasList: areas },
+      payload,
       { merge: true }
     );
   }
@@ -1451,6 +1464,10 @@
     if (idx >= 0) areas[idx] = newName;
     _setLocalAreas(areas);
 
+    const meta = _getLocalAreasMeta();
+    if (meta[oldName]) { meta[newName] = meta[oldName]; delete meta[oldName]; }
+    _setLocalAreasMeta(meta);
+
     try {
       const staff = JSON.parse(localStorage.getItem(_STAFF_LS) || '[]');
       let changed = false;
@@ -1474,7 +1491,7 @@
     });
 
     try {
-      await _saveAreasToCloud(_getLocalAreas());
+      await _saveAreasToCloud(_getLocalAreas(), meta);
       if (usersChanged) await saveUsers();
       _renderAreaList();
     } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
@@ -1501,6 +1518,10 @@
     const areas = _getLocalAreas().filter(a => a !== name);
     _setLocalAreas(areas);
 
+    const meta = _getLocalAreasMeta();
+    delete meta[name];
+    _setLocalAreasMeta(meta);
+
     let usersChanged = false;
     _users.forEach(u => {
       if (Array.isArray(u.areas)) {
@@ -1511,7 +1532,7 @@
     });
 
     try {
-      await _saveAreasToCloud(areas);
+      await _saveAreasToCloud(areas, meta);
       if (usersChanged) await saveUsers();
       _renderAreaList();
     } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
