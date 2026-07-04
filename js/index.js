@@ -5255,24 +5255,6 @@
       releaseNum = loadReleaseNum(getCurrentArea());
       updateRotaLabel();
 
-      // Populate print footer from logged-in session
-      try {
-        const _sess = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || 'null');
-        if (_sess) {
-          const nameEl  = document.getElementById('printPreparedByName');
-          const titleEl = document.getElementById('printPreparedByTitle');
-          const dateEl  = document.getElementById('printDate');
-          const fullName = [_sess.nameTitle, _sess.name].filter(Boolean).join(' ') || '—';
-          const pos      = _sess.position || _sess.title || '';  // backward compat
-          const now      = new Date();
-          const dateStr  = now.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
-          const timeStr  = now.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
-          if (nameEl)  nameEl.textContent  = fullName;
-          if (titleEl) titleEl.textContent = pos;
-          if (dateEl)  dateEl.textContent  = dateStr + '  ·  ' + timeStr;
-        }
-      } catch(e) { console.warn('Print footer session read failed:', e); }
-
       updateDashboard();
 
       // Real-time consumption sync: onSnapshot (A) + tab-focus refresh (C)

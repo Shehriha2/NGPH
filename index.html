@@ -435,7 +435,7 @@
          <thead> instead of a margin/padding on the table container — thead
          repeats on every printed page natively, so this way the clearance
          is consistent on every page, not just the first. */
-      @page{ size:landscape; margin:5mm 10mm 26mm; }
+      @page{ size:landscape; margin:5mm 10mm; }
       body{ padding:0; background:#fff; font-size:8pt; }
       .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,#activeStaffBanner,.print-area-box,#bcot-logout-btn,.header-right,#lockStatusBar{ display:none !important; }
       .print-only{ display:block !important; }
@@ -1003,23 +1003,6 @@
     </table>
   </div>
   <div class="legend" id="legendBox"></div>
-
-  <!-- ── Print footer — centered block, appears on every printed page ────── -->
-  <div id="printFooter" class="print-only"
-    style="position:fixed;bottom:0;left:0;right:0;background:#fff;
-           border-top:1pt solid #1a4f8b;padding:6pt 0 5pt;
-           text-align:center;font-family:Arial,sans-serif;font-size:8pt;
-           transform:translateY(30px);">
-    <div style="font-size:7pt;color:#6b7280;text-transform:uppercase;
-                letter-spacing:.6pt;margin-bottom:3pt;">Approved by</div>
-    <div style="font-size:10pt;font-weight:700;color:#0f172a;"
-         id="printPreparedByName">—</div>
-    <div style="font-size:8pt;color:#1a4f8b;font-weight:600;margin-bottom:4pt;"
-         id="printPreparedByTitle"></div>
-    <div style="display:inline-block;width:140pt;border-bottom:1pt solid #374151;
-                margin-bottom:3pt;">&nbsp;</div>
-    <div style="font-size:7pt;color:#6b7280;" id="printDate"></div>
-  </div>
 
   <!-- ── Active staff banner ─────────────────────────────────────────────── -->
   <div id="activeStaffBanner">
