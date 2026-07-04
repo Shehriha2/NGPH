@@ -5274,3 +5274,19 @@
     })();
 
     DP.init();
+
+    // ── Print pagination: force exactly 18 staff rows per printed page ────────
+    const ROTA_PRINT_ROWS_PER_PAGE = 18;
+    function applyRotaPrintPageBreaks() {
+      const rows = Array.from(document.querySelectorAll('#rotaTable tbody tr'))
+        .filter(r => r.style.display !== 'none');
+      rows.forEach((r, i) => {
+        const isBreak = (i + 1) % ROTA_PRINT_ROWS_PER_PAGE === 0 && i !== rows.length - 1;
+        r.classList.toggle('print-page-break', isBreak);
+      });
+    }
+    window.addEventListener('beforeprint', applyRotaPrintPageBreaks);
+    window.addEventListener('afterprint', () => {
+      document.querySelectorAll('#rotaTable tbody tr.print-page-break')
+        .forEach(r => r.classList.remove('print-page-break'));
+    });
