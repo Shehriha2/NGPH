@@ -5278,15 +5278,28 @@
     // ── Print pagination: force exactly 18 staff rows per printed page ────────
     const ROTA_PRINT_ROWS_PER_PAGE = 18;
     function applyRotaPrintPageBreaks() {
+      document.querySelectorAll('#rotaTable tbody tr.print-page-num-row').forEach(r => r.remove());
+
       const rows = Array.from(document.querySelectorAll('#rotaTable tbody tr'))
         .filter(r => r.style.display !== 'none');
+      const totalPages = Math.max(1, Math.ceil(rows.length / ROTA_PRINT_ROWS_PER_PAGE));
+
       rows.forEach((r, i) => {
         const isBreak = (i + 1) % ROTA_PRINT_ROWS_PER_PAGE === 0 && i !== rows.length - 1;
         r.classList.toggle('print-page-break', isBreak);
+
+        if (i % ROTA_PRINT_ROWS_PER_PAGE === 0) {
+          const pageNum = i / ROTA_PRINT_ROWS_PER_PAGE + 1;
+          const marker = document.createElement('tr');
+          marker.className = 'print-page-num-row';
+          marker.innerHTML = `<td colspan="99">Page ${pageNum} / ${totalPages}</td>`;
+          r.parentNode.insertBefore(marker, r);
+        }
       });
     }
     window.addEventListener('beforeprint', applyRotaPrintPageBreaks);
     window.addEventListener('afterprint', () => {
       document.querySelectorAll('#rotaTable tbody tr.print-page-break')
         .forEach(r => r.classList.remove('print-page-break'));
+      document.querySelectorAll('#rotaTable tbody tr.print-page-num-row').forEach(r => r.remove());
     });
