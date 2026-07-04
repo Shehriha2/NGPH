@@ -1381,7 +1381,7 @@
       const month = parseInt(document.getElementById('monthSelect').value, 10);
       const year  = new Date().getFullYear();
       const days  = getDaysInMonth(month);
-      const headerRow = document.querySelector('#rotaTable thead tr');
+      const headerRow = document.getElementById('rotaHeaderRow');
       headerRow.innerHTML = '';
       const nameTh = document.createElement('th'); nameTh.textContent = 'Staff Name (Badge No)'; headerRow.appendChild(nameTh);
       for (let i=1; i<=days; i++) {
@@ -2183,7 +2183,7 @@
         const titleText=document.getElementById('rotaTitleInput').value||'Pharmacy Management';
 
         // ── Build styled HTML table for Excel ──────────────────────────────────
-        const hdrCells=table.tHead.rows[0].cells;
+        const hdrCells=document.getElementById('rotaHeaderRow').cells;
         let thHtml='';
         for(let i=0;i<hdrCells.length;i++){
           const w=i===0?'180pt':i===hdrCells.length-1||i===hdrCells.length-2?'36pt':'18pt';

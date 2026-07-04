@@ -40,6 +40,7 @@
       align-items:center; gap:16px;
     }
     .print-only{ display:none; }
+    .print-spacer-row{ display:none; }
     .logo{ width:80px; height:80px; background:#fff; border-radius:6px; padding:5px; display:flex; justify-content:center; align-items:center; flex-shrink:0; }
     .logo img{ width:100%; height:100%; object-fit:contain; }
     .app-ver{ color:rgba(255,255,255,.7); font-size:9px; text-align:center; letter-spacing:.3px; line-height:1.3; margin-top:4px; }
@@ -428,19 +429,19 @@
     }
 
     @media print{
-      /* Content (table) starts 55mm from the physical page top on every
-         printed page. The fixed header banner is pulled up into that
-         reserved margin via a negative top offset so it sits 5mm from the
-         physical top instead of flush with the content start — same
-         technique as #printFooter reserving the bottom margin, just with
-         an explicit offset instead of sitting flush at the margin edge. */
-      @page{ size:landscape; margin:55mm 10mm 18mm; }
+      /* @page top margin is kept small (5mm) so the fixed header banner
+         (top:0) lands exactly there. The 50mm clearance down to where the
+         table itself starts (55mm) is reserved by a spacer row inside
+         <thead> instead of a margin/padding on the table container — thead
+         repeats on every printed page natively, so this way the clearance
+         is consistent on every page, not just the first. */
+      @page{ size:landscape; margin:5mm 10mm 18mm; }
       body{ padding:0; background:#fff; font-size:8pt; }
       .no-print,.top-toolbar,.delete-btn,.save-btn,.saveas-btn,.modal,.status-message,.pattern-bar,.area-badge,#activeStaffBanner,.print-area-box,#bcot-logout-btn,.header-right,#lockStatusBar{ display:none !important; }
       .print-only{ display:block !important; }
       .page-top{ box-shadow:none; border:none; }
       .header-banner{
-        position:fixed; top:-50mm; left:0; right:0; z-index:10;
+        position:fixed; top:0; left:0; right:0; z-index:10;
         background-color:#1a4f8b !important;
         border-bottom:5px solid #2f7d57 !important;
         padding:8px 12px;
@@ -456,6 +457,10 @@
       .summary-strip{ display:none; }
       .summary-pill{ color:#000 !important; border:1px solid #000; background:#fff !important; }
       .table-container{ overflow:visible !important; box-shadow:none; border:none; }
+      /* Reserves 50mm under the fixed header — repeats every page since
+         it's part of <thead>. Table starts at 5mm + 50mm = 55mm. */
+      .print-spacer-row{ display:table-row !important; }
+      .print-spacer-row td{ height:50mm; padding:0; border:none !important; }
       .sched-cell, th.sched-th{ display:none !important; }
       .ot-cell,    th.ot-th  { display:none !important; }
       .ext-cell,   th.ext-th { display:none !important; }
@@ -982,7 +987,13 @@
     <!-- Readonly overlay: blocks mouse interaction when rota is locked by another user -->
     <div id="_lkOv" style="display:none;" onclick="LockManager.blockMsg()" title="Rota locked — view only"></div>
     <table id="rotaTable">
-      <thead><tr><th>Staff Name (Badge No)</th><th>Hours</th></tr></thead>
+      <thead>
+        <!-- Print-only spacer row: thead repeats on every printed page, so
+             this reserves the same 50mm clearance under the fixed header
+             banner on every page, not just the first. -->
+        <tr class="print-spacer-row"><td colspan="99"></td></tr>
+        <tr id="rotaHeaderRow"><th>Staff Name (Badge No)</th><th>Hours</th></tr>
+      </thead>
       <tbody></tbody>
     </table>
   </div>
