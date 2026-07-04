@@ -466,6 +466,11 @@
       .ext-cell,   th.ext-th { display:none !important; }
       table{ font-size:7pt; }
       th,td{ padding:2px; border:.5pt solid #000; }
+      /* Never let a table row split across a page break — a partial row
+         bleeding past the reserved bottom margin is what overlapped the
+         fixed "Approved by" footer. A whole row is pushed to the next
+         page instead. */
+      #rotaTable tbody tr{ page-break-inside:avoid; break-inside:avoid; }
       .legend{ font-size:7pt; padding:2px; margin-top:5px; box-shadow:none; border:1px solid #000; }
       .legend-color{ width:8px; height:8px; }
       *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
