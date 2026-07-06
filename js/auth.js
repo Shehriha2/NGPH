@@ -1630,6 +1630,12 @@
     createOverlay();
     showScreen('loading');
 
+    // The page's own <head> ships with `html{visibility:hidden}` so nothing
+    // paints before this script runs. Reveal now — the overlay (z-index
+    // 99999, fixed inset:0) is what actually becomes visible, never the raw
+    // page content underneath, even for a single frame.
+    document.documentElement.style.visibility = 'visible';
+
     // 2. Get app key
     _key = (window.BCOT_APP_KEY || '').trim();
     if (!_key) {

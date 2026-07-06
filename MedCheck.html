@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedCheck - MNGHA</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f6f9fc;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(to right, #ffffff, #f8f9fa);
+            padding: 15px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 3px solid #008756;
+            position: relative;
+            gap: 30px;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(0,135,86,0.3);
+        }
+
+        .back-link {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #008756;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 6px 12px;
+            border: 1px solid rgba(0,135,86,0.3);
+            border-radius: 20px;
+            transition: background-color 0.2s ease;
+        }
+
+        .back-link:hover {
+            background-color: rgba(0,135,86,0.08);
+        }
+
+        .logo {
+            flex: 0 0 auto;
+            padding-right: 30px;
+            border-right: 2px solid #e0e0e0;
+        }
+
+        .logo img {
+            width: 100px;
+            height: auto;
+            display: block;
+        }
+
+        .header-text {
+            flex: 0 1 auto;
+            padding-left: 30px;
+            text-align: center;
+        }
+
+        .header-text h1 {
+            margin: 3px 0;
+            color: #008756;
+            font-size: 1.1em;
+            font-weight: 600;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        .header-text h1:first-child {
+            font-size: 1.2em;
+        }
+
+        .header-text h2 {
+            margin: 3px 0;
+            color: #505050;
+            font-size: 0.95em;
+            font-weight: 500;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        .header-text .department {
+            color: #008756;
+            font-weight: 600;
+        }
+
+        .medcheck-title {
+            background: #008756;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 5px rgba(0,135,86,0.3);
+            flex: 0 0 auto;
+        }
+
+        .main-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            flex: 1;
+        }
+
+        .scanner-container {
+            background: linear-gradient(145deg, #ffffff, #f8f9fa);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            text-align: center;
+            border: 1px solid rgba(0,135,86,0.1);
+        }
+
+        .title {
+            color: #008756;
+            font-size: 1.8em;
+            margin-bottom: 30px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .badge-input {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .badge-input label {
+            display: block;
+            margin-bottom: 8px;
+            color: #008756;
+            font-weight: 600;
+        }
+
+        .badge-input input {
+            width: 200px;
+        }
+
+        .input-group {
+            margin: 25px 0;
+            position: relative;
+        }
+
+        .extracted-code {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+
+        input {
+            width: 100%;
+            max-width: 400px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 18px;
+            text-align: center;
+            margin: 0 auto;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #008756;
+            box-shadow: 0 0 0 3px rgba(0,135,86,0.1);
+            transform: translateY(-2px);
+        }
+
+        input:disabled {
+            background-color: #f0f0f0;
+            cursor: not-allowed;
+        }
+
+        input#codeInput {
+            caret-color: #008756;
+        }
+
+        #currentStep {
+            color: #2c3e50;
+            font-size: 2em;
+            margin: 25px 0;
+            font-weight: 600;
+            text-shadow: 1px 1px 0 rgba(255,255,255,0.5);
+        }
+
+        .status-indicator {
+            margin-top: 15px;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .status-indicator.success {
+            background-color: rgba(52, 199, 89, 0.1);
+            color: #34c759;
+            border: 1px solid rgba(52, 199, 89, 0.2);
+        }
+
+        .status-indicator.error {
+            background-color: rgba(255, 59, 48, 0.1);
+            color: #ff3b30;
+            border: 1px solid rgba(255, 59, 48, 0.2);
+        }
+
+        .tool-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .manage-button {
+            background-color: white;
+            color: #008756;
+            border: 2px solid #008756;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .manage-button:hover {
+            background-color: rgba(0,135,86,0.08);
+        }
+
+        .sync-status {
+            margin-top: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .table-container {
+            margin-top: 40px;
+            overflow-x: auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 auto;
+            font-size: 0.9em;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background-color: #008756;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+
+        .no-records {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 25px;
+            border: none;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .modal-content.error {
+            background-color: #ff3b30;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5em;
+            animation: flash 1s infinite;
+            padding-bottom: 30px;
+        }
+
+        .modal-content.success {
+            background-color: #34c759;
+            color: white;
+            transform: scale(1);
+        }
+
+        .modal-content.expired {
+            background-color: #f59e0b;
+            color: white;
+            font-weight: bold;
+            font-size: 1.4em;
+            animation: flashExpired 0.7s infinite;
+            padding-bottom: 30px;
+        }
+
+        @keyframes flashExpired {
+            0% { background-color: #f59e0b; }
+            50% { background-color: #b45309; }
+            100% { background-color: #f59e0b; }
+        }
+
+        #confirmationBox {
+            margin-top: 20px;
+        }
+
+        #confirmInput {
+            width: 200px;
+            padding: 10px;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            margin: 10px auto;
+        }
+
+        #confirmInput:focus {
+            outline: none;
+            border-color: #fff;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+        }
+
+        .error-hint {
+            color: #fff;
+            font-size: 0.85em;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        .export-button {
+            background-color: #008756;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .export-button:hover {
+            background-color: #006d45;
+        }
+
+        @keyframes flash {
+            0% { background-color: #ff3b30; }
+            50% { background-color: #cc2f26; }
+            100% { background-color: #ff3b30; }
+        }
+
+        .footer {
+            padding: 20px;
+            text-align: center;
+            background: linear-gradient(to right, #f8f9fa, #ffffff, #f8f9fa);
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .footer-text {
+            color: #6B7280;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .footer-credits {
+            color: #4B5563;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 4px;
+        }
+
+        .footer-credits span {
+            position: relative;
+        }
+
+        .footer-credits span:first-child::after {
+            content: '•';
+            position: absolute;
+            right: -25px;
+            color: #9CA3AF;
+        }
+
+        /* ── Mapping manager modal ── */
+        .map-modal-content {
+            position: relative;
+            background-color: #fefefe;
+            margin: 6% auto;
+            padding: 25px 28px;
+            border: none;
+            width: 92%;
+            max-width: 640px;
+            max-height: 84vh;
+            overflow-y: auto;
+            border-radius: 15px;
+            text-align: left;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .map-modal-content h2 {
+            color: #008756;
+            font-size: 1.3em;
+            margin-bottom: 18px;
+        }
+
+        .map-form {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            margin-bottom: 10px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .map-form div {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .map-form label {
+            font-size: 0.75em;
+            font-weight: 700;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .map-form select,
+        .map-form input {
+            width: auto;
+            max-width: none;
+            padding: 8px 10px;
+            font-size: 13px;
+            border-radius: 8px;
+            margin: 0;
+            text-align: left;
+        }
+
+        .map-form input:focus {
+            transform: none;
+        }
+
+        .map-add-btn {
+            background-color: #008756;
+            color: white;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            height: 36px;
+        }
+
+        .map-add-btn:hover {
+            background-color: #006d45;
+        }
+
+        .map-err {
+            color: #dc2626;
+            font-size: 0.8em;
+            min-height: 16px;
+            margin: 4px 0 10px;
+        }
+
+        .map-table-wrap {
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        table.map-table {
+            width: 100%;
+            font-size: 0.85em;
+            border-collapse: collapse;
+        }
+
+        table.map-table th {
+            position: sticky;
+            top: 0;
+        }
+
+        .map-del-btn {
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .map-del-btn:hover {
+            background-color: #cc2f26;
+        }
+
+        .map-empty {
+            text-align: center;
+            padding: 16px;
+            color: #666;
+            font-style: italic;
+            font-size: 0.85em;
+        }
+
+        .map-close-btn {
+            background-color: #f1f5f9;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 18px;
+        }
+
+        .map-close-btn:hover {
+            background-color: #e2e8f0;
+        }
+
+        @media (max-width: 968px) {
+            .header {
+                padding: 15px 20px;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .back-link {
+                position: static;
+                transform: none;
+                order: -1;
+            }
+
+            .logo {
+                padding-right: 0;
+                border-right: none;
+                margin-bottom: 15px;
+            }
+
+            .header-text {
+                padding-left: 0;
+            }
+
+            .medcheck-title {
+                margin-top: 10px;
+            }
+
+            .scanner-container {
+                padding: 20px;
+            }
+
+            .title {
+                font-size: 1.5em;
+            }
+
+            #currentStep {
+                font-size: 1.6em;
+            }
+
+            input {
+                font-size: 16px;
+                padding: 12px;
+            }
+
+            .footer {
+                padding: 15px;
+            }
+
+            .footer-credits {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .footer-credits span:first-child::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="index.html" class="back-link">← Back to Rota</a>
+        <div class="logo">
+            <img src="MNGHA-Logo.png" alt="MNGHA Logo" onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\'><rect width=\'80\' height=\'80\' fill=\'%23f0f0f0\'/><text x=\'50%\' y=\'50%\' font-size=\'12\' text-anchor=\'middle\' dy=\'.3em\'>Logo</text></svg>';">
+        </div>
+        <div class="header-text">
+            <h1>الشؤون الصحية – وزارة الحرس الوطني</h1>
+            <h1>Ministry of National Guard Health Affairs</h1>
+            <h2>KAMC-WR</h2>
+            <h2 class="department">Pharmaceutical Care Department</h2>
+        </div>
+        <div class="medcheck-title">MedCheck</div>
+    </div>
+
+    <div class="main-container">
+        <div class="scanner-container">
+            <h1 class="title">Medication Checker</h1>
+
+            <div class="badge-input">
+                <label for="badgeInput">Pharmacist Badge No.</label>
+                <input type="text" id="badgeInput" placeholder="Enter Badge Number" autocomplete="off">
+            </div>
+
+            <div id="currentStep">Scan the label</div>
+
+            <div class="input-group">
+                <input type="text" id="codeInput" placeholder="Enter code" autocomplete="off">
+                <div class="extracted-code" id="extractedCode"></div>
+                <div class="status-indicator" id="statusIndicator"></div>
+            </div>
+
+            <div class="table-container">
+                <table id="recordsTable">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Label Code</th>
+                            <th>Medication Code</th>
+                            <th>Expiry Date</th>
+                            <th>Code Type</th>
+                            <th>Badge</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scanningLog">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="sync-status" id="syncStatus">Connecting…</div>
+
+            <div class="tool-actions">
+                <button class="export-button" onclick="exportToExcel()">
+                    Export to Excel
+                </button>
+                <button class="manage-button" onclick="openMappingModal()">
+                    ⚙ Manage Drug Code Mappings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="myModal" class="modal">
+        <div class="modal-content" id="modalContent">
+            <p id="modalMessage"></p>
+            <div id="confirmationBox" style="display: none;">
+                <input type="text" id="confirmInput" placeholder="Type 'OK' to continue" autocomplete="off">
+                <div class="error-hint">Please type 'OK' to continue</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mapModal" class="modal">
+        <div class="map-modal-content">
+            <h2>Drug Code Mappings</h2>
+            <div class="map-form">
+                <div>
+                    <label for="mapType">Type</label>
+                    <select id="mapType">
+                        <option value="GTIN">GTIN (barcode)</option>
+                        <option value="Linear">Linear barcode</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="mapCode">Scanned Code</label>
+                    <input type="text" id="mapCode" placeholder="e.g. 06285097002197">
+                </div>
+                <div>
+                    <label for="mapDrugCode">Drug Code</label>
+                    <input type="text" id="mapDrugCode" placeholder="e.g. Ser2i">
+                </div>
+                <button class="map-add-btn" onclick="addMapping()">+ Add</button>
+            </div>
+            <div class="map-err" id="mapErr"></div>
+            <div class="map-table-wrap">
+                <table class="map-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Scanned Code</th>
+                            <th>Drug Code</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="mapList"></tbody>
+                </table>
+            </div>
+            <button class="map-close-btn" onclick="closeMappingModal()">Close</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-text">MedCheck™, All rights reserved.</div>
+            <div class="footer-credits">
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </footer>
+    <script src="config.js"></script>
+    <script src="js/version-check.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+        import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot }
+          from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+        const app = initializeApp({
+          apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+          authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+          storageBucket:"bcotrota.firebasestorage.app",
+          messagingSenderId:"659421824894",
+          appId:"1:659421824894:web:f0546879df8808491ad52f"
+        });
+        const db = getFirestore(app);
+
+        const _key      = () => (window.BCOT_APP_KEY || '').trim();
+        const scansColl = () => collection(db, 'bcot_overtime_secure', _key(), 'medcheck_scans');
+        const mapColl   = () => collection(db, 'bcot_overtime_secure', _key(), 'medcheck_mappings');
+
+        // DOM Elements
+        const modal = document.getElementById("myModal");
+        const modalMessage = document.getElementById("modalMessage");
+        const currentStep = document.getElementById("currentStep");
+        const codeInput = document.getElementById("codeInput");
+        const modalContent = document.getElementById("modalContent");
+        const confirmInput = document.getElementById("confirmInput");
+        const extractedCodeDisplay = document.getElementById("extractedCode");
+        const statusIndicator = document.getElementById("statusIndicator");
+        const badgeInput = document.getElementById("badgeInput");
+        const scanningLog = document.getElementById("scanningLog");
+        const syncStatus = document.getElementById("syncStatus");
+
+        // Global Variables
+        let firstCode = null;
+        let step = 1;
+        let pendingDocId = null;
+        let audioContext = null;
+        let currentOscillator = null;
+        let currentGainNode = null;
+        let scanningRecords = [];
+        let mappingDocs = [];
+        let sirenInterval = null;
+
+        // Drug Code Mappings — populated from Firestore (medcheck_mappings), with
+        // localStorage as an offline-read cache, same pattern as the rest of the app.
+        let gtinMapping = {};
+        let linearBarcodeMapping = {};
+
+        function determineCodeType(input) {
+            if (input.includes('@')) {
+                return 'UDS';
+            } else if (input.length > 16 && input.startsWith('01')) {
+                return 'GTIN';
+            } else if (linearBarcodeMapping[input]) {
+                return 'Linear';
+            }
+            return 'Unknown';
+        }
+
+        // Initialize Web Audio
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Continuous alarm for the most serious case — wrong medication (drug code
+        // mismatch). Steady square-wave tone, distinct from the expired-item siren.
+        function createWrongMedicationBeep() {
+            initAudio();
+            stopCurrentBeep();
+
+            currentOscillator = audioContext.createOscillator();
+            currentGainNode = audioContext.createGain();
+
+            currentOscillator.connect(currentGainNode);
+            currentGainNode.connect(audioContext.destination);
+
+            currentOscillator.type = 'square';
+            currentOscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+            currentGainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+            currentOscillator.start();
+        }
+
+        // Alternating two-tone siren for an expired-but-correct-code product —
+        // audibly distinct from the steady wrong-medication alarm above.
+        function createExpiredAlarm() {
+            initAudio();
+            stopCurrentBeep();
+
+            currentOscillator = audioContext.createOscillator();
+            currentGainNode = audioContext.createGain();
+
+            currentOscillator.connect(currentGainNode);
+            currentGainNode.connect(audioContext.destination);
+
+            currentOscillator.type = 'triangle';
+            currentGainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            currentOscillator.frequency.setValueAtTime(550, audioContext.currentTime);
+            currentOscillator.start();
+
+            let high = false;
+            sirenInterval = setInterval(() => {
+                high = !high;
+                if (currentOscillator) {
+                    currentOscillator.frequency.setValueAtTime(high ? 750 : 550, audioContext.currentTime);
+                }
+            }, 350);
+        }
+
+        function createCorrectBeep() {
+            initAudio();
+            stopCurrentBeep();
+
+            currentOscillator = audioContext.createOscillator();
+            currentGainNode = audioContext.createGain();
+
+            currentOscillator.connect(currentGainNode);
+            currentGainNode.connect(audioContext.destination);
+
+            currentOscillator.type = 'sine';
+            currentOscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            currentGainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+            currentOscillator.start();
+            currentOscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        function stopCurrentBeep() {
+            if (sirenInterval) {
+                clearInterval(sirenInterval);
+                sirenInterval = null;
+            }
+            if (currentOscillator) {
+                currentOscillator.stop();
+                currentOscillator = null;
+            }
+        }
+
+        // Code Extraction Functions
+        function extractGTIN(gs1Code) {
+            if (gs1Code.startsWith('01') && gs1Code.length > 16) {
+                return gs1Code.substring(2, 16);
+            }
+            return null;
+        }
+
+        // UDS product format: numbers@drugCode@productionDate@expiryDate@qty@text
+        // Dates are DDMMYY (e.g. 230626 = 23-Jun-2026) — production date must
+        // fall before expiry date under this reading, confirming the format.
+        function parseDDMMYY(str) {
+            if (!/^\d{6}$/.test(str)) return null;
+            const day   = parseInt(str.slice(0, 2), 10);
+            const month = parseInt(str.slice(2, 4), 10) - 1;
+            const year  = 2000 + parseInt(str.slice(4, 6), 10);
+            const d = new Date(year, month, day);
+            if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return null;
+            return d;
+        }
+
+        function formatDMY(d) {
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        // Only meaningful for the second (product) scan — extracts drug code,
+        // production/expiry dates, qty and trailing text from the UDS format.
+        // Returns null if the input isn't in this format.
+        function extractUDSDetails(rawInput) {
+            if (!rawInput.includes('@')) return null;
+            const parts = rawInput.split('@');
+            if (parts.length < 4) return null;
+
+            const productionDateObj = parseDDMMYY(parts[2].trim());
+            const expiryDateObj     = parseDDMMYY(parts[3].trim());
+
+            return {
+                drugCode: parts[1].trim().toLowerCase(),
+                productionDateObj,
+                expiryDateObj,
+                productionDisplay: productionDateObj ? formatDMY(productionDateObj) : (parts[2] || '-').trim(),
+                expiryDisplay:     expiryDateObj     ? formatDMY(expiryDateObj)     : (parts[3] || '-').trim(),
+                qty:  (parts[4] || '').trim(),
+                text: (parts[5] || '').trim()
+            };
+        }
+
+        function extractDrugCode(input) {
+            try {
+                // For standard format with @
+                if (input.includes('@')) {
+                    const parts = input.split('@');
+                    if (parts.length >= 3) {
+                        return parts[1].trim().toLowerCase();
+                    }
+                }
+
+                // For GS1 format
+                if (input.length > 16 && input.startsWith('01')) {
+                    const gtin = extractGTIN(input);
+                    const mappedCode = gtinMapping[gtin];
+                    if (mappedCode) {
+                        return mappedCode.toLowerCase();
+                    }
+                }
+
+                // For linear barcodes
+                const mappedLinearCode = linearBarcodeMapping[input];
+                if (mappedLinearCode) {
+                    return mappedLinearCode.toLowerCase();
+                }
+
+                // Default case
+                return input.trim().toLowerCase();
+            } catch (error) {
+                console.error('Error extracting drug code:', error);
+                return input.trim().toLowerCase();
+            }
+        }
+
+        function updateExtractedCodeDisplay(rawInput, extractedCode) {
+            if (rawInput.includes('@')) {
+                extractedCodeDisplay.textContent = `Extracted Code: ${extractedCode}`;
+                extractedCodeDisplay.style.display = 'block';
+            } else if (rawInput.length > 16 && rawInput.startsWith('01')) {
+                const gtin = extractGTIN(rawInput);
+                extractedCodeDisplay.textContent = `GTIN: ${gtin}, Mapped Code: ${extractedCode}`;
+                extractedCodeDisplay.style.display = 'block';
+            } else if (linearBarcodeMapping[rawInput]) {
+                extractedCodeDisplay.textContent = `Linear Barcode Mapped Code: ${extractedCode}`;
+                extractedCodeDisplay.style.display = 'block';
+            } else {
+                extractedCodeDisplay.style.display = 'none';
+            }
+        }
+
+        function updateStatusIndicator(message, type) {
+            statusIndicator.textContent = message;
+            statusIndicator.className = 'status-indicator ' + type;
+            statusIndicator.style.display = 'block';
+            setTimeout(() => {
+                statusIndicator.style.display = 'none';
+            }, 3000);
+        }
+
+        function setSyncStatus(ok, message) {
+            syncStatus.textContent = (ok ? '🟢 ' : '🔴 ') + message;
+            syncStatus.style.color = ok ? '#166534' : '#b91c1c';
+        }
+
+        function formatDateTime(date) {
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        }
+
+        function updateScanningLog() {
+            if (scanningRecords.length === 0) {
+                scanningLog.innerHTML = '<tr><td colspan="7" class="no-records">No records found</td></tr>';
+                return;
+            }
+
+            scanningLog.innerHTML = scanningRecords.map(record => `
+                <tr>
+                    <td>${record.datetime}</td>
+                    <td>${record.labelCode || '-'}</td>
+                    <td>${record.medicationCode || '-'}</td>
+                    <td>${record.expiryDate || '-'}</td>
+                    <td>${record.codeType || '-'}</td>
+                    <td>${record.badge}</td>
+                    <td>${record.status}</td>
+                </tr>
+            `).join('');
+        }
+
+        // ── Cloud sync — scan records ─────────────────────────────────────────
+        function cacheScansLocally() {
+            try { localStorage.setItem('BCOT_MEDCHECK_SCANS_CACHE_V1', JSON.stringify(scanningRecords.slice(-300))); } catch {}
+        }
+        function loadScansCache() {
+            try { return JSON.parse(localStorage.getItem('BCOT_MEDCHECK_SCANS_CACHE_V1') || '[]'); } catch { return []; }
+        }
+        function subscribeScans() {
+            const q = query(scansColl(), orderBy('submittedAt', 'desc'), limit(300));
+            onSnapshot(q, snap => {
+                const rows = [];
+                snap.forEach(d => rows.push({ _id: d.id, ...d.data() }));
+                scanningRecords = rows.reverse(); // oldest first, matches original scan-order display
+                cacheScansLocally();
+                updateScanningLog();
+                setSyncStatus(true, 'Synced — live across all workstations');
+            }, err => {
+                console.error(err);
+                setSyncStatus(false, 'Offline — showing cached records');
+            });
+        }
+
+        async function processCode() {
+            const rawInput = codeInput.value.trim();
+            const badgeNo = badgeInput.value.trim();
+
+            // Clear input immediately
+            codeInput.value = "";
+
+            if (rawInput === "") {
+                return;
+            }
+
+            if (badgeNo === "") {
+                alert("Please enter your badge number first");
+                badgeInput.focus();
+                return;
+            }
+
+            const currentCode = extractDrugCode(rawInput);
+            updateExtractedCodeDisplay(rawInput, currentCode);
+
+            if (step === 1) {
+                firstCode = currentCode;
+                step = 2;
+                currentStep.textContent = "Scan the medication";
+                updateStatusIndicator("First scan successful", "success");
+
+                const entry = {
+                    datetime: formatDateTime(new Date()),
+                    labelCode: currentCode,
+                    medicationCode: '-',
+                    expiryDate: '-',
+                    codeType: determineCodeType(rawInput),
+                    badge: badgeNo,
+                    status: 'Label Scanned',
+                    submittedAt: new Date().toISOString()
+                };
+
+                pendingDocId = null;
+                try {
+                    const ref = await addDoc(scansColl(), entry);
+                    pendingDocId = ref.id;
+                } catch (error) {
+                    console.error('Save failed:', error);
+                    // Offline fallback — shown locally only until connection returns
+                    scanningRecords.push({ _id: 'local-' + Date.now(), ...entry });
+                    cacheScansLocally();
+                    updateScanningLog();
+                    setSyncStatus(false, 'Offline — saved locally only');
+                }
+            } else {
+                const secondCode = currentCode;
+                const matchStatus = secondCode === firstCode;
+
+                // Product scan only — extracts expiry/production date, qty, text
+                // from the UDS format. null if this scan wasn't in that format.
+                const uds = extractUDSDetails(rawInput);
+                const isExpired = !!(uds && uds.expiryDateObj && uds.expiryDateObj < new Date(new Date().setHours(0, 0, 0, 0)));
+
+                // Wrong medication takes priority over expiry — a mismatched
+                // drug code is unsafe regardless of that product's own expiry.
+                const outcome = !matchStatus ? 'mismatch' : (isExpired ? 'expired' : 'match');
+
+                const update = {
+                    medicationCode: secondCode,
+                    expiryDate: uds ? uds.expiryDisplay : '-',
+                    productionDate: uds ? uds.productionDisplay : '-',
+                    qty: uds ? uds.qty : '-',
+                    udsText: uds ? uds.text : '-',
+                    codeType: determineCodeType(rawInput),
+                    status: outcome === 'mismatch' ? 'Mismatch' : outcome === 'expired' ? 'Expired' : 'Match'
+                };
+
+                if (pendingDocId) {
+                    try {
+                        await updateDoc(doc(db, 'bcot_overtime_secure', _key(), 'medcheck_scans', pendingDocId), update);
+                    } catch (error) {
+                        console.error('Save failed:', error);
+                        setSyncStatus(false, 'Offline — update not synced');
+                    }
+                } else {
+                    // First scan never made it to the cloud — update the local fallback entry
+                    const lastIndex = [...scanningRecords].reverse().findIndex(record =>
+                        record.labelCode === firstCode && record.medicationCode === '-'
+                    );
+                    if (lastIndex !== -1) {
+                        const actualIndex = scanningRecords.length - 1 - lastIndex;
+                        scanningRecords[actualIndex] = { ...scanningRecords[actualIndex], ...update };
+                        cacheScansLocally();
+                        updateScanningLog();
+                    }
+                }
+                pendingDocId = null;
+
+                if (outcome === 'mismatch') {
+                    modalMessage.textContent = "⚠ WRONG MEDICATION — doesn't match label";
+                    modalContent.className = "modal-content error";
+                    document.getElementById('confirmationBox').style.display = 'block';
+                    confirmInput.value = '';
+                    createWrongMedicationBeep();
+                    modal.style.display = "block";
+                    disableMainInput();
+                    confirmInput.focus();
+                } else if (outcome === 'expired') {
+                    modalMessage.textContent = `⚠ MEDICATION EXPIRED — Expiry date: ${uds.expiryDisplay}`;
+                    modalContent.className = "modal-content expired";
+                    document.getElementById('confirmationBox').style.display = 'block';
+                    confirmInput.value = '';
+                    createExpiredAlarm();
+                    modal.style.display = "block";
+                    disableMainInput();
+                    confirmInput.focus();
+                } else {
+                    modalMessage.textContent = "OK you are right";
+                    modalContent.className = "modal-content success";
+                    document.getElementById('confirmationBox').style.display = 'none';
+                    createCorrectBeep();
+                    modal.style.display = "block";
+                    setTimeout(() => {
+                        hideModal();
+                    }, 800);
+                }
+
+                step = 1;
+                firstCode = null;
+                currentStep.textContent = "Scan the label";
+            }
+        }
+
+        function hideModal() {
+            modal.style.display = "none";
+            stopCurrentBeep();
+            document.getElementById('confirmationBox').style.display = 'none';
+            enableMainInput();
+            extractedCodeDisplay.style.display = 'none';
+            confirmInput.value = ''; // Clear the confirmation input
+        }
+
+        function disableMainInput() {
+            codeInput.disabled = true;
+        }
+
+        function enableMainInput() {
+            codeInput.disabled = false;
+            codeInput.focus();
+        }
+
+        // Export Functions
+        function exportToExcel() {
+            if (scanningRecords.length === 0) {
+                alert("No records to export");
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(scanningRecords);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Scanning Records");
+
+            const fileName = `scanning_records_${formatDateTime(new Date()).replace(/[/:]/g, '-')}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        }
+
+        // ── Drug code mapping manager ─────────────────────────────────────────
+        function cacheMappingsLocally() {
+            try { localStorage.setItem('BCOT_MEDCHECK_MAPPINGS_CACHE_V1', JSON.stringify(mappingDocs)); } catch {}
+        }
+        function loadMappingsCache() {
+            try { return JSON.parse(localStorage.getItem('BCOT_MEDCHECK_MAPPINGS_CACHE_V1') || '[]'); } catch { return []; }
+        }
+        function rebuildMappingObjects() {
+            gtinMapping = {};
+            linearBarcodeMapping = {};
+            mappingDocs.forEach(m => {
+                if (m.type === 'GTIN') gtinMapping[m.code] = m.drugCode;
+                else linearBarcodeMapping[m.code] = m.drugCode;
+            });
+        }
+        async function loadMappings() {
+            try {
+                const snap = await getDocs(mapColl());
+                mappingDocs = [];
+                snap.forEach(d => mappingDocs.push({ id: d.id, ...d.data() }));
+                cacheMappingsLocally();
+            } catch (error) {
+                console.error('Could not load drug code mappings:', error);
+                mappingDocs = loadMappingsCache();
+            }
+            rebuildMappingObjects();
+            renderMappingsList();
+        }
+
+        function renderMappingsList() {
+            const list = document.getElementById('mapList');
+            if (mappingDocs.length === 0) {
+                list.innerHTML = '<tr><td colspan="4" class="map-empty">No mappings yet — add one above.</td></tr>';
+                return;
+            }
+            list.innerHTML = mappingDocs.map(m => `
+                <tr>
+                    <td>${m.type}</td>
+                    <td>${m.code}</td>
+                    <td>${m.drugCode}</td>
+                    <td><button class="map-del-btn" onclick="deleteMapping('${m.id}')">Delete</button></td>
+                </tr>
+            `).join('');
+        }
+
+        window.openMappingModal = function () {
+            document.getElementById('mapErr').textContent = '';
+            document.getElementById('mapCode').value = '';
+            document.getElementById('mapDrugCode').value = '';
+            document.getElementById('mapModal').style.display = 'block';
+        };
+
+        window.closeMappingModal = function () {
+            document.getElementById('mapModal').style.display = 'none';
+        };
+
+        window.addMapping = async function () {
+            const type = document.getElementById('mapType').value;
+            const code = document.getElementById('mapCode').value.trim();
+            const drugCode = document.getElementById('mapDrugCode').value.trim().toLowerCase();
+            const errEl = document.getElementById('mapErr');
+            errEl.textContent = '';
+
+            if (!code) { errEl.textContent = 'Scanned code is required.'; return; }
+            if (!drugCode) { errEl.textContent = 'Drug code is required.'; return; }
+            if (mappingDocs.find(m => m.type === type && m.code === code)) {
+                errEl.textContent = 'A mapping for this code already exists.';
+                return;
+            }
+
+            try {
+                const ref = await addDoc(mapColl(), { type, code, drugCode, createdAt: new Date().toISOString() });
+                mappingDocs.push({ id: ref.id, type, code, drugCode });
+                rebuildMappingObjects();
+                cacheMappingsLocally();
+                renderMappingsList();
+                document.getElementById('mapCode').value = '';
+                document.getElementById('mapDrugCode').value = '';
+            } catch (error) {
+                errEl.textContent = 'Save failed: ' + (error?.message || error);
+            }
+        };
+
+        window.deleteMapping = async function (id) {
+            const m = mappingDocs.find(x => x.id === id);
+            if (!m) return;
+            if (!confirm(`Remove mapping for code "${m.code}"?`)) return;
+            try {
+                await deleteDoc(doc(db, 'bcot_overtime_secure', _key(), 'medcheck_mappings', id));
+                mappingDocs = mappingDocs.filter(x => x.id !== id);
+                rebuildMappingObjects();
+                cacheMappingsLocally();
+                renderMappingsList();
+            } catch (error) {
+                alert('Delete failed: ' + (error?.message || error));
+            }
+        };
+
+        // Event Listeners
+        codeInput.addEventListener("keydown", function(event) {
+            if (event.key === "Tab" || event.key === "Enter") {
+                event.preventDefault();
+                const inputValue = codeInput.value.trim();
+                if (inputValue !== "") {
+                    processCode();
+                }
+            }
+        });
+
+        confirmInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                if (confirmInput.value.toUpperCase() === "OK") {
+                    stopCurrentBeep();
+                    hideModal();
+                    codeInput.focus(); // Return focus to the main input
+                }
+            }
+        });
+
+        window.addEventListener("click", function(event) {
+            if (event.target == modal) {
+                if (modalContent.classList.contains('success')) {
+                    hideModal();
+                }
+            }
+            if (event.target == document.getElementById('mapModal')) {
+                closeMappingModal();
+            }
+        });
+
+        // Initialize
+        window.addEventListener('load', function() {
+            scanningRecords = loadScansCache();
+            updateScanningLog();
+            loadMappings();
+            subscribeScans();
+            codeInput.focus();
+        });
+    </script>
+    </body>
+    </html>
