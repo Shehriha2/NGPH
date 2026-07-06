@@ -358,6 +358,21 @@
             100% { background-color: #f59e0b; }
         }
 
+        .modal-content.wrongstep {
+            background-color: #2563eb;
+            color: white;
+            font-weight: bold;
+            font-size: 1.3em;
+            animation: flashWrongStep 0.7s infinite;
+            padding-bottom: 30px;
+        }
+
+        @keyframes flashWrongStep {
+            0% { background-color: #2563eb; }
+            50% { background-color: #1e3a8a; }
+            100% { background-color: #2563eb; }
+        }
+
         #confirmationBox {
             margin-top: 20px;
         }
@@ -869,6 +884,18 @@
             return 'Unknown';
         }
 
+        // Distinguishes a Bestcare-printed label from an actual medication
+        // scan, purely by how many '@' characters appear in the raw text —
+        // regardless of position. A Bestcare label always has exactly 2. A
+        // product scan has either none (GS1 GTIN / linear barcode) or 4-5
+        // (the UDS format). Anything else is ambiguous and isn't enforced.
+        function classifyScanRole(rawInput) {
+            const atCount = (rawInput.match(/@/g) || []).length;
+            if (atCount === 2) return 'label';
+            if (atCount === 0 || atCount >= 4) return 'product';
+            return 'unknown';
+        }
+
         // Initialize Web Audio
         function initAudio() {
             if (!audioContext) {
@@ -919,6 +946,30 @@
                     currentOscillator.frequency.setValueAtTime(high ? 750 : 550, audioContext.currentTime);
                 }
             }, 350);
+        }
+
+        // Two short beeps for a procedural mistake (wrong scan at this step) —
+        // deliberately not a continuous alarm, since this isn't a medication
+        // safety failure like a mismatch or an expired product, just a
+        // scan-order correction.
+        function createWrongStepBeep() {
+            initAudio();
+            stopCurrentBeep();
+
+            [0, 250].forEach(delay => {
+                setTimeout(() => {
+                    if (!audioContext) return;
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, audioContext.currentTime);
+                    gain.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    osc.start();
+                    osc.stop(audioContext.currentTime + 0.15);
+                }, delay);
+            });
         }
 
         function createCorrectBeep() {
@@ -1341,6 +1392,20 @@
                 return;
             }
 
+            // Catch a wrong-order scan before touching any state — reject and
+            // let them rescan the correct item at the same step, rather than
+            // silently treating a swapped scan as if it were correct (which
+            // would skip the expiry check entirely on a swapped-order scan).
+            const scanRole = classifyScanRole(rawInput);
+            if (step === 1 && scanRole === 'product') {
+                showWrongStepModal("⚠ THIS LOOKS LIKE A MEDICATION SCAN, NOT THE LABEL — please scan the Bestcare label first");
+                return;
+            }
+            if (step === 2 && scanRole === 'label') {
+                showWrongStepModal("⚠ THIS LOOKS LIKE ANOTHER LABEL SCAN, NOT THE MEDICATION — please scan the medication package");
+                return;
+            }
+
             const currentCode = extractDrugCode(rawInput);
             updateExtractedCodeDisplay(rawInput, currentCode);
 
@@ -1461,6 +1526,17 @@
                 firstCode = null;
                 currentStep.textContent = "Scan the label";
             }
+        }
+
+        function showWrongStepModal(message) {
+            modalMessage.textContent = message;
+            modalContent.className = "modal-content wrongstep";
+            document.getElementById('confirmationBox').style.display = 'block';
+            confirmInput.value = '';
+            createWrongStepBeep();
+            modal.style.display = "block";
+            disableMainInput();
+            confirmInput.focus();
         }
 
         function hideModal() {
