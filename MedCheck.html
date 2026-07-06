@@ -701,6 +701,12 @@
                 <button class="export-button" onclick="exportToExcel()">
                     Export to Excel
                 </button>
+                <button class="manage-button" onclick="archiveVisibleRecords()">
+                    🗄 Archive Visible Records
+                </button>
+                <button class="manage-button" onclick="openArchiveViewModal()">
+                    📁 View Archived Records
+                </button>
                 <button class="manage-button" onclick="openMappingModal()">
                     ⚙ Manage Drug Code Mappings
                 </button>
@@ -757,6 +763,43 @@
         </div>
     </div>
 
+    <div id="archiveModal" class="modal">
+        <div class="map-modal-content">
+            <h2>Archived Records</h2>
+            <div class="map-form">
+                <div>
+                    <label for="archFrom">From</label>
+                    <input type="date" id="archFrom">
+                </div>
+                <div>
+                    <label for="archTo">To</label>
+                    <input type="date" id="archTo">
+                </div>
+                <button class="map-add-btn" onclick="searchArchivedRecords()">Search</button>
+                <button class="map-add-btn" style="background-color:#1a4f8b;" onclick="exportArchivedToExcel()">Export</button>
+            </div>
+            <div class="map-err" id="archResultsInfo" style="color:#666;"></div>
+            <div class="map-table-wrap">
+                <table class="map-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Label Code</th>
+                            <th>Medication Code</th>
+                            <th>Expiry Date</th>
+                            <th>Code Type</th>
+                            <th>Badge</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="archList"></tbody>
+                </table>
+            </div>
+            <button class="map-close-btn" onclick="closeArchiveViewModal()">Close</button>
+        </div>
+    </div>
+
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-text">MedCheck™, All rights reserved.</div>
@@ -770,7 +813,7 @@
     <script src="js/version-check.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-        import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot }
+        import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, writeBatch }
           from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
         const app = initializeApp({
@@ -954,6 +997,84 @@
             };
         }
 
+        // GS1 (GTIN barcode/QR) product format — real manufacturer codes, e.g.
+        // 01<14-digit GTIN>21<serial>^17<expiry YYMMDD>10<batch>
+        // AI order is NOT fixed (confirmed against a real scan), so this walks
+        // the string reading a 2-digit Application Identifier at a time.
+        // Dates here are GS1-standard YYMMDD — the OPPOSITE of the UDS format's
+        // DDMMYY above. Do not reuse parseDDMMYY for these.
+        const GS1_AI_DEFS = {
+            '01': { length: 14, field: 'gtin' },            // GTIN, fixed
+            '11': { length: 6,  field: 'productionRaw' },   // Production date, fixed
+            '17': { length: 6,  field: 'expiryRaw' },        // Expiry date, fixed
+            '10': { variable: true, field: 'batch' },        // Batch/lot, variable
+            '21': { variable: true, field: 'serial' }        // Serial number, variable
+        };
+        // Real GS1 group separator (0x1D), or the printable '^' some scanners
+        // substitute it with when configured for keyboard-wedge output.
+        const GS1_SEPARATOR_RE = /[\x1D^]/;
+
+        function parseYYMMDD(str) {
+            if (!/^\d{6}$/.test(str)) return null;
+            const year  = 2000 + parseInt(str.slice(0, 2), 10);
+            const month = parseInt(str.slice(2, 4), 10) - 1;
+            const day   = parseInt(str.slice(4, 6), 10);
+            // GS1 spec: day "00" means "last day of the month"
+            if (day === 0) return new Date(year, month + 1, 0);
+            const d = new Date(year, month, day);
+            if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return null;
+            return d;
+        }
+
+        // Only meaningful for the second (product) scan — walks a GS1 AI string
+        // and extracts whichever of GTIN / production / expiry / batch / serial
+        // are present. Returns null if this isn't a GS1 GTIN-style scan.
+        function extractGS1Details(rawInput) {
+            if (rawInput.includes('@')) return null;
+            if (!rawInput.startsWith('01') || rawInput.length <= 16) return null;
+
+            const fields = {};
+            let cursor = 0;
+            while (cursor < rawInput.length) {
+                const ai = rawInput.slice(cursor, cursor + 2);
+                const def = GS1_AI_DEFS[ai];
+                if (!def) break; // unrecognized AI — stop, ignore the remainder rather than misparse it
+
+                cursor += 2;
+                if (def.variable) {
+                    const rest = rawInput.slice(cursor);
+                    const sepIdx = rest.search(GS1_SEPARATOR_RE);
+                    const end = sepIdx === -1 ? rawInput.length : cursor + sepIdx;
+                    fields[def.field] = rawInput.slice(cursor, end);
+                    cursor = sepIdx === -1 ? rawInput.length : end + 1;
+                } else {
+                    fields[def.field] = rawInput.slice(cursor, cursor + def.length);
+                    cursor += def.length;
+                }
+            }
+
+            if (!fields.gtin) return null;
+
+            const expiryDateObj     = fields.expiryRaw     ? parseYYMMDD(fields.expiryRaw)     : null;
+            const productionDateObj = fields.productionRaw ? parseYYMMDD(fields.productionRaw) : null;
+
+            return {
+                gtin: fields.gtin,
+                productionDateObj,
+                expiryDateObj,
+                productionDisplay: productionDateObj ? formatDMY(productionDateObj) : '-',
+                expiryDisplay:     expiryDateObj     ? formatDMY(expiryDateObj)     : '-',
+                batch:  fields.batch  || '',
+                serial: fields.serial || ''
+            };
+        }
+
+        // Dispatches to whichever product-scan format applies. The two formats
+        // are mutually exclusive (UDS always contains '@'; GS1 never does).
+        function extractExpiryInfo(rawInput) {
+            return rawInput.includes('@') ? extractUDSDetails(rawInput) : extractGS1Details(rawInput);
+        }
+
         function extractDrugCode(input) {
             try {
                 // For standard format with @
@@ -1056,7 +1177,10 @@
             try { return JSON.parse(localStorage.getItem('BCOT_MEDCHECK_SCANS_CACHE_V1') || '[]'); } catch { return []; }
         }
         function subscribeScans() {
-            const q = query(scansColl(), orderBy('submittedAt', 'desc'), limit(300));
+            // Only the active (non-archived) list — archiving is what keeps this
+            // bounded day to day; the 2000 cap is just a safety ceiling in case
+            // archiving is skipped for a long stretch.
+            const q = query(scansColl(), where('archived', '==', false), orderBy('submittedAt', 'desc'), limit(2000));
             onSnapshot(q, snap => {
                 const rows = [];
                 snap.forEach(d => rows.push({ _id: d.id, ...d.data() }));
@@ -1069,6 +1193,136 @@
                 setSyncStatus(false, 'Offline — showing cached records');
             });
         }
+
+        // ── Archiving ──────────────────────────────────────────────────────────
+        window.archiveVisibleRecords = async function archiveVisibleRecords() {
+            // Cloud-backed records only — offline-fallback entries (never made
+            // it to Firestore) have nothing to mark archived, so drop them from
+            // the local view instead.
+            const cloudRecords = scanningRecords.filter(r => !String(r._id).startsWith('local-'));
+            const localOnly    = scanningRecords.filter(r => String(r._id).startsWith('local-'));
+
+            if (cloudRecords.length === 0 && localOnly.length === 0) {
+                alert('No records to archive.');
+                return;
+            }
+            const total = cloudRecords.length + localOnly.length;
+            if (!confirm(`Archive all ${total} visible record${total === 1 ? '' : 's'}? They'll move out of this list but can be brought back later via "View Archived Records".`)) {
+                return;
+            }
+
+            try {
+                // Firestore batched writes cap at 500 ops — chunk generously under that.
+                for (let i = 0; i < cloudRecords.length; i += 450) {
+                    const chunk = cloudRecords.slice(i, i + 450);
+                    const batch = writeBatch(db);
+                    chunk.forEach(r => {
+                        batch.update(doc(db, 'bcot_overtime_secure', _key(), 'medcheck_scans', r._id),
+                            { archived: true, archivedAt: new Date().toISOString() });
+                    });
+                    await batch.commit();
+                }
+                if (localOnly.length) {
+                    scanningRecords = scanningRecords.filter(r => !String(r._id).startsWith('local-'));
+                    cacheScansLocally();
+                    updateScanningLog();
+                }
+                setSyncStatus(true, `Archived ${total} record${total === 1 ? '' : 's'}`);
+            } catch (error) {
+                console.error('Archive failed:', error);
+                alert('Archiving failed: ' + (error?.message || error));
+            }
+        }
+
+        let archivedResults = [];
+
+        window.openArchiveViewModal = function () {
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('archFrom').value = today;
+            document.getElementById('archTo').value = today;
+            document.getElementById('archResultsInfo').textContent = '';
+            document.getElementById('archList').innerHTML = '';
+            archivedResults = [];
+            document.getElementById('archiveModal').style.display = 'block';
+        };
+
+        window.closeArchiveViewModal = function () {
+            document.getElementById('archiveModal').style.display = 'none';
+        };
+
+        window.searchArchivedRecords = async function () {
+            const fromDate = document.getElementById('archFrom').value;
+            const toDate = document.getElementById('archTo').value;
+            const infoEl = document.getElementById('archResultsInfo');
+            if (!fromDate || !toDate) {
+                infoEl.textContent = 'Please select both a from and to date.';
+                return;
+            }
+            infoEl.textContent = 'Searching…';
+            try {
+                const fromISO = fromDate + 'T00:00:00.000Z';
+                const toISO = toDate + 'T23:59:59.999Z';
+                const q = query(
+                    scansColl(),
+                    where('archived', '==', true),
+                    where('submittedAt', '>=', fromISO),
+                    where('submittedAt', '<=', toISO),
+                    orderBy('submittedAt', 'desc')
+                );
+                const snap = await getDocs(q);
+                archivedResults = [];
+                snap.forEach(d => archivedResults.push({ _id: d.id, ...d.data() }));
+                renderArchivedList();
+                infoEl.textContent = `${archivedResults.length} archived record${archivedResults.length === 1 ? '' : 's'} found.`;
+            } catch (error) {
+                console.error('Archived search failed:', error);
+                infoEl.textContent = 'Search failed: ' + (error?.message || error) +
+                    ' — if this mentions a missing index, open the link Firestore gives in the browser console once to create it.';
+            }
+        };
+
+        function renderArchivedList() {
+            const list = document.getElementById('archList');
+            if (archivedResults.length === 0) {
+                list.innerHTML = '<tr><td colspan="8" class="no-records">No archived records in this range</td></tr>';
+                return;
+            }
+            list.innerHTML = archivedResults.map(record => `
+                <tr>
+                    <td>${record.datetime}</td>
+                    <td>${record.labelCode || '-'}</td>
+                    <td>${record.medicationCode || '-'}</td>
+                    <td>${record.expiryDate || '-'}</td>
+                    <td>${record.codeType || '-'}</td>
+                    <td>${record.badge}</td>
+                    <td>${record.status}</td>
+                    <td><button class="map-del-btn" style="background-color:#008756;" onclick="unarchiveRecord('${record._id}')">Unarchive</button></td>
+                </tr>
+            `).join('');
+        }
+
+        window.unarchiveRecord = async function (id) {
+            try {
+                await updateDoc(doc(db, 'bcot_overtime_secure', _key(), 'medcheck_scans', id), { archived: false });
+                archivedResults = archivedResults.filter(r => r._id !== id);
+                renderArchivedList();
+                document.getElementById('archResultsInfo').textContent = 'Record restored to the active list.';
+            } catch (error) {
+                alert('Unarchive failed: ' + (error?.message || error));
+            }
+        };
+
+        window.exportArchivedToExcel = function () {
+            if (archivedResults.length === 0) {
+                alert('No archived records to export');
+                return;
+            }
+            const ws = XLSX.utils.json_to_sheet(archivedResults);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Archived Records');
+            const fileName = `archived_records_${formatDateTime(new Date()).replace(/[/:]/g, '-')}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        };
 
         async function processCode() {
             const rawInput = codeInput.value.trim();
@@ -1101,9 +1355,15 @@
                     labelCode: currentCode,
                     medicationCode: '-',
                     expiryDate: '-',
+                    productionDate: '-',
+                    qty: '-',
+                    udsText: '-',
+                    batch: '-',
+                    serial: '-',
                     codeType: determineCodeType(rawInput),
                     badge: badgeNo,
                     status: 'Label Scanned',
+                    archived: false,
                     submittedAt: new Date().toISOString()
                 };
 
@@ -1123,10 +1383,11 @@
                 const secondCode = currentCode;
                 const matchStatus = secondCode === firstCode;
 
-                // Product scan only — extracts expiry/production date, qty, text
-                // from the UDS format. null if this scan wasn't in that format.
-                const uds = extractUDSDetails(rawInput);
-                const isExpired = !!(uds && uds.expiryDateObj && uds.expiryDateObj < new Date(new Date().setHours(0, 0, 0, 0)));
+                // Product scan only — extracts expiry/production date from
+                // whichever format applies (UDS '@' format, or a GS1 GTIN
+                // barcode/QR). null if this scan matched neither.
+                const expiryInfo = extractExpiryInfo(rawInput);
+                const isExpired = !!(expiryInfo && expiryInfo.expiryDateObj && expiryInfo.expiryDateObj < new Date(new Date().setHours(0, 0, 0, 0)));
 
                 // Wrong medication takes priority over expiry — a mismatched
                 // drug code is unsafe regardless of that product's own expiry.
@@ -1134,10 +1395,14 @@
 
                 const update = {
                     medicationCode: secondCode,
-                    expiryDate: uds ? uds.expiryDisplay : '-',
-                    productionDate: uds ? uds.productionDisplay : '-',
-                    qty: uds ? uds.qty : '-',
-                    udsText: uds ? uds.text : '-',
+                    expiryDate: expiryInfo ? expiryInfo.expiryDisplay : '-',
+                    productionDate: expiryInfo ? expiryInfo.productionDisplay : '-',
+                    // UDS-only fields
+                    qty: expiryInfo ? (expiryInfo.qty || '-') : '-',
+                    udsText: expiryInfo ? (expiryInfo.text || '-') : '-',
+                    // GS1-only fields
+                    batch: expiryInfo ? (expiryInfo.batch || '-') : '-',
+                    serial: expiryInfo ? (expiryInfo.serial || '-') : '-',
                     codeType: determineCodeType(rawInput),
                     status: outcome === 'mismatch' ? 'Mismatch' : outcome === 'expired' ? 'Expired' : 'Match'
                 };
@@ -1173,7 +1438,7 @@
                     disableMainInput();
                     confirmInput.focus();
                 } else if (outcome === 'expired') {
-                    modalMessage.textContent = `⚠ MEDICATION EXPIRED — Expiry date: ${uds.expiryDisplay}`;
+                    modalMessage.textContent = `⚠ MEDICATION EXPIRED — Expiry date: ${expiryInfo.expiryDisplay}`;
                     modalContent.className = "modal-content expired";
                     document.getElementById('confirmationBox').style.display = 'block';
                     confirmInput.value = '';
@@ -1359,6 +1624,9 @@
             }
             if (event.target == document.getElementById('mapModal')) {
                 closeMappingModal();
+            }
+            if (event.target == document.getElementById('archiveModal')) {
+                closeArchiveViewModal();
             }
         });
 
