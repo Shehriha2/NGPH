@@ -1307,10 +1307,20 @@
 <script>
 /* ── Role-based UI enforcement ─────────────────────────────────────────────
    Fires on every page load (fresh login OR valid cached session).
-   Hides/restricts UI elements based on the logged-in user's app_role.       */
-window.addEventListener('bcotAuth', function (e) {
-  var role  = (e.detail && e.detail.app_role)  || 'user';
-  var areas = (e.detail && e.detail.ext_areas) || [];
+   Hides/restricts UI elements based on the logged-in user's app_role.
+
+   auth.js dispatches 'bcotAuth' synchronously the moment its own <script>
+   tag runs (near the top of <body>) when a valid session is already cached
+   — which is *before* this listener, positioned near the end of <body>, has
+   been registered. That returning-session case would otherwise miss the
+   event entirely. Admin sessions never surfaced this because nothing below
+   actually hides anything for admins — but the BCcode button needs it, so
+   we also run the handler immediately against whatever session is already
+   in localStorage, in addition to listening for the event (which still
+   fires normally for a fresh login submitted on this same page load). */
+function _applyRoleUI(detail) {
+  var role  = (detail && detail.app_role)  || 'user';
+  var areas = (detail && detail.ext_areas) || [];
 
   function hide(id) {
     var el = document.getElementById(id);
@@ -1334,7 +1344,7 @@ window.addEventListener('bcotAuth', function (e) {
       return;
     }
     if (role !== 'charge') return;
-    const badge = (e.detail && e.detail.badge || '').trim();
+    const badge = (detail && detail.badge || '').trim();
     if (!badge) return;
     (async () => {
       let t = 0;
@@ -1397,7 +1407,20 @@ window.addEventListener('bcotAuth', function (e) {
       };
     }
   }
-});
+}
+
+window.addEventListener('bcotAuth', function (e) { _applyRoleUI(e.detail); });
+
+// Compensate for the returning-session race described above: if a session
+// is already in localStorage by the time this script runs, the 'bcotAuth'
+// event for it already fired (and was missed) before this listener existed.
+(function () {
+  try {
+    var s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || 'null');
+    if (s && s.ts) _applyRoleUI(s);
+  } catch (e) {}
+})();
+
 </script>
 <script src="js/version-admin.js"></script>
 </body>
