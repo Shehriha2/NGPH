@@ -545,6 +545,7 @@
           <button onclick="clearAllTable()" style="background:#991b1b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-printer-fill"></i> Print</button>
           <button onclick="window.location.href='ChargeRequests.html'" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard2-check-fill"></i> Staff Requests</button>
+          <button id="btn-bccode" onclick="window.location.href='BCcode.html'" style="display:none;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-capsule"></i> BCcode</button>
         </div>
         <!-- Print: area filter info -->
         <div class="print-only">
@@ -1323,6 +1324,35 @@ window.addEventListener('bcotAuth', function (e) {
     hide('dm-newAreaInput');
     hide('btn-areas');
   }
+
+  // ── BCcode nav button: admins always see it; charge persons only if their
+  // badge is on the bccode_access list (permission is independent of app_role).
+  (function bcCodeVisibility() {
+    if (role === 'admin') {
+      const el = document.getElementById('btn-bccode');
+      if (el) el.style.display = '';
+      return;
+    }
+    if (role !== 'charge') return;
+    const badge = (e.detail && e.detail.badge || '').trim();
+    if (!badge) return;
+    (async () => {
+      let t = 0;
+      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+      if (!window.FB) return;
+      try {
+        const key = (window.BCOT_APP_KEY || '').trim();
+        if (!key) return;
+        const snap = await window.FB.getDoc(
+          window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'app_config', 'bccode_access'));
+        const badges = snap.exists() ? (snap.data().badges || []) : [];
+        if (badges.includes(badge)) {
+          const el = document.getElementById('btn-bccode');
+          if (el) el.style.display = '';
+        }
+      } catch (err) { console.warn('[BCcode] access check failed:', err); }
+    })();
+  })();
 
   // ── User role must never land on index.html. A fresh login submitted
   // right here still needs its normal redirect to UserHome.html — but if a

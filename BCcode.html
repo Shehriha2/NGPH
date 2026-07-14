@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>BCcode — Medication Coding — KAMC-WR</title>
+  <style>
+    :root{
+      --navy:#1a4f8b; --teal:#0f766e; --green:#16a34a; --red:#dc2626;
+      --amber:#d97706; --purple:#7c3aed; --orange:#ea580c;
+      --bg:#f1f5f9; --card:#fff; --border:#e2e8f0; --muted:#64748b;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;background:var(--bg);color:#1e293b;font-size:13px;}
+
+    /* ── Auth / access overlay ── */
+    #authOv{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+
+    /* ── Controls bar ── */
+    .controls-bar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.12);
+      padding:10px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .page-badge{background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff;
+      font-weight:800;font-size:13px;padding:6px 16px;border-radius:20px;letter-spacing:.3px;white-space:nowrap;}
+
+    /* ── Buttons ── */
+    button{padding:7px 14px;border:none;border-radius:7px;font-size:12px;font-weight:700;
+      cursor:pointer;background:var(--navy);color:#fff;transition:background .15s;font-family:Arial,sans-serif;}
+    button:hover{background:#163e70;}
+    .btn-green{background:var(--green);} .btn-green:hover{background:#15803d;}
+    .btn-teal{background:var(--teal);} .btn-teal:hover{background:#0b5c56;}
+    .btn-red{background:var(--red);} .btn-red:hover{background:#b91c1c;}
+    .btn-amber{background:var(--amber);} .btn-amber:hover{background:#b45309;}
+    .btn-orange{background:var(--orange);} .btn-orange:hover{background:#c2410c;}
+    .btn-purple{background:var(--purple);} .btn-purple:hover{background:#6d28d9;}
+    .btn-ghost{background:#e2e8f0;color:#334155;} .btn-ghost:hover{background:#cbd5e1;}
+    .btn-sm{padding:4px 11px;font-size:11px;}
+
+    /* ── Tabs ── */
+    .tab-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+    .tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;
+      border:2px solid var(--border);background:#fff;color:var(--muted);transition:all .15s;}
+    .tab:hover{border-color:#94a3b8;color:#334155;}
+    .tab.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+    .tab-count{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;
+      font-weight:800;margin-left:5px;background:rgba(255,255,255,.25);}
+    .tab.active .tab-count{background:rgba(255,255,255,.3);}
+    .tab:not(.active) .tab-count{background:#f1f5f9;color:#64748b;}
+
+    /* ── Summary chips ── */
+    .summary-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+    .sum-chip{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+      border:1px solid transparent;white-space:nowrap;}
+    .sum-all{background:#eff6ff;color:var(--navy);border-color:#bfdbfe;}
+    .sum-pending{background:#fefce8;color:#713f12;border-color:#fef08a;}
+    .sum-recode{background:#fff7ed;color:#7c2d12;border-color:#fed7aa;}
+
+    /* ── Table ── */
+    .table-wrap{overflow-x:auto;background:#fff;border-radius:12px;
+      box-shadow:0 1px 4px rgba(0,0,0,.09);border:1px solid var(--border);}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    thead th{background:var(--navy);color:#fff;padding:9px 11px;text-align:left;
+      font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:2;}
+    tbody td{padding:8px 11px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+    tbody tr:hover{background:#f8fafc;}
+    tbody tr:last-child td{border-bottom:none;}
+    tbody tr.row-pending{background:#fffbeb;}
+    tbody tr.row-pending:hover{background:#fef9c3;}
+    tbody tr.row-recode{background:#fff7ed;}
+    tbody tr.row-recode:hover{background:#ffedd5;}
+
+    /* ── Chips ── */
+    .chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;
+      font-weight:700;border:1px solid transparent;white-space:nowrap;}
+    .c-pending{background:#fef3c7;color:#92400e;border-color:#fde68a;}
+    .c-coded{background:#ccfbf1;color:#0f766e;border-color:#99f6e4;}
+    .c-approved{background:#dcfce7;color:#166534;border-color:#86efac;}
+    .c-recode{background:#ffedd5;color:#9a3412;border-color:#fed7aa;}
+    .c-done{background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;}
+
+    /* ── Action buttons in table ── */
+    .action-btns{display:flex;gap:5px;white-space:nowrap;flex-wrap:wrap;}
+
+    /* ── Modal ── */
+    .mbd{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;
+      align-items:center;justify-content:center;z-index:8000;}
+    .mbd.show{display:flex;}
+    .mbox{background:#fff;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.25);
+      width:min(520px,96%);max-height:90vh;overflow-y:auto;}
+    .mhd{padding:13px 18px;border-radius:14px 14px 0 0;display:flex;align-items:center;
+      justify-content:space-between;color:#fff;font-weight:800;font-size:14px;}
+    .mhd button{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;}
+    .mbody{padding:18px 20px;}
+    .mft{padding:12px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;}
+    .info-box{background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:14px;
+      border:1px solid var(--border);font-size:12px;color:#374151;line-height:1.7;}
+    .info-box strong{color:#0f172a;}
+    .fg{margin-bottom:13px;}
+    .fl{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;
+      text-transform:uppercase;letter-spacing:.4px;}
+    .fg input,.fg textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;
+      font-size:13px;font-family:Arial,sans-serif;outline:none;resize:vertical;box-sizing:border-box;}
+    .fg input:focus,.fg textarea:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(26,79,139,.1);}
+
+    /* ── History timeline ── */
+    .hist-item{border-left:3px solid var(--border);padding:4px 0 4px 14px;margin-bottom:10px;position:relative;}
+    .hist-item::before{content:'';position:absolute;left:-6px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--navy);}
+    .hist-status{font-weight:800;font-size:12px;color:#0f172a;}
+    .hist-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+    .hist-note{font-size:12px;color:#374151;margin-top:4px;background:#f8fafc;padding:6px 9px;border-radius:6px;border:1px solid var(--border);}
+
+    /* ── Access list ── */
+    .access-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+      padding:7px 10px;border:1px solid var(--border);border-radius:7px;margin-bottom:6px;background:#f9fafb;}
+
+    /* ── Status toast ── */
+    #statusBox{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 22px;
+      border-radius:10px;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);
+      display:none;z-index:9000;max-width:90vw;text-align:center;}
+
+    .empty{text-align:center;padding:40px;color:var(--muted);font-size:13px;}
+    @media print{.no-print{display:none!important;}}
+  </style>
+</head>
+<body>
+
+<!-- Auth / access overlay -->
+<div id="authOv">
+  <div style="text-align:center;color:#64748b;font-family:Arial,sans-serif;">
+    <div style="font-size:40px;margin-bottom:12px;">🧾</div>
+    <div style="font-size:14px;" id="authMsg">Verifying access…</div>
+    <div id="authAction" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="main" style="display:none;padding:12px;">
+
+  <!-- Controls bar -->
+  <div class="controls-bar no-print">
+    <span class="page-badge">🧾 BCcode — Medication Coding</span>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <div class="tab active" id="tabAll" onclick="setTab('all')">All <span class="tab-count" id="cntAll">0</span></div>
+      <div class="tab" id="tabPending" onclick="setTab('pending')">Pending <span class="tab-count" id="cntPending">0</span></div>
+      <div class="tab" id="tabCoded" onclick="setTab('coded')">Coded <span class="tab-count" id="cntCoded">0</span></div>
+      <div class="tab" id="tabApproved" onclick="setTab('approved')">Approved <span class="tab-count" id="cntApproved">0</span></div>
+      <div class="tab" id="tabRecode" onclick="setTab('rejected_recoding')">Needs Recoding <span class="tab-count" id="cntRecode">0</span></div>
+      <div class="tab" id="tabDone" onclick="setTab('done')">Done <span class="tab-count" id="cntDone">0</span></div>
+    </div>
+
+    <div style="margin-left:auto;display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:12px;font-weight:700;color:#64748b;" id="userLabel"></span>
+      <button id="accessMgrBtn" class="btn-purple btn-sm" style="display:none;" onclick="openAccessManager()">🔐 Manage Access</button>
+      <button class="btn-green" onclick="openAddModal()">+ Add MRN</button>
+      <button class="btn-ghost btn-sm" onclick="window.location.href='UserHome.html'">← Back</button>
+    </div>
+  </div>
+
+  <!-- Summary chips -->
+  <div class="summary-bar no-print" id="summaryBar"></div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4%">#</th>
+          <th style="width:12%">MRN</th>
+          <th style="width:11%">Status</th>
+          <th>Created By</th>
+          <th>Last Update</th>
+          <th class="no-print" style="width:22%">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Add MRN modal ─────────────────────────────────────────────────────── -->
+<div id="mAdd" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,var(--green),var(--teal));">
+      <span>+ Add MRN for Coding</span>
+      <button onclick="closeModal('mAdd')">&#x2715;</button>
+    </div>
+    <div class="mbody">
+      <div class="info-box">Enter the patient MRN to create a new coding request. It starts in <strong>Pending</strong> status.</div>
+      <div class="fg">
+        <label class="fl">MRN *</label>
+        <input type="text" id="addMrn" placeholder="e.g. 1234567" onkeydown="if(event.key==='Enter') submitAddMrn();"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Note (optional)</label>
+        <textarea id="addNote" rows="2" placeholder="Any context for this request…"></textarea>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mAdd')">Cancel</button>
+      <button class="btn-green" onclick="submitAddMrn()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Action modal (mark coded / approve / reject / done) ─────────────────── -->
+<div id="mAction" class="mbd">
+  <div class="mbox">
+    <div class="mhd" id="mActionHd">
+      <span id="mActionTitle">Update Status</span>
+      <button onclick="closeModal('mAction')">&#x2715;</button>
+    </div>
+    <div class="mbody">
+      <div class="info-box" id="mActionInfo"></div>
+      <div class="fg">
+        <label class="fl" id="mNoteLbl">Note</label>
+        <textarea id="mNote" rows="3" placeholder=""></textarea>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mAction')">Cancel</button>
+      <button id="mActionConfirmBtn" onclick="confirmAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── History modal ───────────────────────────────────────────────────────── -->
+<div id="mHistory" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,var(--navy),var(--teal));">
+      <span id="mHistTitle">Audit Trail</span>
+      <button onclick="closeModal('mHistory')">&#x2715;</button>
+    </div>
+    <div class="mbody" id="mHistBody"></div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mHistory')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Access manager modal (admin only) ───────────────────────────────────── -->
+<div id="mAccess" class="mbd">
+  <div class="mbox">
+    <div class="mhd" style="background:linear-gradient(135deg,var(--purple),var(--navy));">
+      <span>🔐 BCcode Access</span>
+      <button onclick="closeModal('mAccess')">&#x2715;</button>
+    </div>
+    <div class="mbody">
+      <div class="info-box">Staff badges listed here can open and use this page. Admins always have access.</div>
+      <div id="accessList" style="margin-bottom:14px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="accessNewBadge" placeholder="Badge number" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;" onkeydown="if(event.key==='Enter') addAccessBadge();"/>
+        <button class="btn-purple" onclick="addAccessBadge()">+ Grant</button>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn-ghost" onclick="closeModal('mAccess')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="statusBox"></div>
+
+<script src="js/version-check.js"></script>
+<script src="config.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc }
+    from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+    storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894",
+    appId:"1:659421824894:web:f0546879df8808491ad52f"
+  });
+  const db = getFirestore(app);
+
+  // ── State ───────────────────────────────────────────────────────────────
+  let _sess      = null;
+  let _isAdmin   = false;
+  let _requests  = [];
+  let _tab       = 'all';
+  let _actionKind = '';   // 'code' | 'approve' | 'reject' | 'done'
+  let _actionId   = '';
+  let _accessBadges = [];
+
+  const STATUS_LABEL = {
+    pending:'Pending', coded:'Coded', approved:'Approved',
+    rejected_recoding:'Needs Recoding', done:'Done'
+  };
+  const STATUS_CHIP = {
+    pending:'c-pending', coded:'c-coded', approved:'c-approved',
+    rejected_recoding:'c-recode', done:'c-done'
+  };
+
+  const _key       = () => (window.BCOT_APP_KEY || '').trim();
+  const reqColl    = () => collection(db, 'bcot_overtime_secure', _key(), 'bccoding_requests');
+  const reqDocRef  = id => doc(db, 'bcot_overtime_secure', _key(), 'bccoding_requests', id);
+  const accessRef  = () => doc(db, 'bcot_overtime_secure', _key(), 'app_config', 'bccode_access');
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fts(iso){
+    if(!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+      + ' ' + new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }
+  function ss(msg, ok=true){
+    const el=document.getElementById('statusBox');
+    el.textContent=msg;
+    el.style.cssText=`display:block;background:${ok?'#166534':'#dc2626'};color:#fff;`;
+    clearTimeout(el._t);
+    el._t=setTimeout(()=>el.style.display='none', ok?3200:5000);
+  }
+  window.closeModal=function(id){ document.getElementById(id).classList.remove('show'); };
+
+  function currentActor(){
+    return {
+      name:  [_sess.nameTitle,_sess.name].filter(Boolean).join(' ') || _sess.name || 'Staff',
+      badge: _sess.badge || ''
+    };
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  window.setTab=function(t){
+    _tab=t;
+    ['all','pending','coded','approved','rejected_recoding','done'].forEach(k=>{
+      const id = 'tab'+(k==='rejected_recoding'?'Recode':k.charAt(0).toUpperCase()+k.slice(1));
+      document.getElementById(id)?.classList.toggle('active', k===t);
+    });
+    render();
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function countBy(status){ return _requests.filter(r=>r.status===status).length; }
+
+  function render(){
+    let rows = _tab==='all' ? _requests.slice() : _requests.filter(r=>r.status===_tab);
+    rows.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+
+    document.getElementById('cntAll').textContent      = _requests.length;
+    document.getElementById('cntPending').textContent   = countBy('pending');
+    document.getElementById('cntCoded').textContent     = countBy('coded');
+    document.getElementById('cntApproved').textContent  = countBy('approved');
+    document.getElementById('cntRecode').textContent    = countBy('rejected_recoding');
+    document.getElementById('cntDone').textContent      = countBy('done');
+
+    document.getElementById('summaryBar').innerHTML=`
+      <span class="sum-chip sum-all">📋 ${_requests.length} total</span>
+      <span class="sum-chip sum-pending">⏳ ${countBy('pending')} pending</span>
+      <span class="sum-chip sum-recode">↩ ${countBy('rejected_recoding')} need recoding</span>`;
+
+    if(!rows.length){
+      document.getElementById('tBody').innerHTML=
+        `<tr><td colspan="6" class="empty">No coding requests found.</td></tr>`;
+      return;
+    }
+
+    let html='';
+    rows.forEach((r,i)=>{
+      const rowCls = r.status==='pending' ? 'row-pending'
+                   : r.status==='rejected_recoding' ? 'row-recode' : '';
+      const first  = r.history[0] || {};
+      const last   = r.history[r.history.length-1] || {};
+
+      let actions = '';
+      if(r.status==='pending'){
+        actions = `<button class="btn-teal btn-sm" onclick="openActionModal('code','${r._id}')">🧾 Mark Coded</button>`;
+      } else if(r.status==='coded'){
+        actions = `<button class="btn-green btn-sm" onclick="openActionModal('approve','${r._id}')">✓ Approve</button>
+                   <button class="btn-orange btn-sm" onclick="openActionModal('reject','${r._id}')">↩ Reject</button>`;
+      } else if(r.status==='rejected_recoding'){
+        actions = `<button class="btn-teal btn-sm" onclick="openActionModal('code','${r._id}')">🧾 Recode</button>`;
+      } else if(r.status==='approved'){
+        actions = `<button class="btn-navy btn-sm" style="background:var(--navy);" onclick="openActionModal('done','${r._id}')">✅ Mark Done</button>`;
+      }
+      actions += ` <button class="btn-ghost btn-sm" onclick="openHistory('${r._id}')">🕘 History</button>`;
+
+      html+=`<tr class="${rowCls}">
+        <td style="text-align:center;color:var(--muted);">${i+1}</td>
+        <td style="font-weight:700;">${esc(r.mrn)}</td>
+        <td><span class="chip ${STATUS_CHIP[r.status]}">${STATUS_LABEL[r.status]}</span></td>
+        <td style="font-size:11px;">
+          <div style="font-weight:700;color:#1f2937;">${esc(first.name||'—')}</div>
+          <div style="color:var(--muted);">🪪 ${esc(first.badge||'—')} · ${fts(first.timestamp)}</div>
+        </td>
+        <td style="font-size:11px;">
+          <div style="font-weight:700;color:#1f2937;">${esc(last.name||'—')}</div>
+          <div style="color:var(--muted);">🪪 ${esc(last.badge||'—')} · ${fts(last.timestamp)}</div>
+        </td>
+        <td class="no-print"><div class="action-btns">${actions}</div></td>
+      </tr>`;
+    });
+    document.getElementById('tBody').innerHTML=html;
+  }
+
+  // ── Add MRN ─────────────────────────────────────────────────────────────
+  window.openAddModal=function(){
+    document.getElementById('addMrn').value='';
+    document.getElementById('addNote').value='';
+    document.getElementById('mAdd').classList.add('show');
+    setTimeout(()=>document.getElementById('addMrn').focus(),120);
+  };
+
+  window.submitAddMrn=async function(){
+    const mrn  = document.getElementById('addMrn').value.trim();
+    const note = document.getElementById('addNote').value.trim();
+    if(!mrn){ ss('Please enter an MRN.',false); return; }
+
+    const openExisting = _requests.find(r=>r.mrn===mrn && r.status!=='done');
+    if(openExisting){
+      const proceed = confirm(`MRN ${mrn} already has an open request (status: ${STATUS_LABEL[openExisting.status]}). Create another one anyway?`);
+      if(!proceed) return;
+    }
+
+    const actor = currentActor();
+    const now = new Date().toISOString();
+    const entry = {
+      mrn, status:'pending',
+      history:[{status:'pending', name:actor.name, badge:actor.badge, timestamp:now, note}],
+      createdAt: now, updatedAt: now
+    };
+    try{
+      const ref = await addDoc(reqColl(), entry);
+      _requests.push({_id:ref.id, ...entry});
+      closeModal('mAdd');
+      render();
+      ss(`MRN ${mrn} added — pending coding.`);
+    }catch(e){ ss('Save failed: '+(e?.message||e), false); }
+  };
+
+  // ── Action modal (code / approve / reject / done) ──────────────────────
+  const ACTION_CFG = {
+    code:    { title:'🧾 Mark as Coded',    grad:'linear-gradient(135deg,#0f766e,#0b5c56)', status:'coded',             noteLabel:'Coding Note (optional)',    required:false, btn:'Mark Coded', btnClass:'btn-teal' },
+    approve: { title:'✓ Approve Coding',    grad:'linear-gradient(135deg,#16a34a,#0f766e)', status:'approved',          noteLabel:'Note (optional)',            required:false, btn:'Approve',     btnClass:'btn-green' },
+    reject:  { title:'↩ Reject — Needs Recoding', grad:'linear-gradient(135deg,#ea580c,#dc2626)', status:'rejected_recoding', noteLabel:'Reason for Rejection (required)', required:true, btn:'Reject',   btnClass:'btn-orange' },
+    done:    { title:'✅ Mark as Done',      grad:'linear-gradient(135deg,#1a4f8b,#0f766e)', status:'done',              noteLabel:'Note (optional)',            required:false, btn:'Mark Done',  btnClass:'btn-navy' }
+  };
+
+  window.openActionModal=function(kind, id){
+    const rec = _requests.find(r=>r._id===id); if(!rec) return;
+    _actionKind = kind; _actionId = id;
+    const cfg = ACTION_CFG[kind];
+
+    document.getElementById('mActionHd').style.background = cfg.grad;
+    document.getElementById('mActionTitle').textContent = cfg.title;
+    document.getElementById('mActionInfo').innerHTML =
+      `MRN <strong>${esc(rec.mrn)}</strong> — current status: <strong>${STATUS_LABEL[rec.status]}</strong>.`;
+    document.getElementById('mNoteLbl').textContent = cfg.noteLabel;
+    document.getElementById('mNote').value = '';
+    document.getElementById('mNote').placeholder = cfg.required
+      ? 'Explain what needs to be corrected…' : 'Optional note…';
+
+    const btn = document.getElementById('mActionConfirmBtn');
+    btn.textContent = cfg.btn;
+    btn.className = cfg.btnClass;
+
+    document.getElementById('mAction').classList.add('show');
+    setTimeout(()=>document.getElementById('mNote').focus(),120);
+  };
+
+  window.confirmAction=async function(){
+    const cfg = ACTION_CFG[_actionKind];
+    const note = document.getElementById('mNote').value.trim();
+    if(cfg.required && !note){ ss('A note is required for this action.',false); return; }
+
+    const rec = _requests.find(r=>r._id===_actionId); if(!rec) return;
+    const actor = currentActor();
+    const now = new Date().toISOString();
+    const histEntry = { status:cfg.status, name:actor.name, badge:actor.badge, timestamp:now, note };
+
+    try{
+      const newHistory = [...rec.history, histEntry];
+      await updateDoc(reqDocRef(_actionId), {
+        status: cfg.status, history: newHistory, updatedAt: now
+      });
+      rec.status = cfg.status; rec.history = newHistory; rec.updatedAt = now;
+      closeModal('mAction');
+      render();
+      ss(`MRN ${rec.mrn} updated to ${STATUS_LABEL[cfg.status]}.`);
+    }catch(e){ ss('Update failed: '+(e?.message||e), false); }
+  };
+
+  // ── History modal ────────────────────────────────────────────────────────
+  window.openHistory=function(id){
+    const rec = _requests.find(r=>r._id===id); if(!rec) return;
+    document.getElementById('mHistTitle').textContent = `Audit Trail — MRN ${rec.mrn}`;
+    document.getElementById('mHistBody').innerHTML = rec.history.map(h=>`
+      <div class="hist-item">
+        <div class="hist-status">${STATUS_LABEL[h.status]||h.status}</div>
+        <div class="hist-meta">${esc(h.name||'—')} · 🪪 ${esc(h.badge||'—')} · ${fts(h.timestamp)}</div>
+        ${h.note ? `<div class="hist-note">${esc(h.note)}</div>` : ''}
+      </div>`).join('') || '<p style="color:var(--muted);">No history yet.</p>';
+    document.getElementById('mHistory').classList.add('show');
+  };
+
+  // ── Access manager (admin only) ──────────────────────────────────────────
+  async function loadAccessList(){
+    try{
+      const snap = await getDoc(accessRef());
+      _accessBadges = snap.exists() ? (snap.data().badges||[]) : [];
+    }catch{ _accessBadges = []; }
+  }
+  async function saveAccessList(){
+    await setDoc(accessRef(), { badges:_accessBadges });
+  }
+  function renderAccessList(){
+    const el = document.getElementById('accessList');
+    if(!_accessBadges.length){
+      el.innerHTML = '<p style="color:var(--muted);font-size:12px;">No badges granted yet — only admins can access this page.</p>';
+      return;
+    }
+    el.innerHTML = _accessBadges.map(b=>`
+      <div class="access-row">
+        <span style="font-weight:700;">🪪 ${esc(b)}</span>
+        <button class="btn-red btn-sm" onclick="removeAccessBadge('${esc(b)}')">Remove</button>
+      </div>`).join('');
+  }
+  window.openAccessManager=async function(){
+    await loadAccessList();
+    renderAccessList();
+    document.getElementById('mAccess').classList.add('show');
+  };
+  window.addAccessBadge=async function(){
+    const b = document.getElementById('accessNewBadge').value.trim();
+    if(!b){ ss('Enter a badge number.',false); return; }
+    if(_accessBadges.includes(b)){ ss('That badge already has access.',false); return; }
+    _accessBadges.push(b);
+    try{
+      await saveAccessList();
+      document.getElementById('accessNewBadge').value='';
+      renderAccessList();
+      ss(`Access granted to badge ${b}.`);
+    }catch(e){ ss('Save failed: '+(e?.message||e), false); }
+  };
+  window.removeAccessBadge=async function(b){
+    _accessBadges = _accessBadges.filter(x=>x!==b);
+    try{
+      await saveAccessList();
+      renderAccessList();
+      ss(`Access removed for badge ${b}.`);
+    }catch(e){ ss('Save failed: '+(e?.message||e), false); }
+  };
+
+  // ── Load requests ─────────────────────────────────────────────────────────
+  async function loadData(){
+    try{
+      const snap = await getDocs(reqColl());
+      _requests = [];
+      snap.forEach(d=>{
+        const data = d.data();
+        _requests.push({ _id:d.id, ...data, history: Array.isArray(data.history)?data.history:[] });
+      });
+    }catch(e){
+      console.error(e);
+      ss('Failed to load coding requests — check connection.',false);
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function init(){
+    let s;
+    try{
+      s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'{}');
+    }catch{ window.location.href='index.html'; return; }
+    if(!s.ts || Date.now()-s.ts>43200000){ window.location.href='index.html'; return; }
+    _sess = s;
+    _isAdmin = s.app_role==='admin';
+
+    const dispName=[_sess.nameTitle,_sess.name].filter(Boolean).join(' ')||_sess.name||'Staff';
+    document.getElementById('userLabel').textContent = dispName;
+
+    // ── Access check: admins always allowed; everyone else must be on the
+    // bccode_access badge list. This permission is independent of app_role
+    // since Business Center staff may be any role.
+    document.getElementById('authMsg').textContent='Checking BCcode access…';
+    await loadAccessList();
+    const myBadge = (_sess.badge||'').trim();
+    const allowed = _isAdmin || (myBadge && _accessBadges.includes(myBadge));
+
+    if(!allowed){
+      document.getElementById('authMsg').innerHTML =
+        '<strong style="color:#dc2626;">Access Restricted</strong><br>' +
+        '<span style="font-size:12px;">You do not have permission to use BCcode.<br>Contact your administrator if you believe this is a mistake.</span>';
+      document.getElementById('authAction').innerHTML =
+        '<button class="btn-ghost" onclick="window.location.href=\'UserHome.html\'">← Back to Portal</button>';
+      return;
+    }
+
+    if(_isAdmin) document.getElementById('accessMgrBtn').style.display='';
+
+    document.getElementById('authMsg').textContent='Loading requests…';
+    await loadData();
+    render();
+
+    document.getElementById('authOv').style.display='none';
+    document.getElementById('main').style.display='';
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -215,6 +215,11 @@
     <symbol id="i-check" viewBox="0 0 24 24">
       <path d="M4 12l6 6L20 6"/>
     </symbol>
+    <symbol id="i-rx" viewBox="0 0 24 24">
+      <path d="M6 3v18"/>
+      <path d="M6 3h6a4 4 0 0 1 0 8H6"/>
+      <path d="M12 11l6 10"/>
+    </symbol>
   </defs>
 </svg>
 
@@ -241,6 +246,8 @@
       <span class="topbar-name" id="topbarName"></span>
       <button id="precBtn" class="btn-ghost btn-sm" style="display:none;"
         onclick="window.location.href='Preceptor.html'"><svg class="icon"><use href="#i-mortarboard"/></svg> Preceptorship</button>
+      <button id="bcBtn" class="btn-ghost btn-sm" style="display:none;"
+        onclick="window.location.href='BCcode.html'"><svg class="icon"><use href="#i-rx"/></svg> BCcode</button>
       <button class="btn-outline-red btn-sm" onclick="doSignOut()"><svg class="icon"><use href="#i-signout"/></svg> Sign Out</button>
     </div>
   </div>
@@ -843,12 +850,13 @@
   async function loadData(){
     const k=_key(); if(!k) return;
     try{
-      const [lieuSnap,lieuReqSnap,vacSnap,dutySnap,precSnap]=await Promise.all([
+      const [lieuSnap,lieuReqSnap,vacSnap,dutySnap,precSnap,bcAccessSnap]=await Promise.all([
         getDoc(lieuRef(_badge)),
         getDocs(query(lieuReqColl(), where('badge','==',_badge))),
         getDocs(query(vacReqColl(),  where('badge','==',_badge))),
         getDocs(query(dutyReqColl(), where('badge','==',_badge))),
-        getDocs(collection(db,'bcot_overtime_secure',k,'preceptors'))
+        getDocs(collection(db,'bcot_overtime_secure',k,'preceptors')),
+        getDoc(doc(db,'bcot_overtime_secure',k,'app_config','bccode_access'))
       ]);
 
       _lieu     =lieuSnap.exists()?lieuSnap.data():null;
@@ -868,6 +876,10 @@
         if(sessName && String(p.name||'').toLowerCase().trim()===sessName) isPreceptor=true;
       });
       if(isPreceptor) document.getElementById('precBtn').style.display='';
+
+      // BCcode access check — independent of app_role, granted per-badge
+      const bcBadges = bcAccessSnap.exists() ? (bcAccessSnap.data().badges||[]) : [];
+      if(_badge && bcBadges.includes(_badge)) document.getElementById('bcBtn').style.display='';
     }catch(e){
       console.error(e);
       ss('Failed to load data — check connection.',false);
