@@ -742,7 +742,11 @@
     <div id="mapModal" class="modal">
         <div class="map-modal-content">
             <h2>Drug Code Mappings</h2>
-            <div class="map-form">
+            <div class="map-err" id="mapAuthNotice" style="display:none;">
+                🔒 Sign in via the main portal to add or remove mappings — you can still view the list below.
+                <a href="index.html">Go to Sign In</a>
+            </div>
+            <div class="map-form" id="mapForm">
                 <div>
                     <label for="mapType">Type</label>
                     <select id="mapType">
@@ -1558,7 +1562,7 @@
         }
 
         // Export Functions
-        function exportToExcel() {
+        window.exportToExcel = function () {
             if (scanningRecords.length === 0) {
                 alert("No records to export");
                 return;
@@ -1570,7 +1574,7 @@
 
             const fileName = `scanning_records_${formatDateTime(new Date()).replace(/[/:]/g, '-')}.xlsx`;
             XLSX.writeFile(wb, fileName);
-        }
+        };
 
         // ── Drug code mapping manager ─────────────────────────────────────────
         function cacheMappingsLocally() {
@@ -1601,8 +1605,22 @@
             renderMappingsList();
         }
 
+        // Adding/removing mappings needs the same session the main portal's
+        // js/auth.js creates on login — checked here directly (12h TTL, same
+        // as auth.js's SESSION_TTL) rather than including auth.js itself,
+        // since that would force a login gate on the scanner too, which we
+        // deliberately don't want on this page.
+        function isSignedIn() {
+            try {
+                const s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || 'null');
+                if (!s || !s.ts) return false;
+                return (Date.now() - s.ts) <= 12 * 60 * 60 * 1000;
+            } catch { return false; }
+        }
+
         function renderMappingsList() {
             const list = document.getElementById('mapList');
+            const canEdit = isSignedIn();
             if (mappingDocs.length === 0) {
                 list.innerHTML = '<tr><td colspan="4" class="map-empty">No mappings yet — add one above.</td></tr>';
                 return;
@@ -1612,7 +1630,7 @@
                     <td>${m.type}</td>
                     <td>${m.code}</td>
                     <td>${m.drugCode}</td>
-                    <td><button class="map-del-btn" onclick="deleteMapping('${m.id}')">Delete</button></td>
+                    <td>${canEdit ? `<button class="map-del-btn" onclick="deleteMapping('${m.id}')">Delete</button>` : ''}</td>
                 </tr>
             `).join('');
         }
@@ -1621,7 +1639,13 @@
             document.getElementById('mapErr').textContent = '';
             document.getElementById('mapCode').value = '';
             document.getElementById('mapDrugCode').value = '';
+
+            const canEdit = isSignedIn();
+            document.getElementById('mapAuthNotice').style.display = canEdit ? 'none' : 'block';
+            document.getElementById('mapForm').style.display = canEdit ? 'flex' : 'none';
+
             document.getElementById('mapModal').style.display = 'block';
+            renderMappingsList();
         };
 
         window.closeMappingModal = function () {
@@ -1629,11 +1653,13 @@
         };
 
         window.addMapping = async function () {
+            const errEl = document.getElementById('mapErr');
+            errEl.textContent = '';
+            if (!isSignedIn()) { errEl.textContent = 'Please sign in via the main portal to add mappings.'; return; }
+
             const type = document.getElementById('mapType').value;
             const code = document.getElementById('mapCode').value.trim();
             const drugCode = document.getElementById('mapDrugCode').value.trim().toLowerCase();
-            const errEl = document.getElementById('mapErr');
-            errEl.textContent = '';
 
             if (!code) { errEl.textContent = 'Scanned code is required.'; return; }
             if (!drugCode) { errEl.textContent = 'Drug code is required.'; return; }
@@ -1656,6 +1682,7 @@
         };
 
         window.deleteMapping = async function (id) {
+            if (!isSignedIn()) { alert('Please sign in via the main portal to remove mappings.'); return; }
             const m = mappingDocs.find(x => x.id === id);
             if (!m) return;
             if (!confirm(`Remove mapping for code "${m.code}"?`)) return;
