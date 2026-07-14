@@ -265,7 +265,7 @@
 <script src="config.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc }
+  import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const app = initializeApp({
@@ -423,10 +423,8 @@
       createdAt: now, updatedAt: now
     };
     try{
-      const ref = await addDoc(reqColl(), entry);
-      _requests.push({_id:ref.id, ...entry});
+      await addDoc(reqColl(), entry);
       closeModal('mAdd');
-      render();
       ss(`MRN ${mrn} added — pending coding.`);
     }catch(e){ ss('Save failed: '+(e?.message||e), false); }
   };
@@ -476,9 +474,7 @@
       await updateDoc(reqDocRef(_actionId), {
         status: cfg.status, history: newHistory, updatedAt: now
       });
-      rec.status = cfg.status; rec.history = newHistory; rec.updatedAt = now;
       closeModal('mAction');
-      render();
       ss(`MRN ${rec.mrn} updated to ${STATUS_LABEL[cfg.status]}.`);
     }catch(e){ ss('Update failed: '+(e?.message||e), false); }
   };
@@ -544,19 +540,27 @@
     }catch(e){ ss('Save failed: '+(e?.message||e), false); }
   };
 
-  // ── Load requests ─────────────────────────────────────────────────────────
-  async function loadData(){
-    try{
-      const snap = await getDocs(reqColl());
-      _requests = [];
-      snap.forEach(d=>{
-        const data = d.data();
-        _requests.push({ _id:d.id, ...data, history: Array.isArray(data.history)?data.history:[] });
+  // ── Live data subscription ───────────────────────────────────────────────
+  // Real-time instead of a one-time fetch: every staff member with the page
+  // open sees additions/status changes from everyone else immediately, no
+  // manual refresh or polling interval needed.
+  function subscribeData(){
+    return new Promise(resolve=>{
+      let first = true;
+      onSnapshot(reqColl(), snap=>{
+        _requests = [];
+        snap.forEach(d=>{
+          const data = d.data();
+          _requests.push({ _id:d.id, ...data, history: Array.isArray(data.history)?data.history:[] });
+        });
+        render();
+        if(first){ first=false; resolve(); }
+      }, err=>{
+        console.error(err);
+        ss('Live update connection lost — check network.',false);
+        if(first){ first=false; resolve(); }
       });
-    }catch(e){
-      console.error(e);
-      ss('Failed to load coding requests — check connection.',false);
-    }
+    });
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -592,8 +596,7 @@
     if(_isAdmin) document.getElementById('accessMgrBtn').style.display='';
 
     document.getElementById('authMsg').textContent='Loading requests…';
-    await loadData();
-    render();
+    await subscribeData();
 
     document.getElementById('authOv').style.display='none';
     document.getElementById('main').style.display='';
