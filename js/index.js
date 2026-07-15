@@ -4325,6 +4325,10 @@
           </tr>`;
         }).join('');
 
+        // Totals rows live inside <tbody>, not <tfoot> — browsers reprint a
+        // <tfoot> at the bottom of every page a table spans when printing,
+        // so a multi-page report would show "Totals" on each page instead
+        // of once at the true end of the table.
         const rptHtml=`
           <div style="text-align:center;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #e5e7eb;">
             <div style="font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#1a4f8b;">Duties Status Report</div>
@@ -4355,14 +4359,13 @@
               <th style="padding:7px 6px;font-size:11px;text-align:center;">Total/Period</th>
               <th style="padding:7px 6px;font-size:11px;text-align:center;">Staff</th>
             </tr></thead>
-            <tbody>${activeRows}</tbody>
-            <tfoot><tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #86efac;">
+            <tbody>${activeRows}<tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #86efac;">
               <td colspan="4" style="padding:7px 10px;font-size:12px;text-align:right;">Totals:</td>
               <td style="padding:7px 6px;font-size:14px;text-align:center;color:#15803d;font-weight:900;">${activeHrs}</td>
               <td></td>
               <td style="padding:7px 6px;font-size:14px;text-align:center;color:#0f766e;font-weight:900;">${weeklyHrs.toFixed(1)} h</td>
               <td></td>
-            </tr></tfoot>
+            </tr></tbody>
           </table>
           <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
             <div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">📐 FTE Requirement (${areaLabel})</div>
@@ -4385,12 +4388,11 @@
               <th style="padding:7px 6px;font-size:11px;">Remarks</th>
               <th style="padding:7px 6px;font-size:11px;">Last Changed</th>
             </tr></thead>
-            <tbody>${disabledRows}</tbody>
-            <tfoot><tr style="background:#fef2f2;font-weight:700;border-top:2px solid #fca5a5;">
+            <tbody>${disabledRows}<tr style="background:#fef2f2;font-weight:700;border-top:2px solid #fca5a5;">
               <td colspan="4" style="padding:7px 10px;font-size:12px;text-align:right;">Total disabled hrs/shift:</td>
               <td style="padding:7px 6px;font-size:14px;text-align:center;color:#991b1b;font-weight:900;">${disabledHrs}</td>
               <td colspan="2"></td>
-            </tr></tfoot>
+            </tr></tbody>
           </table>`:'<p style="color:#9ca3af;font-style:italic;">No disabled duties.</p>'}`;
 
         const overlay=document.createElement('div');
