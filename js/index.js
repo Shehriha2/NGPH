@@ -4280,6 +4280,17 @@
         const disabled=filtered.filter(([,m])=>m.enabled===false);
         const sumHrs=arr=>arr.reduce((s,[,m])=>s+(Number(m.hours)||0),0);
         const activeHrs=sumHrs(active), disabledHrs=sumHrs(disabled);
+
+        // ── FTE calculation ─────────────────────────────────────────────────
+        // Total/Period is each duty's weekly workload (Hrs/Shift × schedule
+        // days). Summed across all active duties, ×4 gives one month of
+        // coverage, ÷180 (hrs covered by one FTE per month) gives the
+        // headcount needed to staff everything in this report.
+        const FTE_HOURS_PER_MONTH = 180;
+        const periodHrsOf=m=>(m.scheduleDays&&m.schedulePeriod)?(Number(m.hours)||0)*Number(m.scheduleDays):0;
+        const weeklyHrs = active.reduce((s,[,m])=>s+periodHrsOf(m),0);
+        const monthlyHrs = weeklyHrs*4;
+        const requiredFTE = monthlyHrs/FTE_HOURS_PER_MONTH;
         const fmtD=iso=>{try{return new Date(iso).toLocaleDateString('en-SA',{day:'2-digit',month:'short',year:'numeric'});}catch{return'—';}};
         const lastChg=m=>{const log=m.changesLog||[];if(!log.length)return'—';const l=log[log.length-1];return`${l.by||'?'} · ${fmtD(l.at)}`;};
         const areaLabel=f==='ALL'?'All Areas':f;
@@ -4288,7 +4299,7 @@
         const activeRows=active.map(([code,m],i)=>{
           const bg=m.color||'#1a4f8b',fg=contrastColor(bg);
           const schTxt=m.scheduleDays&&m.schedulePeriod?`${m.scheduleDays}d/${m.schedulePeriod==='week'?'wk':'mo'}`:'—';
-          const totPer=m.scheduleDays&&m.schedulePeriod?((Number(m.hours)||0)*Number(m.scheduleDays)).toFixed(1)+' h':null;
+          const totPer=(m.scheduleDays&&m.schedulePeriod)?periodHrsOf(m).toFixed(1)+' h':null;
           return`<tr style="border-bottom:1px solid #e5e7eb;">
             <td style="padding:6px;text-align:center;color:#9ca3af;font-size:11px;">${i+1}</td>
             <td style="padding:6px;text-align:center;"><span style="background:${bg};color:${fg};font-weight:700;border-radius:4px;padding:2px 8px;font-size:11px;font-family:monospace;">${code}</span></td>
@@ -4346,11 +4357,23 @@
             </tr></thead>
             <tbody>${activeRows}</tbody>
             <tfoot><tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #86efac;">
-              <td colspan="4" style="padding:7px 10px;font-size:12px;text-align:right;">Total active hrs/shift:</td>
+              <td colspan="4" style="padding:7px 10px;font-size:12px;text-align:right;">Totals:</td>
               <td style="padding:7px 6px;font-size:14px;text-align:center;color:#15803d;font-weight:900;">${activeHrs}</td>
-              <td colspan="3"></td>
+              <td></td>
+              <td style="padding:7px 6px;font-size:14px;text-align:center;color:#0f766e;font-weight:900;">${weeklyHrs.toFixed(1)} h</td>
+              <td></td>
             </tr></tfoot>
-          </table>`:'<p style="color:#9ca3af;font-style:italic;margin-bottom:22px;">No active duties.</p>'}
+          </table>
+          <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+            <div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">📐 FTE Requirement (${areaLabel})</div>
+            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:#1e3a5f;">
+              <span>Weekly hours (Σ Total/Period): <b style="font-size:15px;">${weeklyHrs.toFixed(1)} h</b></span>
+              <span style="color:#93c5fd;">×4 weeks →</span>
+              <span>Monthly hours: <b style="font-size:15px;">${monthlyHrs.toFixed(1)} h</b></span>
+              <span style="color:#93c5fd;">÷${FTE_HOURS_PER_MONTH} hrs/FTE →</span>
+              <span>Required FTE: <b style="font-size:20px;color:#1a4f8b;">${requiredFTE.toFixed(2)}</b></span>
+            </div>
+          </div>`:'<p style="color:#9ca3af;font-style:italic;margin-bottom:22px;">No active duties.</p>'}
           <div style="font-size:13px;font-weight:800;color:#991b1b;margin-bottom:8px;border-left:4px solid #dc2626;padding-left:10px;">Disabled Duties (${disabled.length})</div>
           ${disabled.length?`<table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:#dc2626;color:#fff;">
