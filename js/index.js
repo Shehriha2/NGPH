@@ -4291,6 +4291,28 @@
         const weeklyHrs = active.reduce((s,[,m])=>s+periodHrsOf(m),0);
         const monthlyHrs = weeklyHrs*4;
         const requiredFTE = monthlyHrs/FTE_HOURS_PER_MONTH;
+
+        // Leave/sick coverage buffer: staffing on paper still needs to
+        // absorb people being on annual/sick leave, so the real headcount
+        // target is padded 20% above the raw workload requirement.
+        const LEAVE_BUFFER_PCT = 0.20;
+        const requiredFTEBuffered = requiredFTE*(1+LEAVE_BUFFER_PCT);
+
+        // The 180-hr figure is defined per 4 weeks (28 days); a real
+        // calendar month runs ~30 days, so scale up proportionally for a
+        // rough real-month estimate rather than treating 4 weeks = 1 month.
+        const monthlyHrs30 = monthlyHrs*(30/28);
+        const requiredFTE30 = monthlyHrs30/FTE_HOURS_PER_MONTH;
+        const requiredFTE30Buffered = requiredFTE30*(1+LEAVE_BUFFER_PCT);
+
+        // Staffing conclusion against the actual available pool.
+        const AVAILABLE_AIDE_STAFF    = 36;
+        const AVAILABLE_MAHARAH_STAFF = 5;
+        const availableStaff = AVAILABLE_AIDE_STAFF+AVAILABLE_MAHARAH_STAFF;
+        const availableHrs30 = availableStaff*FTE_HOURS_PER_MONTH*(30/28);
+        const requiredHrs30Buffered = monthlyHrs30*(1+LEAVE_BUFFER_PCT);
+        const hoursGap = availableHrs30-requiredHrs30Buffered;
+        const fteGap   = availableStaff-requiredFTE30Buffered;
         const fmtD=iso=>{try{return new Date(iso).toLocaleDateString('en-SA',{day:'2-digit',month:'short',year:'numeric'});}catch{return'—';}};
         const lastChg=m=>{const log=m.changesLog||[];if(!log.length)return'—';const l=log[log.length-1];return`${l.by||'?'} · ${fmtD(l.at)}`;};
         const areaLabel=f==='ALL'?'All Areas':f;
@@ -4367,14 +4389,38 @@
               <td></td>
             </tr></tbody>
           </table>
-          <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+          <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:16px 20px;margin-bottom:16px;">
             <div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">📐 FTE Requirement (${areaLabel})</div>
-            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:#1e3a5f;">
+            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:#1e3a5f;margin-bottom:10px;">
               <span>Weekly hours (Σ Total/Period): <b style="font-size:15px;">${weeklyHrs.toFixed(1)} h</b></span>
               <span style="color:#93c5fd;">×4 weeks →</span>
               <span>Monthly hours: <b style="font-size:15px;">${monthlyHrs.toFixed(1)} h</b></span>
               <span style="color:#93c5fd;">÷${FTE_HOURS_PER_MONTH} hrs/FTE →</span>
               <span>Required FTE: <b style="font-size:20px;color:#1a4f8b;">${requiredFTE.toFixed(2)}</b></span>
+            </div>
+            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:#1e3a5f;border-top:1px dashed #93c5fd;padding-top:10px;margin-bottom:10px;">
+              <span>+${(LEAVE_BUFFER_PCT*100).toFixed(0)}% leave/sick coverage →</span>
+              <span>Required FTE (buffered): <b style="font-size:20px;color:#1a4f8b;">${requiredFTEBuffered.toFixed(2)}</b></span>
+            </div>
+            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:#1e3a5f;border-top:1px dashed #93c5fd;padding-top:10px;">
+              <span>Rough 30-day month (180h/4wks × 30/28) →</span>
+              <span>Monthly hours: <b style="font-size:15px;">${monthlyHrs30.toFixed(1)} h</b></span>
+              <span style="color:#93c5fd;">→</span>
+              <span>Required FTE (30-day, buffered): <b style="font-size:20px;color:#1a4f8b;">${requiredFTE30Buffered.toFixed(2)}</b></span>
+            </div>
+          </div>
+          <div style="background:${hoursGap>=0?'#f0fdf4':'#fef2f2'};border:1.5px solid ${hoursGap>=0?'#86efac':'#fca5a5'};border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+            <div style="font-size:11px;font-weight:700;color:${hoursGap>=0?'#15803d':'#991b1b'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">🧮 Conclusion — Available Pharmacy Aide Staff</div>
+            <div style="font-size:13px;color:#1e293b;line-height:1.9;">
+              Available staff: <b>${AVAILABLE_AIDE_STAFF} Aide + ${AVAILABLE_MAHARAH_STAFF} Maharah = ${availableStaff} staff</b>
+              &nbsp;(≈ <b>${availableHrs30.toFixed(1)} h</b> capacity over a 30-day month)<br>
+              Required (30-day, +${(LEAVE_BUFFER_PCT*100).toFixed(0)}% buffer): <b>${requiredHrs30Buffered.toFixed(1)} h</b>
+              &nbsp;(<b>${requiredFTE30Buffered.toFixed(2)} FTE</b>)<br>
+              <span style="font-weight:800;font-size:14px;color:${hoursGap>=0?'#15803d':'#991b1b'};">
+                ${hoursGap>=0
+                  ?`✓ Sufficient staffing — surplus of ${hoursGap.toFixed(1)} h (${fteGap.toFixed(2)} FTE)`
+                  :`⚠ Staffing shortage — short by ${Math.abs(hoursGap).toFixed(1)} h (${Math.abs(fteGap).toFixed(2)} FTE)`}
+              </span>
             </div>
           </div>`:'<p style="color:#9ca3af;font-style:italic;margin-bottom:22px;">No active duties.</p>'}
           <div style="font-size:13px;font-weight:800;color:#991b1b;margin-bottom:8px;border-left:4px solid #dc2626;padding-left:10px;">Disabled Duties (${disabled.length})</div>
