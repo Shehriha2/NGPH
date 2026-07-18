@@ -2,9 +2,10 @@
    BCOT Rota — App Authentication Guard  (js/auth.js)
    ───────────────────────────────────────────────────────────────────────────
    • Fullscreen overlay on every page — nothing visible until authenticated
-   • IP access control — new IPs queued for admin approval; max configurable
+   • IP/device logging — every visit is recorded, but never blocks access;
+     username + password is the only access gate
    • Users stored in Firebase: bcot_overtime_secure/[KEY]/app_auth/USERS
-   • IPs stored in Firebase:   bcot_overtime_secure/[KEY]/app_ips/LIST
+   • IPs stored in Firebase:   bcot_overtime_secure/[KEY]/app_ips/LIST (log only)
    • Session in localStorage, 12-hour expiry, shared across all tabs
    • First login forces password change (default: 12345)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -14,14 +15,11 @@
   /* ── Constants ─────────────────────────────────────────────────────────── */
   const SESSION_KEY     = 'BCOT_AUTH_SESSION_V1';
   const SESSION_TTL     = 12 * 60 * 60 * 1000;   // 12 hours
-  const MAX_IPS_DEFAULT = 12;
 
   /* ── State ─────────────────────────────────────────────────────────────── */
   let _key         = '';
   let _users       = [];
-  let _ips         = [];          // approved IPs
-  let _pendingIPs  = [];          // awaiting admin decision
-  let _maxIPs      = MAX_IPS_DEFAULT;
+  let _ips         = [];          // access log — every IP/device ever seen
   let _myIP        = null;
   let _pendingUser = null;
 
@@ -82,25 +80,18 @@
   }
   async function loadIPs() {
     const snap = await window.FB.getDoc(ipDoc());
-    if (snap.exists()) {
-      const data  = snap.data();
-      _ips        = data.ips     || [];
-      _pendingIPs = data.pending || [];
-      _maxIPs     = typeof data.maxIPs === 'number' ? data.maxIPs : MAX_IPS_DEFAULT;
-    } else {
-      _ips = []; _pendingIPs = []; _maxIPs = MAX_IPS_DEFAULT;
-    }
+    _ips = snap.exists() ? (snap.data().ips || []) : [];
   }
   async function saveIPs() {
     if (typeof window.FB.setDoc !== 'function') return;
-    await window.FB.setDoc(ipDoc(), { ips: _ips, pending: _pendingIPs, maxIPs: _maxIPs });
+    await window.FB.setDoc(ipDoc(), { ips: _ips });
   }
 
   /* ── DOM helpers ───────────────────────────────────────────────────────── */
   function $id(id) { return document.getElementById(id); }
 
   function showScreen(name) {
-    ['loading', 'login', 'changepwd', 'setup', 'error', 'blocked', 'pending'].forEach(s => {
+    ['loading', 'login', 'changepwd', 'setup', 'error'].forEach(s => {
       const el = $id('bcot-scr-' + s);
       if (el) el.style.display = (s === name) ? '' : 'none';
     });
@@ -126,53 +117,6 @@
   <div id="bcot-scr-loading" style="text-align:center;color:#6b7280;padding:20px 0;">
     <div style="font-size:28px;margin-bottom:12px;">🔒</div>
     <div style="font-size:14px;font-weight:600;color:#1a4f8b;">Checking access…</div>
-  </div>
-
-  <!-- Pending approval -->
-  <div id="bcot-scr-pending" style="display:none;text-align:center;padding:8px 0;">
-    <div style="font-size:44px;margin-bottom:14px;">⏳</div>
-    <h3 style="margin:0 0 10px;font-size:18px;color:#d97706;font-weight:700;">Access Request Pending</h3>
-    <p style="margin:0 0 8px;font-size:13px;color:#374151;line-height:1.7;">
-      Your device has been added to the access request queue.
-    </p>
-    <p style="margin:0 0 20px;font-size:12px;color:#6b7280;">
-      Device IP: <strong id="bcot-pending-ip" style="font-family:monospace;color:#374151;">—</strong>
-    </p>
-    <p style="margin:0 0 20px;font-size:13px;color:#374151;line-height:1.7;">
-      Please contact your administrator to approve your device.
-    </p>
-    <div style="border-top:1px solid #f3f4f6;padding-top:18px;display:flex;
-                flex-direction:column;gap:8px;align-items:center;">
-      <a href="#" onclick="event.preventDefault(); BCOT_AUTH._adminBypass();"
-        style="font-size:12px;color:#1a4f8b;text-decoration:underline;">
-        🔑 Administrator? Review access requests
-      </a>
-      <a href="#" onclick="event.preventDefault(); location.reload();"
-        style="font-size:11px;color:#9ca3af;text-decoration:underline;">
-        ↻ Reload to check if approved
-      </a>
-    </div>
-  </div>
-
-  <!-- Blocked -->
-  <div id="bcot-scr-blocked" style="display:none;text-align:center;padding:8px 0;">
-    <div style="font-size:44px;margin-bottom:14px;">🚫</div>
-    <h3 style="margin:0 0 10px;font-size:18px;color:#dc2626;font-weight:700;">Access Restricted</h3>
-    <p style="margin:0 0 20px;font-size:13px;color:#374151;line-height:1.7;">
-      This device does not have access to this application.<br>
-      Please contact your administrator.
-    </p>
-    <div style="border-top:1px solid #f3f4f6;padding-top:18px;display:flex;
-                flex-direction:column;gap:8px;align-items:center;">
-      <a href="#" onclick="event.preventDefault(); BCOT_AUTH._adminBypass();"
-        style="font-size:12px;color:#1a4f8b;text-decoration:underline;">
-        🔑 Administrator? Manage device access
-      </a>
-      <a href="#" onclick="event.preventDefault(); location.reload();"
-        style="font-size:11px;color:#9ca3af;text-decoration:underline;">
-        ↻ Reload page
-      </a>
-    </div>
   </div>
 
   <!-- Login -->
@@ -391,43 +335,6 @@
     });
   }
 
-  function _collectAccessMessage(ip) {
-    return new Promise(resolve => {
-      const ov = _dialogBase(`
-        <h3 style="margin:0 0 8px;font-size:16px;color:#1a4f8b;">🔒 Access Request</h3>
-        <p style="margin:0 0 4px;font-size:13px;color:#374151;line-height:1.6;">
-          Your device is not yet approved. Your request will be sent to the administrator.
-        </p>
-        <p style="margin:0 0 10px;font-size:12px;color:#6b7280;">
-          IP: <strong style="font-family:monospace;">${ip}</strong>
-        </p>
-        <label style="display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;letter-spacing:.05em;">
-          MESSAGE TO ADMINISTRATOR
-          <span style="font-weight:400;color:#9ca3af;">(optional, max 200 characters)</span>
-        </label>
-        <textarea id="_cam_msg" maxlength="200"
-          placeholder="e.g. Dr. Ahmed – Pharmacy department, office laptop"
-          style="width:100%;padding:9px 10px;border:1px solid #d1d5db;border-radius:8px;
-                 font-size:13px;box-sizing:border-box;resize:vertical;min-height:72px;
-                 font-family:Arial,sans-serif;margin-bottom:4px;"></textarea>
-        <div style="text-align:right;margin-bottom:14px;">
-          <span id="_cam_count" style="font-size:11px;color:#9ca3af;">0 / 200</span>
-        </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;">
-          <button id="_cam_skip" style="padding:9px 22px;background:#f3f4f6;color:#374151;
-            border:1px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer;">Skip</button>
-          <button id="_cam_send" style="padding:9px 22px;background:#1a4f8b;color:#fff;border:none;
-            border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Send Request</button>
-        </div>`);
-      const ta    = ov.querySelector('#_cam_msg');
-      const count = ov.querySelector('#_cam_count');
-      ta.addEventListener('input', () => { count.textContent = ta.value.length + ' / 200'; });
-      ov.querySelector('#_cam_send').onclick = () => { const v = ta.value.trim().slice(0,200); ov.remove(); resolve(v); };
-      ov.querySelector('#_cam_skip').onclick  = () => { ov.remove(); resolve(''); };
-      setTimeout(() => ta.focus(), 50);
-    });
-  }
-
   function doLogout() {
     _bcotConfirm('You will need to log in again to access the app.', 'Log Out?',
       { confirmLabel: 'Log Out', danger: true })
@@ -450,6 +357,7 @@
     // later page load, including one that finished logging in elsewhere.
     window.__bcotFreshLogin = true;
     window.dispatchEvent(new CustomEvent('bcotAuth', { detail: getSession() }));
+    _linkUserToIP(user);
   }
 
   function _removeOverlay() {
@@ -524,7 +432,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
-     IP Access Control
+     IP / Device Logging (audit only — never blocks access)
      ══════════════════════════════════════════════════════════════════════════ */
 
   /** Fetch this device's public IP from ipify.org (5 s timeout). */
@@ -540,82 +448,70 @@
   }
 
   /**
-   * Check whether this device's IP is allowed.
-   * Returns: 'allow' | 'pending'
-   *
-   * - IP detection fails    → 'allow' (password still protects the app)
-   * - IP in approved list   → update lastSeen/visits → 'allow'
-   * - IP in pending list    → update lastSeen/visits → 'pending'
-   * - New IP                → add to pending list    → 'pending'
+   * Record this device's IP in the access log. Best-effort and non-blocking:
+   * any failure (IP detection, Firestore) is swallowed — logging is an audit
+   * trail, not a gate, so it must never stop a user from reaching login.
    */
-  async function _checkIP() {
-    _myIP = await _getMyIP();
-    if (!_myIP) return 'allow';
-
+  async function _logIP() {
     try {
+      _myIP = await _getMyIP();
+      if (!_myIP) return;
+
       await loadIPs();
-    } catch { return 'allow'; }
-
-    const now = new Date().toISOString();
-
-    // Already approved
-    const approved = _ips.find(e => e.ip === _myIP);
-    if (approved) {
-      approved.lastSeen = now;
-      approved.visits   = (approved.visits || 0) + 1;
-      try { await saveIPs(); } catch {}
-      return 'allow';
-    }
-
-    // In pending queue
-    const pending = _pendingIPs.find(e => e.ip === _myIP);
-    if (pending) {
-      pending.lastSeen = now;
-      pending.visits   = (pending.visits || 0) + 1;
-      try { await saveIPs(); } catch {}
-      return 'pending';
-    }
-
-    // New device — collect optional message then add to pending queue
-    const accessMsg = await _collectAccessMessage(_myIP);
-    _pendingIPs.push({
-      ip:        _myIP,
-      label:     '',
-      firstSeen: now,
-      lastSeen:  now,
-      visits:    1,
-      ua:        (navigator.userAgent || '').slice(0, 120),
-      message:   accessMsg
-    });
-    try { await saveIPs(); } catch {}
-    return 'pending';
+      const now   = new Date().toISOString();
+      const entry = _ips.find(e => e.ip === _myIP);
+      if (entry) {
+        entry.lastSeen = now;
+        entry.visits   = (entry.visits || 0) + 1;
+      } else {
+        _ips.push({
+          ip:        _myIP,
+          label:     '',
+          firstSeen: now,
+          lastSeen:  now,
+          visits:    1,
+          ua:        (navigator.userAgent || '').slice(0, 120)
+        });
+      }
+      await saveIPs();
+    } catch {}
   }
 
-  /** Called from "Administrator?" link on the pending / blocked screens. */
-  async function _adminBypass() {
-    // If the user already has a valid admin session, let them straight in
-    const sess = getSession();
-    if (sess && (sess.app_role === 'admin')) {
-      await openIPManager();
-      return;
-    }
+  /**
+   * Associate the just-logged-in user with this device's IP entry, so the
+   * admin can see who has used each IP. An IP can be shared by more than one
+   * person (an office PC across shifts), so each entry keeps a *list* of
+   * users rather than a single owner — never overwritten, only appended to.
+   * Best-effort and non-blocking, same as _logIP(); called fire-and-forget
+   * from _finishLogin so a slow/failed write never delays showing the app.
+   */
+  async function _linkUserToIP(user) {
+    try {
+      if (!_myIP || !user || !user.badge) return;
+      if (!_ips.length) await loadIPs();
 
-    const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-    if (!pwd) {
-      await _bcotAlert('Override password is not configured on this page.', 'Error');
-      return;
-    }
-    const entered = await _bcotPrompt(
-      'Enter the administrator override password to manage device access.',
-      { title: '🔑 Admin Override', placeholder: 'Override password',
-        type: 'password', confirmLabel: 'Unlock' }
-    );
-    if (entered === null) return;
-    if (entered.trim() !== pwd) {
-      await _bcotAlert('Incorrect password.', 'Access Denied');
-      return;
-    }
-    await openIPManager();
+      const now = new Date().toISOString();
+      let entry = _ips.find(e => e.ip === _myIP);
+      if (!entry) {
+        entry = { ip: _myIP, label: '', firstSeen: now, lastSeen: now, visits: 1,
+                   ua: (navigator.userAgent || '').slice(0, 120) };
+        _ips.push(entry);
+      }
+      if (!Array.isArray(entry.users)) entry.users = [];
+      const link = entry.users.find(u => u.badge === user.badge);
+      if (link) {
+        link.name      = user.name;
+        link.nameTitle = user.nameTitle || '';
+        link.lastLogin = now;
+        link.logins    = (link.logins || 0) + 1;
+      } else {
+        entry.users.push({
+          badge: user.badge, name: user.name, nameTitle: user.nameTitle || '',
+          firstLogin: now, lastLogin: now, logins: 1
+        });
+      }
+      await saveIPs();
+    } catch {}
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -940,138 +836,62 @@
             max-width:94vw;max-height:86vh;overflow-y:auto;
             box-shadow:0 8px 32px rgba(0,0,0,.2);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-    <h3 style="margin:0;font-size:16px;color:#1a4f8b;">🌐 IP Access Control</h3>
+    <h3 style="margin:0;font-size:16px;color:#1a4f8b;">🌐 Device / IP Access Log</h3>
     <button onclick="document.getElementById('bcot-ip-modal').remove();"
       style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;
              line-height:1;padding:0 4px;">&times;</button>
   </div>
 
-  <!-- Usage counter + progress bar -->
+  <!-- Total count -->
   <div id="bcot-ip-counter"
     style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;
-           padding:10px 14px;margin-bottom:14px;font-size:13px;color:#0369a1;"></div>
+           padding:10px 14px;margin-bottom:10px;font-size:13px;color:#0369a1;"></div>
 
-  <!-- Pending requests section -->
-  <div id="bcot-ip-pending" style="margin-bottom:14px;"></div>
+  <p style="margin:0 0 14px;font-size:11px;color:#9ca3af;">
+    Access is controlled by username + password only. Every device below was let in
+    automatically and is listed here for reference — nothing needs approval.
+  </p>
 
-  <!-- Approved devices list -->
-  <div id="bcot-ip-list" style="margin-bottom:20px;"></div>
-
-  <!-- Manual add -->
-  <div style="border-top:1px solid #e5e7eb;padding-top:16px;">
-    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">
-      ADD DEVICE MANUALLY
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <input id="bcot-ip-newip" type="text" placeholder="IP address"
-        style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #d1d5db;
-               border-radius:7px;font-size:12px;" />
-      <input id="bcot-ip-newlabel" type="text" placeholder="Label (optional)"
-        style="flex:1;min-width:130px;padding:8px 10px;border:1px solid #d1d5db;
-               border-radius:7px;font-size:12px;"
-        onkeydown="if(event.key==='Enter') BCOT_AUTH.ipManualAdd();" />
-      <button onclick="BCOT_AUTH.ipManualAdd();"
-        style="padding:8px 16px;background:#1a4f8b;color:#fff;border:none;
-               border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
-        + Add
-      </button>
-    </div>
-    <div id="bcot-ip-err"
-      style="color:#dc2626;font-size:11px;min-height:16px;margin-top:5px;"></div>
-    <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">
-      New devices are queued for approval automatically. Use this to pre-register a device directly.
-    </p>
-  </div>
+  <!-- Device log -->
+  <div id="bcot-ip-list" style="margin-bottom:4px;"></div>
 </div>`;
 
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     _renderIPCounter();
-    _renderPendingList();
     _renderIPList();
   }
 
   function _renderIPCounter() {
     const counter = $id('bcot-ip-counter');
     if (!counter) return;
-    const used     = _ips.length;
-    const pct      = Math.min(100, Math.round(used / _maxIPs * 100));
-    const barColor = used >= _maxIPs     ? '#dc2626'
-                   : used >= _maxIPs - 2 ? '#f59e0b'
-                   :                       '#0ea5e9';
+    const total = _ips.length;
     counter.innerHTML =
       `<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">` +
-      `<div><strong>${used} / ${_maxIPs} device slots used</strong>` +
-      `<span style="font-size:11px;color:${used >= _maxIPs ? '#dc2626' : '#6b7280'};margin-left:10px;">` +
-      `${_maxIPs - used} slot${_maxIPs - used !== 1 ? 's' : ''} remaining</span></div>` +
-      `<button onclick="BCOT_AUTH.ipSetMax();" ` +
-      `style="padding:5px 12px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;` +
-      `border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">` +
-      `⚙️ Change Limit</button></div>` +
-      `<div style="height:6px;background:#e0f2fe;border-radius:3px;margin-top:8px;">` +
-      `<div style="height:100%;background:${barColor};border-radius:3px;` +
-      `width:${pct}%;transition:width .3s;"></div></div>`;
+      `<div><strong>${total} device${total !== 1 ? 's' : ''} recorded</strong>` +
+      `<span style="font-size:11px;color:#6b7280;margin-left:10px;">Unlimited — access is not restricted by IP</span></div>` +
+      (total ? `<button onclick="BCOT_AUTH.ipClearAll();" ` +
+        `style="padding:5px 12px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;` +
+        `border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">` +
+        `🗑️ Clear All</button>` : ``) +
+      `</div>`;
   }
 
-  function _renderPendingList() {
-    const el = $id('bcot-ip-pending');
-    if (!el) return;
-
-    if (!_pendingIPs.length) {
-      el.innerHTML =
-        `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;` +
-        `padding:10px 14px;font-size:12px;color:#9ca3af;">` +
-        `⏳ No pending access requests.</div>`;
-      return;
-    }
-
-    const fmtDate = iso => {
-      if (!iso) return '—';
-      try {
-        return new Date(iso).toLocaleDateString('en-GB',
-          { day: '2-digit', month: 'short', year: 'numeric' });
-      } catch { return iso.slice(0, 10); }
-    };
-
-    const rows = _pendingIPs.map((e, i) => {
-      const isMe = (e.ip === _myIP);
-      return `
-<div style="border:1px solid #fde68a;border-radius:9px;padding:10px 12px;margin-bottom:8px;
-            background:${isMe ? '#fffbeb' : '#fefce8'};">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-    <div style="flex:1;min-width:0;">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
-        <span style="font-size:13px;font-weight:700;color:#1f2937;font-family:monospace;">${e.ip}</span>
-        ${isMe ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;">This device</span>' : ''}
-        <span style="font-size:10px;background:#fde68a;color:#78350f;padding:2px 7px;border-radius:10px;">Pending</span>
-      </div>
-      <div style="font-size:11px;color:#9ca3af;">
-        Requested: ${fmtDate(e.firstSeen)}
-        &nbsp;·&nbsp; Last seen: ${fmtDate(e.lastSeen)}
-        &nbsp;·&nbsp; Visits: ${e.visits || 1}
-      </div>
-      ${e.ua ? `<div style="font-size:10px;color:#d1d5db;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.ua}</div>` : ''}
-      ${e.message ? `<div style="font-size:11px;color:#374151;margin-top:5px;background:#fffbeb;padding:5px 9px;border-radius:6px;border-left:3px solid #f59e0b;">💬 ${e.message}</div>` : ''}
-    </div>
-    <div style="display:flex;gap:6px;flex-shrink:0;">
-      <button onclick="BCOT_AUTH.ipApprove(${i});"
-        style="padding:5px 12px;background:#16a34a;color:#fff;border:none;
-               border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
-        ✓ Approve
-      </button>
-      <button onclick="BCOT_AUTH.ipDeny(${i});"
-        style="padding:5px 12px;background:#dc2626;color:#fff;border:none;
-               border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">
-        ✗ Deny
-      </button>
-    </div>
-  </div>
-</div>`;
-    }).join('');
-
-    el.innerHTML =
-      `<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">` +
-      `⏳ PENDING REQUESTS (${_pendingIPs.length})</div>` + rows;
+  async function ipClearAll() {
+    if (!_ips.length) return;
+    const ok = await _bcotConfirm(
+      `Permanently clear the entire access log?<br>` +
+      `This deletes all <strong>${_ips.length}</strong> recorded device${_ips.length !== 1 ? 's' : ''} ` +
+      `(IPs, labels, linked usernames, visit history). It does not affect who can log in — only the log itself.`,
+      'Clear Access Log', { confirmLabel: 'Clear All', danger: true }
+    );
+    if (!ok) return;
+    _ips = [];
+    try {
+      await saveIPs();
+      _renderIPCounter();
+      _renderIPList();
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   function _renderIPList() {
@@ -1088,14 +908,17 @@
 
     if (!_ips.length) {
       list.innerHTML =
-        `<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">✅ APPROVED DEVICES</div>` +
-        `<p style="color:#9ca3af;font-size:13px;margin:0;">No approved devices yet.</p>`;
+        `<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">📋 RECORDED DEVICES</div>` +
+        `<p style="color:#9ca3af;font-size:13px;margin:0;">No visits recorded yet.</p>`;
       return;
     }
 
+    const sorted = [..._ips].sort((a, b) => (b.lastSeen || '').localeCompare(a.lastSeen || ''));
+
     list.innerHTML =
-      `<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">✅ APPROVED DEVICES</div>` +
-      _ips.map((e, i) => {
+      `<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">📋 RECORDED DEVICES (${_ips.length})</div>` +
+      sorted.map(e => {
+        const i = _ips.indexOf(e);
         const isMe = (e.ip === _myIP);
         return `
 <div style="border:1px solid ${isMe ? '#93c5fd' : '#e5e7eb'};border-radius:9px;
@@ -1116,11 +939,23 @@
           style="font-size:10px;padding:2px 7px;background:#e5e7eb;color:#374151;
                  border:none;border-radius:5px;cursor:pointer;line-height:1.5;">✏️ Label</button>
       </div>
+      <div style="font-size:12px;color:#1a4f8b;margin-bottom:4px;">
+        👤 ${
+          (e.users && e.users.length)
+            ? [...e.users].sort((a, b) => (b.lastLogin||'').localeCompare(a.lastLogin||''))
+                .map(u => [u.nameTitle, u.name].filter(Boolean).join(' ') +
+                          `<span style="color:#9ca3af;"> (${u.badge})</span>` +
+                          (u.logins > 1 ? ` ×${u.logins}` : ''))
+                .join(', ')
+            : '<span style="color:#d1d5db;">No login recorded from this IP yet</span>'
+        }
+      </div>
       <div style="font-size:11px;color:#9ca3af;">
         First seen: ${fmtDate(e.firstSeen)}
         &nbsp;·&nbsp; Last visit: ${fmtDate(e.lastSeen)}
         &nbsp;·&nbsp; Visits: ${e.visits || 1}
       </div>
+      ${e.ua ? `<div style="font-size:10px;color:#d1d5db;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.ua}</div>` : ''}
     </div>
     <button onclick="BCOT_AUTH.ipRemove(${i});"
       style="padding:5px 12px;background:#dc2626;color:#fff;border:none;
@@ -1131,78 +966,6 @@
   </div>
 </div>`;
       }).join('');
-  }
-
-  async function ipApprove(idx) {
-    const entry = _pendingIPs[idx];
-    if (!entry) return;
-    if (_ips.length >= _maxIPs) {
-      await _bcotAlert(
-        `Cannot approve — the device limit (<strong>${_maxIPs}</strong>) is full.<br>` +
-        `Remove an approved device first, or increase the limit with ⚙️ Change Limit.`,
-        'Limit Reached'
-      );
-      return;
-    }
-    const label = await _bcotPrompt(
-      `Approve <strong style="font-family:monospace;">${entry.ip}</strong>?<br>` +
-      `Optionally add a label so you can identify this device later.`,
-      { title: '✓ Approve Device', placeholder: 'e.g. Office PC, Dr. Ahmed Phone (optional)',
-        confirmLabel: 'Approve' }
-    );
-    if (label === null) return;   // cancelled
-
-    const now = new Date().toISOString();
-    _ips.push({
-      ip:        entry.ip,
-      label:     label.trim(),
-      firstSeen: entry.firstSeen,
-      lastSeen:  now,
-      visits:    entry.visits || 1
-    });
-    _pendingIPs.splice(idx, 1);
-    try {
-      await saveIPs();
-      _renderIPCounter();
-      _renderPendingList();
-      _renderIPList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
-  }
-
-  async function ipDeny(idx) {
-    const entry = _pendingIPs[idx];
-    if (!entry) return;
-    const ok = await _bcotConfirm(
-      `Deny access request from <strong style="font-family:monospace;">${entry.ip}</strong>?<br>` +
-      `The request will be removed. The device will be queued again on its next visit.`,
-      'Deny Access Request', { confirmLabel: 'Deny', danger: true }
-    );
-    if (!ok) return;
-    _pendingIPs.splice(idx, 1);
-    try {
-      await saveIPs();
-      _renderPendingList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
-  }
-
-  async function ipSetMax() {
-    const val = await _bcotPrompt(
-      `Current limit: <strong>${_maxIPs} devices</strong>.<br>` +
-      `Enter the new maximum number of approved devices allowed:`,
-      { title: '⚙️ Device Limit', placeholder: 'e.g. 20', type: 'number', confirmLabel: 'Save' }
-    );
-    if (val === null) return;
-    const n = parseInt(val, 10);
-    if (!n || n < 1 || n > 500) {
-      await _bcotAlert('Please enter a number between 1 and 500.', 'Invalid Value');
-      return;
-    }
-    _maxIPs = n;
-    try {
-      await saveIPs();
-      _renderIPCounter();
-      _renderIPList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   async function ipEditLabel(idx) {
@@ -1226,9 +989,9 @@
     const entry = _ips[idx];
     if (!entry) return;
     const ok = await _bcotConfirm(
-      `Remove <strong>${entry.label || entry.ip}</strong> from the approved list?<br>` +
-      `The device will need to re-submit an access request on its next visit.`,
-      'Remove Device', { confirmLabel: 'Remove', danger: true });
+      `Remove <strong>${entry.label || entry.ip}</strong> from the log?<br>` +
+      `It will reappear automatically the next time that device visits.`,
+      'Remove Log Entry', { confirmLabel: 'Remove', danger: true });
     if (!ok) return;
     _ips.splice(idx, 1);
     try {
@@ -1236,38 +999,6 @@
       _renderIPCounter();
       _renderIPList();
     } catch (e) { await _bcotAlert('Save failed — check connection.', 'Error'); }
-  }
-
-  async function ipManualAdd() {
-    const ip    = ($id('bcot-ip-newip')?.value    || '').trim();
-    const label = ($id('bcot-ip-newlabel')?.value || '').trim();
-    const errEl = $id('bcot-ip-err');
-    if (errEl) errEl.textContent = '';
-    if (!ip) { if (errEl) errEl.textContent = 'IP address is required.'; return; }
-    const isIPv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
-    const isIPv6 = ip.includes(':');
-    if (!isIPv4 && !isIPv6) {
-      if (errEl) errEl.textContent = 'Enter a valid IP address (e.g. 192.168.1.1).'; return;
-    }
-    if (_ips.find(e => e.ip === ip)) {
-      if (errEl) errEl.textContent = 'This IP is already in the approved list.'; return;
-    }
-    if (_pendingIPs.find(e => e.ip === ip)) {
-      if (errEl) errEl.textContent = 'This IP already has a pending request — use Approve instead.'; return;
-    }
-    if (_ips.length >= _maxIPs) {
-      if (errEl) errEl.textContent = `Limit reached (${_maxIPs} devices). Remove one or increase the limit first.`;
-      return;
-    }
-    const now = new Date().toISOString();
-    _ips.push({ ip, label, firstSeen: now, lastSeen: now, visits: 0 });
-    try {
-      await saveIPs();
-      if ($id('bcot-ip-newip'))    $id('bcot-ip-newip').value    = '';
-      if ($id('bcot-ip-newlabel')) $id('bcot-ip-newlabel').value = '';
-      _renderIPCounter();
-      _renderIPList();
-    } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -1663,15 +1394,8 @@
       return;
     }
 
-    // 5. IP access check — runs before showing login
-    const ipStatus = await _checkIP();
-    if (ipStatus === 'pending') {
-      showScreen('pending');
-      const ipEl = $id('bcot-pending-ip');
-      if (ipEl && _myIP) ipEl.textContent = _myIP;
-      return;
-    }
-    // ipStatus === 'allow' → continue to login
+    // 5. Log this device's IP for the admin's records — never blocks login
+    await _logIP();
 
     // 6. Load user list
     try {
@@ -1712,15 +1436,11 @@
     umSaveRole,
     umSaveAll,
     fetchExtUsers,
-    // IP manager
+    // IP / device log
     openIPManager,
-    ipApprove,
-    ipDeny,
-    ipSetMax,
     ipEditLabel,
     ipRemove,
-    ipManualAdd,
-    _adminBypass,
+    ipClearAll,
     // Area manager
     openAreaManager,
     areaAdd,
