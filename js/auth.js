@@ -562,7 +562,14 @@
 
   <!-- Add user form -->
   <div style="border-top:1px solid #e5e7eb;padding-top:16px;flex-shrink:0;">
-    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">ADD USER</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:700;color:#374151;">ADD USER</div>
+      <button onclick="BCOT_AUTH.umImportFromStaff();"
+        style="padding:6px 14px;background:#0f766e;color:#fff;border:none;
+               border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+        📥 Import All From Staff
+      </button>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
       <input id="bcot-um-newbadge" type="text" placeholder="Badge no. *"
         style="width:100px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:12px;" />
@@ -682,6 +689,73 @@
       if ($id('bcot-um-newname'))  $id('bcot-um-newname').value  = '';
       _renderUserList();
     } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
+  }
+
+  /**
+   * Bulk-create a login account (role User, default password 12345) for
+   * every staff member in Staff Management who doesn't already have one.
+   * Staff records repeat per area (same badge, multiple rows), so entries
+   * are de-duplicated by badge; staff with no badge number are skipped
+   * since a badge is what they'd log in with.
+   */
+  async function umImportFromStaff() {
+    if (!_key) { await _bcotAlert('Authentication module is not initialized.', 'Error'); return; }
+
+    let staffRecords = [];
+    try {
+      const snap = await window.FB.getDoc(
+        window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'staff_named', 'STAFF_POOL')
+      );
+      staffRecords = (snap.exists() && Array.isArray(snap.data().records)) ? snap.data().records : [];
+    } catch (e) {
+      await _bcotAlert('Could not load the staff list — check your connection.', 'Connection Error');
+      return;
+    }
+
+    const existingBadges = new Set(_users.map(u => u.badge));
+    const seenBadges      = new Set();
+    const toAdd           = [];
+    let noBadge = 0, alreadyHasLogin = 0;
+
+    staffRecords.forEach(r => {
+      const badge = String(r?.badge || '').trim();
+      const name  = String(r?.name  || '').trim();
+      if (!badge) { noBadge++; return; }
+      if (!name || seenBadges.has(badge)) return;
+      if (existingBadges.has(badge)) { alreadyHasLogin++; return; }
+      seenBadges.add(badge);
+      toAdd.push({
+        id: _uid(), badge, nameTitle: '', name, position: '',
+        password: '12345', firstLogin: true, app_role: 'user'
+      });
+    });
+
+    if (!toAdd.length) {
+      await _bcotAlert(
+        `Nothing to import.<br>` +
+        (alreadyHasLogin ? `${alreadyHasLogin} staff member(s) already have a login.<br>` : '') +
+        (noBadge ? `${noBadge} staff member(s) have no badge number, so they can't be given a login.` : ''),
+        'Import From Staff'
+      );
+      return;
+    }
+
+    const ok = await _bcotConfirm(
+      `Create login accounts for <strong>${toAdd.length}</strong> staff member(s) not yet in this list?<br>` +
+      `Each gets role <strong>User</strong> and the default password <strong>12345</strong> ` +
+      `— they'll be asked to set a personal password on first login.` +
+      (alreadyHasLogin ? `<br><br>${alreadyHasLogin} already have a login and will be skipped.` : '') +
+      (noBadge ? `<br>${noBadge} have no badge number and will be skipped.` : ''),
+      'Import From Staff', { confirmLabel: `Add ${toAdd.length}` }
+    );
+    if (!ok) return;
+
+    _users = _users.concat(toAdd);
+    try {
+      await saveUsers();
+      _renderUserList();
+      await _bcotAlert(`Added ${toAdd.length} user${toAdd.length !== 1 ? 's' : ''}.`, 'Import Complete');
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   async function umSetPosition(id) {
@@ -1428,6 +1502,7 @@
     // User manager
     openUserManager,
     umAddUser,
+    umImportFromStaff,
     umSetBadge,
     umSetPosition,
     umResetPwd,
