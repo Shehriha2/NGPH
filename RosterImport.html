@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Import Roster Duties</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --bg:#f5f5f5; --card:#fff; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; }
+
+    .header{
+      background:linear-gradient(135deg,var(--primary),var(--secondary));
+      color:#fff; padding:12px; border-radius:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,.12); margin-bottom:12px;
+    }
+    .header h1{ margin:0 0 2px; font-size:14px; }
+
+    .card{ background:var(--card); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.12); padding:10px; margin-bottom:12px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    input,select,button{ padding:6px 8px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+    button{ background:var(--primary); color:#fff; border:none; cursor:pointer; }
+    button:hover{ background:var(--secondary); }
+    .btn-ok{ background:#28a745; }     .btn-ok:hover{ background:#218838; }
+    .btn-purple{ background:#6f42c1; } .btn-purple:hover{ background:#5a35a1; }
+    .hint{ color:#666; font-size:11px; }
+
+    table{ width:100%; border-collapse:collapse; }
+    th,td{ border:1px solid #e5e7eb; padding:7px; text-align:center; font-size:12px; }
+    th{ background:var(--primary); color:#fff; position:sticky; top:0; }
+    td.symbol-cell{ text-align:left; font-weight:700; font-family:monospace; }
+    tr.incomplete-row td.symbol-cell{ background:#fef3c7; color:#92400e; }
+
+    input[type="radio"],input[type="checkbox"]{ width:16px; height:16px; cursor:pointer; }
+
+    .status{
+      position:fixed; top:18px; right:18px; display:none; z-index:9999;
+      padding:10px 14px; border-radius:8px; color:#fff;
+      max-width:520px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .ok{ background:#28a745; } .err{ background:#dc3545; }
+
+    .empty-hint{ color:#888; font-size:12px; text-align:center; padding:20px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>📥 Import Roster Duties</h1>
+    <div class="hint" style="color:rgba(255,255,255,.85);">
+      Upload a monthly roster Excel file — only the first sheet is read. Every distinct duty symbol found is listed below for hour classification, then saved.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button type="button" onclick="document.getElementById('rosterFileInput').click()">📂 Choose Excel File</button>
+      <input type="file" id="rosterFileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleFileSelect(this)"/>
+      <span id="fileNameLabel" class="hint"></span>
+      <button type="button" style="margin-left:auto;background:#6b7280;" onclick="window.location.href='index.html'">⬅ Back to Rota</button>
+    </div>
+    <div id="importSummary" class="hint" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <b style="color:#3730a3;">Duty Symbol Classification</b>
+      <span id="classifiedCount" class="hint"></span>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button type="button" class="btn-purple" onclick="loadSavedFromCloud()">☁ Load Saved</button>
+        <button type="button" class="btn-ok" onclick="saveClassifications()">💾 Save</button>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:6px;">
+      <b>Weekend 12 Hours</b> = this symbol counts as 12 hours specifically when it falls on Friday or Saturday, independent of the base 9/12 hour choice.
+    </div>
+    <div style="overflow:auto;max-height:65vh;margin-top:8px;">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;">Duty Symbol</th>
+            <th>9 Hours</th>
+            <th>12 Hours</th>
+            <th>Weekend 12 Hours</th>
+            <th style="text-align:left;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody id="symbolsBody"></tbody>
+      </table>
+      <div id="emptyHint" class="empty-hint">Import an Excel file above, or load your previously saved classifications.</div>
+    </div>
+  </div>
+
+  <div class="status" id="statusBox"></div>
+
+  <script src="config.js"></script>
+  <script src="js/version-check.js"></script>
+  <script src="js/auth.js?v=10"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+      storageBucket:"bcotrota.firebasestorage.app",
+      messagingSenderId:"659421824894",
+      appId:"1:659421824894:web:f0546879df8808491ad52f"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window.FB = { db, doc, setDoc, getDoc };
+  </script>
+
+  <script src="js/roster-import.js"></script>
+</body>
+</html>
