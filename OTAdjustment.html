@@ -71,6 +71,7 @@
     .form-group{ margin-bottom:14px; }
     .form-group label{ display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px; }
     .form-group input[type="number"]{ width:100%; }
+    .form-group select{ width:100%; }
     .form-group textarea{ width:100%; resize:vertical; min-height:80px; line-height:1.5; }
     .submit-btn{ width:100%; padding:10px; font-size:14px; letter-spacing:.3px; }
 
@@ -201,6 +202,13 @@
         <textarea id="adjNotes" placeholder="e.g. Verbal approval by Dr. X on 2026-06-15 for weekend on-call coverage."></textarea>
       </div>
       <div class="form-group">
+        <label>OT Type</label>
+        <select id="adjOtType">
+          <option value="Regular">Regular</option>
+          <option value="Business OT">Business OT</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Remarks <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(optional)</span></label>
         <textarea id="adjRemarks" placeholder="Any additional remarks…" style="min-height:60px;"></textarea>
       </div>
@@ -226,13 +234,14 @@
               <th>Role</th>
               <th>+ Hours</th>
               <th>Notes</th>
+              <th>OT Type</th>
               <th>Remarks</th>
               <th>Submitted By</th>
               <th class="no-print">Actions</th>
             </tr>
           </thead>
           <tbody id="logBody">
-            <tr><td colspan="9" class="empty-log">Load a month to view adjustments.</td></tr>
+            <tr><td colspan="10" class="empty-log">Load a month to view adjustments.</td></tr>
           </tbody>
         </table>
       </div>
@@ -262,6 +271,13 @@
       <div class="form-group">
         <label>Justification / Notes</label>
         <textarea id="editNotes" style="width:100%;min-height:80px;resize:vertical;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>OT Type</label>
+        <select id="editOtType">
+          <option value="Regular">Regular</option>
+          <option value="Business OT">Business OT</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Remarks <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(optional)</span></label>
@@ -381,6 +397,7 @@
   function resetForm() {
     document.getElementById('addHours').value   = '';
     document.getElementById('adjNotes').value   = '';
+    document.getElementById('adjOtType').value  = 'Regular';
     document.getElementById('adjRemarks').value = '';
     document.getElementById('adjFormTitle').textContent = '✏️ Log Adjustment';
     document.getElementById('submitBtn').textContent    = '✅ Submit Adjustment';
@@ -420,6 +437,7 @@
 
     const hours   = parseFloat(document.getElementById('addHours').value);
     const notes   = document.getElementById('adjNotes').value.trim();
+    const otType  = document.getElementById('adjOtType').value;
     const remarks = document.getElementById('adjRemarks').value.trim();
 
     if (!hours || hours <= 0) { showStatus('Enter a valid number of hours (> 0).', false); return; }
@@ -434,6 +452,7 @@
       year:            currentYear(),
       additionalHours: hours,
       notes,
+      otType,
       remarks,
       submittedBy:     getSubmitter(),
       submittedAt:     new Date().toISOString(),
@@ -462,6 +481,7 @@
     document.getElementById('editStaffName').value  = `${a.staffName || ''}  (${a.badge || ''})`;
     document.getElementById('editHours').value      = a.additionalHours || '';
     document.getElementById('editNotes').value      = a.notes   || '';
+    document.getElementById('editOtType').value     = a.otType  || 'Regular';
     document.getElementById('editRemarks').value    = a.remarks || '';
     document.getElementById('editModal').classList.add('show');
   }
@@ -474,6 +494,7 @@
     const id      = document.getElementById('editDocId').value;
     const hours   = parseFloat(document.getElementById('editHours').value);
     const notes   = document.getElementById('editNotes').value.trim();
+    const otType  = document.getElementById('editOtType').value;
     const remarks = document.getElementById('editRemarks').value.trim();
 
     if (!id)                  { showStatus('No record selected.', false); return; }
@@ -484,13 +505,14 @@
       await updateDoc(adjDocRef(id), {
         additionalHours: hours,
         notes,
+        otType,
         remarks,
         lastEditedBy: getSubmitter(),
         lastEditedAt: new Date().toISOString(),
       });
       const idx = _allAdjustments.findIndex(x => x._id === id);
       if (idx >= 0) {
-        _allAdjustments[idx] = { ..._allAdjustments[idx], additionalHours: hours, notes, remarks };
+        _allAdjustments[idx] = { ..._allAdjustments[idx], additionalHours: hours, notes, otType, remarks };
       }
       closeEditModal();
       renderLog();
@@ -553,7 +575,7 @@
 
     document.getElementById('logTitle').textContent = 'Adjustment Log — Loading…';
     document.getElementById('logBody').innerHTML =
-      '<tr><td colspan="9" class="empty-log">Loading…</td></tr>';
+      '<tr><td colspan="10" class="empty-log">Loading…</td></tr>';
 
     try {
       const colRef = collection(db, 'bcot_overtime_secure', k, ADJ_COLL);
@@ -586,7 +608,7 @@
 
     const tbody = document.getElementById('logBody');
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty-log">
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-log">
         No adjustments recorded for ${monthName} ${year}.
       </td></tr>`;
       return;
@@ -600,6 +622,7 @@
         <td style="font-size:11px;color:#475569;">${esc(a.role)}</td>
         <td class="hours-cell">+${Number(a.additionalHours) || 0} hrs</td>
         <td class="notes-cell" title="${esc(a.notes)}">${esc(a.notes)}</td>
+        <td style="white-space:nowrap;font-size:11px;font-weight:700;color:${a.otType === 'Regular' ? '#475569' : '#1a4f8b'};">${esc(a.otType) || '<span style="color:#cbd5e1;">—</span>'}</td>
         <td class="remarks-cell" title="${esc(a.remarks)}">${esc(a.remarks) || '<span style="color:#cbd5e1;">—</span>'}</td>
         <td class="by-cell">${esc(a.submittedBy)}</td>
         <td class="no-print">
