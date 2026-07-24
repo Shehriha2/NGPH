@@ -539,6 +539,7 @@
         if (raw.toLowerCase() === 'auto' || raw === '') {
           // Reset to calculated
           delete td.dataset.override;
+          delete td.dataset.imported;
           span.className = 'ot-val';
           btn.textContent = '🔒'; btn.title = 'Override manually';
           calcOT(td.parentElement);
@@ -559,6 +560,8 @@
             _askOTPwd(
               () => {
                 td.dataset.override = 'true';
+                delete td.dataset.imported;
+                td.title = '';
                 span.textContent = (parsed>0?'+':'')+parsed;
                 span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
                 btn.textContent = '🔓'; btn.title = 'Reset to calculated';
@@ -569,6 +572,8 @@
             return;
           }
           td.dataset.override = 'true';
+          delete td.dataset.imported;
+          td.title = '';
           span.textContent = (parsed>0?'+':'')+parsed;
           span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
           btn.textContent = '🔓'; btn.title = 'Reset to calculated';
@@ -630,6 +635,7 @@
       if (otCell.dataset.override==='true') {
         // Reset to calculated — no password needed (user can always type "auto" too)
         delete otCell.dataset.override;
+        delete otCell.dataset.imported;
         otCell.querySelector('.ot-lock-btn').textContent='🔒';
         otCell.querySelector('.ot-lock-btn').title='Override manually';
         calcOT(otCell.parentElement);
@@ -653,16 +659,18 @@
     // ── Programmatic OT override (used by Import OT Adjustments) ─────────────
     // Mirrors the manual-override branch inside buildOTCell()'s blur handler,
     // so an imported value behaves exactly like one typed in by hand.
-    function applyOTOverrideToRow(row, value) {
+    function applyOTOverrideToRow(row, value, tooltip='') {
       const td = row.querySelector('.ot-cell');
       if (!td) return false;
       const span = td.querySelector('.ot-val');
       const btn  = td.querySelector('.ot-lock-btn');
       const parsed = Number(value) || 0;
       td.dataset.override = 'true';
+      td.dataset.imported = 'true';
       span.textContent = (parsed>0?'+':'')+parsed;
-      span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
+      span.className = 'ot-val ot-override ot-imported'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
       td.dataset.savedVal = span.textContent;
+      if (tooltip) td.title = tooltip;
       if (btn) { btn.textContent = '🔓'; btn.title = 'Reset to calculated'; }
       return true;
     }
@@ -1915,7 +1923,8 @@
             isNew = true;
           }
 
-          applyOTOverrideToRow(row, entry.additionalHours);
+          applyOTOverrideToRow(row, entry.additionalHours,
+            `Imported from OT Adjustments — ${entry.otType || ''} — submitted by ${entry.submittedBy || 'staff'}`);
 
           try {
             await window.FB.setDoc(
@@ -2444,11 +2453,12 @@
         const schedType=row.querySelector('.sched-cell select')?.value||'';
         const otCell=row.querySelector('.ot-cell');
         const otOverride=otCell?.dataset?.override==='true' ? (otCell.querySelector('.ot-val')?.textContent||null) : null;
+        const otImported=otCell?.dataset?.imported==='true';
         const otCalcRaw=parseFloat((otCell?.querySelector('.ot-val')?.textContent||'0').replace('+',''));
         const extension=Number(row.querySelector('.ext-cell input')?.value)||0;
         const compType=row.dataset.compType||'OT';
         const note=(row.querySelector('.note-input')?.value||'').trim().slice(0,50);
-        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, extension, compType, note});
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otImported, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, extension, compType, note});
       }
       return payload;
     }
@@ -2579,9 +2589,10 @@
           const otCell=row.querySelector('.ot-cell');
           otCell.dataset.override='true';
           const v=otCell.querySelector('.ot-val');
-          v.textContent=rec.otOverride; v.className='ot-val ot-override';
+          v.textContent=rec.otOverride; v.className='ot-val ot-override'+(rec.otImported?' ot-imported':'');
           otCell.querySelector('.ot-lock-btn').textContent='🔓';
           otCell.querySelector('.ot-lock-btn').title='Reset to calculated';
+          if (rec.otImported) { otCell.dataset.imported='true'; otCell.title='Imported from OT Adjustments'; }
         }
         // Restore per-row comp type
         if (rec.compType) {
