@@ -9,7 +9,7 @@
       return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
     // SHA-256 of the bootstrap password — original never appears in source
-    const _BOOTSTRAP_HASH = '6bd2dc1ad119f669a2c755c0d45c7008d9c3fefd0b8d8271dd47bd69ee3037fa';
+    const _BOOTSTRAP_HASH = '0d14cdb9a9fbe665964f55a53aadb5d4142b2a71ff7550a8ac381a8ae32a3b6c';
 
     async function _openAdminGated(openFn) {
       if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
@@ -648,6 +648,23 @@
           rng.selectNodeContents(span); sel.removeAllRanges(); sel.addRange(rng);
         });
       }
+    }
+
+    // ── Programmatic OT override (used by Import OT Adjustments) ─────────────
+    // Mirrors the manual-override branch inside buildOTCell()'s blur handler,
+    // so an imported value behaves exactly like one typed in by hand.
+    function applyOTOverrideToRow(row, value) {
+      const td = row.querySelector('.ot-cell');
+      if (!td) return false;
+      const span = td.querySelector('.ot-val');
+      const btn  = td.querySelector('.ot-lock-btn');
+      const parsed = Number(value) || 0;
+      td.dataset.override = 'true';
+      span.textContent = (parsed>0?'+':'')+parsed;
+      span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
+      td.dataset.savedVal = span.textContent;
+      if (btn) { btn.textContent = '🔓'; btn.title = 'Reset to calculated'; }
+      return true;
     }
 
     // ── Holiday UI ────────────────────────────────────────────────────────────
@@ -1826,6 +1843,105 @@
           showStatusMessage(`Added ${addedCount} new staff for "${areaTag}"${existingNames.size ? ` (${existingNames.size} already present)` : ''} ✅`, 'success');
         }
       } catch(e) { console.error(e); showStatusMessage("Load staff failed: " + (e?.message||e), "error"); }
+    }
+
+    // ── Import OT Adjustments (from OTAdjustment.html) ────────────────────────
+    // For the currently selected area/month/year: Regular-type adjustments are
+    // imported everywhere, except area BCOT, which imports Business OT instead
+    // (and — BCOT only — creates a new rota row for a staff member who
+    // submitted one but isn't on this rota yet). A staff member with more than
+    // one qualifying entry this month is left for manual review rather than
+    // summed. Only entries actually applied get marked done in ot_adjustments.
+    async function importOTAdjustments() {
+      const key = getKeyOrWarn(); if (!key) return;
+      const area     = getCurrentArea();
+      const month    = Number(document.getElementById('monthSelect').value);
+      const year     = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
+      const wantType = area === 'BCOT' ? 'Business OT' : 'Regular';
+
+      showStatusMessage('Checking OT Adjustments…', 'info');
+      let snap;
+      try {
+        const colRef = window.FB.collection(window.FB.db, 'bcot_overtime_secure', key, 'ot_adjustments');
+        snap = await window.FB.getDocs(colRef);
+      } catch (e) {
+        console.error(e);
+        showStatusMessage('Failed to load OT Adjustments: ' + (e?.message || e), 'error');
+        return;
+      }
+
+      const all = [];
+      snap.forEach(d => all.push({ _id: d.id, ...d.data() }));
+      const eligible = all.filter(a => a.month === month && a.year === year && a.otType === wantType && a.done !== true);
+
+      if (!eligible.length) {
+        showStatusMessage(`No pending "${wantType}" adjustments to import for ${month}/${year}.`, 'info');
+        return;
+      }
+
+      const byName = new Map();
+      eligible.forEach(a => {
+        const nameKey = (a.staffName || '').trim().toLowerCase();
+        if (!nameKey) return;
+        if (!byName.has(nameKey)) byName.set(nameKey, []);
+        byName.get(nameKey).push(a);
+      });
+
+      if (_getAppRole() === 'admin') _setOTUnlocked(true);
+      _askOTPwd(async () => {
+        const tbody   = document.querySelector('#rotaTable tbody');
+        const findRow = nameKey => Array.from(tbody.querySelectorAll('tr')).find(r =>
+          (r.cells[0]?.querySelector('input')?.value || '').trim().toLowerCase() === nameKey);
+
+        const areaStaffList = loadStaffList();
+        const sess = (() => { try { return BCOT_AUTH.getSession() || {}; } catch { return {}; } })();
+        const submitter = [sess.nameTitle, sess.name].filter(Boolean).join(' ') || 'Staff';
+
+        const updated = [], added = [], bypassed = [], notTagged = [], needsReview = [];
+
+        for (const [nameKey, entries] of byName.entries()) {
+          const displayName = entries[0].staffName;
+          if (entries.length > 1) { needsReview.push(displayName); continue; }
+          const entry = entries[0];
+          let row = findRow(nameKey);
+          let isNew = false;
+
+          if (!row) {
+            if (area !== 'BCOT') { bypassed.push(displayName); continue; }
+            if (!areaStaffList.includes(displayName)) { notTagged.push(displayName); continue; }
+            addNewRow();
+            row = tbody.lastElementChild;
+            row.cells[0].querySelector('input').value = displayName;
+            isNew = true;
+          }
+
+          applyOTOverrideToRow(row, entry.additionalHours);
+
+          try {
+            await window.FB.setDoc(
+              window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'ot_adjustments', entry._id),
+              { done: true, doneAt: new Date().toISOString(), doneBy: submitter },
+              { merge: true }
+            );
+          } catch (e) { console.error('Mark done failed for', displayName, e); }
+
+          (isNew ? added : updated).push(displayName);
+        }
+
+        updateDashboard();
+        sortStaffAlpha(true);
+
+        const lines = [];
+        if (updated.length)     lines.push(`✅ <strong>Updated (${updated.length}):</strong> ${updated.join(', ')}`);
+        if (added.length)       lines.push(`➕ <strong>Added new row (${added.length}):</strong> ${added.join(', ')}`);
+        if (bypassed.length)    lines.push(`⏭ <strong>Bypassed — not in this rota (${bypassed.length}):</strong> ${bypassed.join(', ')}`);
+        if (notTagged.length)   lines.push(`⚠️ <strong>Not tagged for area BCOT (${notTagged.length}):</strong> ${notTagged.join(', ')} — add "BCOT" to their area in Staff Management first.`);
+        if (needsReview.length) lines.push(`🔎 <strong>Needs manual review — multiple entries (${needsReview.length}):</strong> ${needsReview.join(', ')}`);
+        if (!lines.length) lines.push('Nothing to import.');
+
+        await BCOT_AUTH.alert(lines.join('<br><br>'), `📥 OT Import — ${wantType} — ${month}/${year}`);
+        showStatusMessage('Import finished — review the OT column, then Save.', 'success');
+      });
     }
 
     // ── Cell editing ──────────────────────────────────────────────────────────
