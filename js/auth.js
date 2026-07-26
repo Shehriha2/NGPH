@@ -715,11 +715,12 @@
     const existingBadges = new Set(_users.map(u => u.badge));
     const seenBadges      = new Set();
     const toAdd           = [];
-    let noBadge = 0, alreadyHasLogin = 0;
+    let noBadge = 0, alreadyHasLogin = 0, external = 0;
 
     staffRecords.forEach(r => {
       const badge = String(r?.badge || '').trim();
       const name  = String(r?.name  || '').trim();
+      if (r?.department) { external++; return; }
       if (!badge) { noBadge++; return; }
       if (!name || seenBadges.has(badge)) return;
       if (existingBadges.has(badge)) { alreadyHasLogin++; return; }
@@ -734,6 +735,7 @@
       await _bcotAlert(
         `Nothing to import.<br>` +
         (alreadyHasLogin ? `${alreadyHasLogin} staff member(s) already have a login.<br>` : '') +
+        (external ? `${external} staff member(s) are external collaborators and are skipped.<br>` : '') +
         (noBadge ? `${noBadge} staff member(s) have no badge number, so they can't be given a login.` : ''),
         'Import From Staff'
       );
@@ -745,6 +747,7 @@
       `Each gets role <strong>User</strong> and the default password <strong>12345</strong> ` +
       `— they'll be asked to set a personal password on first login.` +
       (alreadyHasLogin ? `<br><br>${alreadyHasLogin} already have a login and will be skipped.` : '') +
+      (external ? `<br>${external} are external collaborators and will be skipped.` : '') +
       (noBadge ? `<br>${noBadge} have no badge number and will be skipped.` : ''),
       'Import From Staff', { confirmLabel: `Add ${toAdd.length}` }
     );

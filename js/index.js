@@ -1111,6 +1111,19 @@
     }
     let staffList = loadStaffList();
 
+    // True if `name` matches a staff-pool record tagged with a home department
+    // (i.e. an external collaborator, not core department staff). Used to keep
+    // collaborators out of "are we adequately staffed" dashboard numbers while
+    // still letting them appear normally in the rota, budget, and cost-center
+    // calculations, which should count everyone who actually worked.
+    function isExternalStaffName(name) {
+      try {
+        const pool = JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY) || '[]') || [];
+        const rec = pool.find(s => (s.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
+        return !!(rec && rec.department);
+      } catch { return false; }
+    }
+
     // ── Fixed leave / holiday duties (all areas, always present) ─────────────
     // SL has noLeaveCount:true → its days are NOT deducted from the OT standard.
     // All others count as off-days (reduce the OT standard like a leave day).
@@ -2961,6 +2974,7 @@
       let assigned=0,over=0,under=0,balanced=0,filled=0,count=0;
       rows.forEach(row=>{
         const name=row.cells[0]?.querySelector('input')?.value?.trim(); if(!name) return;
+        if(isExternalStaffName(name)) return;
         count++;
         const h=Number(row.querySelector('.hours-cell')?.textContent||0); assigned+=h;
         const isBc=row.querySelector('.sched-cell select')?.value==='BC';
@@ -4737,7 +4751,7 @@
         showStatusMessage(`Role "${role}" removed.`);
       }
 
-      function normalize(r) { return {name:String(r?.name||"").trim(),badge:String(r?.badge||"").trim(),role:String(r?.role||"Pharmacist").trim()||"Pharmacist",hrr:Number(r?.hrr??0)||0,area:String(r?.area||"").trim().toUpperCase(),contractDate:String(r?.contractDate||"").trim()}; }
+      function normalize(r) { return {name:String(r?.name||"").trim(),badge:String(r?.badge||"").trim(),role:String(r?.role||"Pharmacist").trim()||"Pharmacist",hrr:Number(r?.hrr??0)||0,area:String(r?.area||"").trim().toUpperCase(),contractDate:String(r?.contractDate||"").trim(),department:String(r?.department||"").trim()}; }
 
       function rebuildUI() {
         const list=getAreasList();
@@ -4780,7 +4794,7 @@
           const tr=document.createElement("tr");
           tr.innerHTML=`
             <td style="padding:4px;text-align:center;">${idx+1}</td>
-            <td style="padding:4px;">${s.name.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</td>
+            <td style="padding:4px;">${s.name.replace(/&/g,"&amp;").replace(/</g,"&lt;")}${s.department?` <span style="background:#ede9fe;color:#6d28d9;font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;white-space:nowrap;" title="External collaborator">🔗 ${s.department.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`:""}</td>
             <td style="padding:4px;text-align:center;">${s.badge}</td>
             <td style="padding:4px;">${s.role}</td>
             <td style="padding:4px;text-align:center;">${Number(s.hrr||0).toFixed(2)}</td>
@@ -4870,6 +4884,13 @@
             <label style="font-size:11px;font-weight:700;color:#374151;">Role<select id="sm-eRole" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;">${getRolesList().map(r=>`<option${r===rec.role?" selected":""}>${r}</option>`).join("")}</select></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">HRR<input id="sm-eHRR" type="number" step="0.01" value="${rec.hrr||0}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
             <label style="font-size:11px;font-weight:700;color:#374151;">Contract Date<input id="sm-eContractDate" type="date" value="${rec.contractDate||""}" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#374151;cursor:pointer;">
+              <input type="checkbox" id="sm-eExternal" ${rec.department?"checked":""} onchange="document.getElementById('sm-eDeptWrap').style.display=this.checked?'block':'none'" style="cursor:pointer;"/>
+              External Collaborator
+            </label>
+            <div id="sm-eDeptWrap" style="display:${rec.department?"block":"none"};">
+              <label style="font-size:11px;font-weight:700;color:#374151;">Their Department<input id="sm-eDept" type="text" value="${(rec.department||"").replace(/"/g,"&quot;")}" placeholder="e.g. Nursing" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;box-sizing:border-box;"/></label>
+            </div>
             <label style="font-size:11px;font-weight:700;color:#374151;">Areas
               <div style="display:flex;gap:6px;align-items:center;margin-top:3px;">
                 <div id="sm-eAreaDisplay" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#f9fafb;min-height:32px;color:#374151;">${rec.area||"—"}</div>
@@ -4926,11 +4947,14 @@
           const newRole=document.getElementById("sm-eRole").value;
           const newHRR=parseFloat(document.getElementById("sm-eHRR").value)||0;
           const newContractDate=(document.getElementById("sm-eContractDate").value||"").trim();
+          const newIsExternal=document.getElementById("sm-eExternal")?.checked||false;
+          const newDepartment=newIsExternal?(document.getElementById("sm-eDept").value||"").trim():"";
           const newArea=_editAreas.toUpperCase();
           if(!newName){alert("Name is required.");return;}
           const oldBadge=rec.badge;
-          records.forEach(r=>{if(oldBadge&&r.badge===oldBadge){r.name=newName;r.badge=newBadge;r.role=newRole;r.hrr=newHRR;r.contractDate=newContractDate;}});
+          records.forEach(r=>{if(oldBadge&&r.badge===oldBadge){r.name=newName;r.badge=newBadge;r.role=newRole;r.hrr=newHRR;r.contractDate=newContractDate;r.department=newDepartment;}});
           records[idx].area=newArea;
+          records[idx].department=newDepartment;
           if(newArea)newArea.split(",").forEach(a=>{if(a.trim())saveAreaToList(a.trim());});
           renderTable(); writeLocal(); rebuildUI(); applyFilter(); modal.remove();
           showStatusMessage("Staff updated ✅");
@@ -4953,16 +4977,21 @@
         const role=document.getElementById("sm-stRole").value||"Pharmacist";
         const hrr=Number(document.getElementById("sm-stHRR").value||0)||0;
         const area=(document.getElementById("sm-stAreaValue").value||"").trim().toUpperCase();
+        const isExternal=document.getElementById("sm-stExternal")?.checked||false;
+        const department=isExternal?(document.getElementById("sm-stDept").value||"").trim():"";
         if(!name){showStatusMessage("Name is required.","error");return;}
         if(badge&&records.some(x=>x.badge&&x.badge===badge&&x.area===area)){showStatusMessage(`Badge "${badge}" already exists in that area.`,"error");return;}
         if(!badge&&records.some(x=>x.name.toLowerCase()===name.toLowerCase()&&x.area===area)){showStatusMessage("Name already exists in this area.","error");return;}
         if(area)saveAreaToList(area);
-        records.push({name,badge,role,hrr,area});
+        records.push({name,badge,role,hrr,area,department});
         renderTable(); writeLocal(); rebuildUI();
         document.getElementById("sm-stName").value="";
         document.getElementById("sm-stBadge").value="";
         document.getElementById("sm-stHRR").value="";
         document.getElementById("sm-stAreaValue").value="";
+        document.getElementById("sm-stExternal").checked=false;
+        document.getElementById("sm-stDept").value="";
+        document.getElementById("sm-stDeptWrap").style.display="none";
         const btn=document.getElementById("sm-stAreaBtn");
         if(btn){btn.textContent="— Area —";}
         showStatusMessage("Staff added ✅");

@@ -1221,6 +1221,13 @@
         <input type="hidden" id="sm-stAreaValue" value=""/>
         <button type="button" id="sm-stAreaBtn" onclick="SM.openAreaPicker('sm-stAreaValue','sm-stAreaBtn','Select Areas')"
           style="min-width:90px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;color:#0369a1;">— Area —</button>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#374151;cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" id="sm-stExternal" onchange="document.getElementById('sm-stDeptWrap').style.display=this.checked?'inline-flex':'none'" style="cursor:pointer;"/>
+          External Collaborator
+        </label>
+        <span id="sm-stDeptWrap" style="display:none;">
+          <input id="sm-stDept" type="text" placeholder="Their department (e.g. Nursing)" style="min-width:170px;font-size:12px;"/>
+        </span>
         <button type="button" onclick="SM.addStaff()" style="background:#1a4f8b;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">Add</button>
       </div>
       <!-- Import / Copy controls -->
