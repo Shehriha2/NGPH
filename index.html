@@ -1245,6 +1245,12 @@
             <input type="number" id="sm-importHRR" step="0.01" placeholder="HRR (opt.)" style="min-width:90px;font-size:12px;"/>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:12px;">Import External Staff:</b>
+            <button type="button" onclick="document.getElementById('sm-extXlsxInput').click()" style="background:#6d28d9;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">📂 Choose File</button>
+            <input type="file" id="sm-extXlsxInput" accept=".xlsx,.xls" style="display:none;" onchange="SM.importExternalStaff(this)"/>
+            <span style="font-size:11px;color:#555;">Columns: Badge No. · Name · Hourly Rate · Department. Role is set to "Pharmacy aide (Collaborative)"; area left blank to assign per person.</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <b style="font-size:12px;">Role Categories:</b>
             <span id="sm-roleTagsContainer" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;"></span>
             <input type="text" id="sm-newRoleInput" placeholder="New role…"

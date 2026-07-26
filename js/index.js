@@ -5038,6 +5038,58 @@
         reader.readAsArrayBuffer(file);
       }
 
+      // Imports external collaborators from a sheet with Badge/Name/Rate/Department
+      // columns (any header order/casing, detected by keyword) — distinct from
+      // importFromExcel() above, which expects a "Name (Badge)" combined column
+      // and one HRR value applied to everyone. Area is left blank (assigned
+      // per-person afterward, as usual); role is fixed to the collaborator
+      // default so these staff are clearly identifiable in the roster.
+      function importExternalStaff(input) {
+        const file=input.files[0]; if(!file)return; input.value="";
+        const reader=new FileReader();
+        reader.onload=function(e){
+          try{
+            const wb=XLSX.read(e.target.result,{type:"array"});
+            const ws=wb.Sheets[wb.SheetNames[0]];
+            const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+            if(rows.length<2){showStatusMessage("File empty.","error");return;}
+            const header=rows[0].map(h=>String(h||"").trim().toLowerCase());
+            let bC=-1,nC=-1,rC=-1,dC=-1;
+            header.forEach((h,i)=>{
+              if(/badge/i.test(h))bC=i;
+              else if(/name/i.test(h))nC=i;
+              else if(/rate|hourly|hrr/i.test(h))rC=i;
+              else if(/depart/i.test(h))dC=i;
+            });
+            if(bC<0||nC<0||dC<0){showStatusMessage("Could not find Badge/Name/Department columns.","error");return;}
+            const ROLE="Pharmacy aide (Collaborative)";
+            saveRoleToList(ROLE); rebuildRoleSelects();
+            const exBadges=new Set(records.map(s=>(s.badge||"").toString().trim()));
+            let added=0,skipped=0,invalid=0,noRate=0;
+            rows.slice(1).forEach(row=>{
+              const badge=String(row[bC]??"").trim();
+              const name=String(row[nC]??"").trim();
+              const department=String(row[dC]??"").trim();
+              if(!badge||!name||!department){invalid++;return;}
+              if(exBadges.has(badge)){skipped++;return;}
+              const rawRate=rC>=0?parseFloat(row[rC]):NaN;
+              const hrr=Number.isFinite(rawRate)?rawRate:0;
+              if(!Number.isFinite(rawRate))noRate++;
+              exBadges.add(badge);
+              records.push(normalize({name,badge,role:ROLE,hrr,area:"",department}));
+              added++;
+            });
+            if(added){writeLocal();renderTable();rebuildUI();}
+            let msg=`Import: ${added} external staff added`;
+            if(skipped)msg+=`, ${skipped} dup(s) skipped`;
+            if(invalid)msg+=`, ${invalid} invalid (missing badge/name/department)`;
+            if(noRate)msg+=`, ${noRate} with no hourly rate — set manually`;
+            showStatusMessage(msg);
+          } catch(err){console.error(err);showStatusMessage("Import failed: "+(err?.message||err),"error");}
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
       function importHRR(input) {
         const file=input.files[0]; if(!file)return; input.value="";
         const reader=new FileReader();
@@ -5094,7 +5146,7 @@
         else doOpen();
       }
 
-      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName,addCustomRole,removeRole};
+      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importExternalStaff,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName,addCustomRole,removeRole};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════
