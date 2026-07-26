@@ -4769,17 +4769,19 @@
       function applyFilter() {
         const filter=(document.getElementById("sm-areaFilter")?.value||"ALL").toUpperCase();
         const query=(document.getElementById("sm-search")?.value||"").trim().toLowerCase();
+        const externalOnly=document.getElementById("sm-externalOnly")?.checked||false;
         let vis=0;
         Array.from(document.querySelectorAll("#sm-tbody tr")).forEach(tr=>{
           const ra=(tr.querySelector(".sm-area-btn")?.dataset?.areas||"").trim().toUpperCase();
           const ars=ra.split(",").map(x=>x.trim()).filter(Boolean);
           const aok=filter==="ALL"||ars.includes(filter);
           let sok=true; if(query){const n=(tr.cells[1]?.textContent||"").toLowerCase(),b=(tr.cells[2]?.textContent||"").toLowerCase();sok=n.includes(query)||b.includes(query);}
-          const hide=!(aok&&sok); tr.classList.toggle("hidden-row",hide); if(!hide)vis++;
+          const dok=!externalOnly||!!tr.dataset.department;
+          const hide=!(aok&&sok&&dok); tr.classList.toggle("hidden-row",hide); if(!hide)vis++;
         });
         const total=document.querySelectorAll("#sm-tbody tr").length;
         const ce=document.getElementById("sm-searchCount");
-        if(ce)ce.textContent=(query||filter!=="ALL")?`${vis} of ${total} shown`:`${total} staff total`;
+        if(ce)ce.textContent=(query||filter!=="ALL"||externalOnly)?`${vis} of ${total} shown`:`${total} staff total`;
       }
       function clearSearch(){document.getElementById("sm-search").value="";applyFilter();}
 
@@ -4792,6 +4794,7 @@
         const tbody=document.getElementById("sm-tbody"); tbody.innerHTML="";
         records.forEach((s,idx)=>{
           const tr=document.createElement("tr");
+          tr.dataset.department=s.department||"";
           tr.innerHTML=`
             <td style="padding:4px;text-align:center;">${idx+1}</td>
             <td style="padding:4px;">${s.name.replace(/&/g,"&amp;").replace(/</g,"&lt;")}${s.department?` <span style="background:#ede9fe;color:#6d28d9;font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;white-space:nowrap;" title="External collaborator">🔗 ${s.department.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`:""}</td>
