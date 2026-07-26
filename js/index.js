@@ -5050,18 +5050,24 @@
         reader.onload=function(e){
           try{
             const wb=XLSX.read(e.target.result,{type:"array"});
-            const ws=wb.Sheets[wb.SheetNames[0]];
-            const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
-            if(rows.length<2){showStatusMessage("File empty.","error");return;}
-            const header=rows[0].map(h=>String(h||"").trim().toLowerCase());
-            let bC=-1,nC=-1,rC=-1,dC=-1;
-            header.forEach((h,i)=>{
-              if(/badge/i.test(h))bC=i;
-              else if(/name/i.test(h))nC=i;
-              else if(/rate|hourly|hrr/i.test(h))rC=i;
-              else if(/depart/i.test(h))dC=i;
-            });
-            if(bC<0||nC<0||dC<0){showStatusMessage("Could not find Badge/Name/Department columns.","error");return;}
+            // Search every sheet for one with Badge/Name/Department columns —
+            // the right data isn't always on the first sheet (e.g. a workbook
+            // with a pre-approval form sheet plus a separate rates-summary sheet).
+            let rows=null,bC=-1,nC=-1,rC=-1,dC=-1;
+            for(const sheetName of wb.SheetNames){
+              const candidateRows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:""});
+              if(candidateRows.length<2)continue;
+              const header=candidateRows[0].map(h=>String(h||"").trim().toLowerCase());
+              let b=-1,n=-1,r=-1,d=-1;
+              header.forEach((h,i)=>{
+                if(/badge/i.test(h))b=i;
+                else if(/name/i.test(h))n=i;
+                else if(/rate|hourly|hrr/i.test(h))r=i;
+                else if(/depart/i.test(h))d=i;
+              });
+              if(b>=0&&n>=0&&d>=0){rows=candidateRows;bC=b;nC=n;rC=r;dC=d;break;}
+            }
+            if(!rows){showStatusMessage("Could not find a sheet with Badge/Name/Department columns.","error");return;}
             const ROLE="Pharmacy aide (Collaborative)";
             saveRoleToList(ROLE); rebuildRoleSelects();
             const exBadges=new Set(records.map(s=>(s.badge||"").toString().trim()));
