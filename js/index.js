@@ -5047,20 +5047,25 @@
       // and one HRR value applied to everyone. Area is left blank (assigned
       // per-person afterward, as usual); role is fixed to the collaborator
       // default so these staff are clearly identifiable in the roster.
-      function importExternalStaff(input) {
+      // Rebuilt with full diagnostics after a report of "0 added, N invalid" that
+      // couldn't be reproduced against the same file outside the browser — every
+      // outcome now shows the actual sheet/header/row values that were read, in a
+      // dismissable dialog (not the auto-hiding toast), so a repeat is diagnosable
+      // from what the user sees, without needing another round-trip to check.
+      async function importExternalStaff(input) {
         const file=input.files[0]; if(!file)return; input.value="";
+        const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
         const reader=new FileReader();
-        reader.onload=function(e){
+        reader.onload=async function(e){
           try{
             const wb=XLSX.read(e.target.result,{type:"array"});
-            // Search every sheet for one with Badge/Name/Department columns —
-            // the right data isn't always on the first sheet (e.g. a workbook
-            // with a pre-approval form sheet plus a separate rates-summary sheet).
-            let rows=null,bC=-1,nC=-1,rC=-1,dC=-1;
+            let rows=null,bC=-1,nC=-1,rC=-1,dC=-1,usedSheet="";
+            const sheetReports=[];
             for(const sheetName of wb.SheetNames){
               const candidateRows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:""});
-              if(candidateRows.length<2)continue;
-              const header=candidateRows[0].map(h=>String(h||"").trim().toLowerCase());
+              if(candidateRows.length<2){ sheetReports.push(`"${esc(sheetName)}": empty or header-only`); continue; }
+              const rawHeader=candidateRows[0];
+              const header=rawHeader.map(h=>String(h||"").trim().toLowerCase());
               let b=-1,n=-1,r=-1,d=-1;
               header.forEach((h,i)=>{
                 if(/badge/i.test(h))b=i;
@@ -5068,18 +5073,30 @@
                 else if(/rate|hourly|hrr/i.test(h))r=i;
                 else if(/depart/i.test(h))d=i;
               });
-              if(b>=0&&n>=0&&d>=0){rows=candidateRows;bC=b;nC=n;rC=r;dC=d;break;}
+              sheetReports.push(`"${esc(sheetName)}": header = ${esc(JSON.stringify(rawHeader))} → badge:${b} name:${n} rate:${r} dept:${d} (${candidateRows.length-1} data rows)`);
+              if(b>=0&&n>=0&&d>=0){rows=candidateRows;bC=b;nC=n;rC=r;dC=d;usedSheet=sheetName;break;}
             }
-            if(!rows){showStatusMessage("Could not find a sheet with Badge/Name/Department columns.","error");return;}
+            if(!rows){
+              await BCOT_AUTH.alert(
+                `Could not find a sheet with Badge/Name/Department columns.<br><br><strong>Sheets checked:</strong><br>${sheetReports.join("<br>")}`,
+                "📂 Import External Staff — No Match"
+              );
+              return;
+            }
             const ROLE="Pharmacy aide (Collaborative)";
             saveRoleToList(ROLE); rebuildRoleSelects();
             const exBadges=new Set(records.map(s=>(s.badge||"").toString().trim()));
             let added=0,skipped=0,invalid=0,noRate=0;
-            rows.slice(1).forEach(row=>{
+            const invalidSamples=[];
+            rows.slice(1).forEach((row,i)=>{
               const badge=String(row[bC]??"").trim();
               const name=String(row[nC]??"").trim();
               const department=String(row[dC]??"").trim();
-              if(!badge||!name||!department){invalid++;return;}
+              if(!badge||!name||!department){
+                invalid++;
+                if(invalidSamples.length<5) invalidSamples.push(`row ${i+2}: badge=${esc(JSON.stringify(row[bC]))} name=${esc(JSON.stringify(row[nC]))} dept=${esc(JSON.stringify(row[dC]))}`);
+                return;
+              }
               if(exBadges.has(badge)){skipped++;return;}
               const rawRate=rC>=0?parseFloat(row[rC]):NaN;
               const hrr=Number.isFinite(rawRate)?rawRate:0;
@@ -5089,12 +5106,18 @@
               added++;
             });
             if(added){writeLocal();renderTable();rebuildUI();}
-            let msg=`Import: ${added} external staff added`;
-            if(skipped)msg+=`, ${skipped} dup(s) skipped`;
-            if(invalid)msg+=`, ${invalid} invalid (missing badge/name/department)`;
-            if(noRate)msg+=`, ${noRate} with no hourly rate — set manually`;
-            showStatusMessage(msg);
-          } catch(err){console.error(err);showStatusMessage("Import failed: "+(err?.message||err),"error");}
+            const lines=[`Sheet used: <strong>${esc(usedSheet)}</strong>`,`Added: <strong>${added}</strong>`];
+            if(skipped)lines.push(`Duplicates skipped: ${skipped}`);
+            if(noRate)lines.push(`No hourly rate found (set to 0 — fix manually): ${noRate}`);
+            if(invalid){
+              lines.push(`Invalid rows (missing badge/name/department): ${invalid}`);
+              lines.push(`<br>Sample:<br>${invalidSamples.join("<br>")}`);
+            }
+            await BCOT_AUTH.alert(lines.join("<br>"), `📂 Import External Staff — ${esc(usedSheet)}`);
+          } catch(err){
+            console.error(err);
+            await BCOT_AUTH.alert("Import failed: "+esc(err?.message||err), "📂 Import External Staff — Error");
+          }
         };
         reader.readAsArrayBuffer(file);
       }
