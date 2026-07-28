@@ -223,6 +223,7 @@
       <div class="log-header">
         <h3 id="logTitle">Adjustment Log</h3>
         <span class="log-summary" id="logSummary"></span>
+        <button class="btn-ghost no-print" onclick="undoAllDone()">↩ Undo All</button>
       </div>
       <div class="table-wrap">
         <table class="adj-table">
@@ -568,6 +569,34 @@
     }
   }
 
+  async function undoAllDone() {
+    const month     = currentMonth();
+    const year      = currentYear();
+    const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+    const doneRows  = _allAdjustments.filter(a => a.month === month && a.year === year && a.done);
+
+    if (!doneRows.length) { showStatus(`Nothing to undo for ${monthName} ${year}.`, false); return; }
+
+    const confirmed = await window.BCOT_AUTH.confirm(
+      `Un-mark ${doneRows.length} adjustment${doneRows.length === 1 ? '' : 's'} as Done for ${monthName} ${year}?\nThey'll return to pending status.`,
+      '↩ Undo All',
+      { confirmLabel: 'Undo All' }
+    );
+    if (!confirmed) return;
+
+    try {
+      await Promise.all(doneRows.map(a => updateDoc(adjDocRef(a._id), {
+        done: false, doneAt: null, doneBy: null,
+      })));
+      doneRows.forEach(a => { a.done = false; a.doneAt = null; a.doneBy = null; });
+      renderLog();
+      showStatus(`${doneRows.length} adjustment${doneRows.length === 1 ? '' : 's'} un-marked as Done.`);
+    } catch (e) {
+      console.error(e);
+      showStatus('Undo All failed: ' + (e?.message || e), false);
+    }
+  }
+
   // ── Log ───────────────────────────────────────────────────────────────────
   async function refreshLog() {
     const k = _key();
@@ -644,6 +673,7 @@
   window.saveEdit         = saveEdit;
   window.deleteAdjustment = deleteAdjustment;
   window.toggleDone       = toggleDone;
+  window.undoAllDone      = undoAllDone;
 
   document.getElementById('monthSel').addEventListener('change', () => {
     if (_logLoaded) renderLog();
