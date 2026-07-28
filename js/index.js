@@ -2700,15 +2700,20 @@
             const dt=new Date(r.savedAt);
             const ds=dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
             const latest=i===0;
-            html+=`<label style="display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 12px;border-radius:8px;
-              border:1px solid ${latest?'#86efac':'#e5e7eb'};background:${latest?'#f0fdf4':'#fafafa'};">
-              <input type="radio" name="releaseChoice" value="${r.id}" ${latest?'checked':''}/>
-              <span style="flex:1;font-size:12px;">
-                <b style="color:#1f4e79;">R${r.releaseNum}</b>
-                <span style="color:#6b7280;"> · ${ds} · ${r.staffCount} staff</span>
-                ${r.note?`<span style="color:#374151;"> · "<i>${r.note}</i>"</span>`:''}
-                ${latest?'<span style="font-size:10px;font-weight:700;color:#16a34a;margin-left:6px;">● LATEST</span>':''}
-              </span></label>`;
+            html+=`<div style="display:flex;align-items:center;gap:6px;">
+              <label style="flex:1;display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 12px;border-radius:8px;
+                border:1px solid ${latest?'#86efac':'#e5e7eb'};background:${latest?'#f0fdf4':'#fafafa'};">
+                <input type="radio" name="releaseChoice" value="${r.id}" ${latest?'checked':''}/>
+                <span style="flex:1;font-size:12px;">
+                  <b style="color:#1f4e79;">R${r.releaseNum}</b>
+                  <span style="color:#6b7280;"> · ${ds} · ${r.staffCount} staff</span>
+                  ${r.note?`<span style="color:#374151;"> · "<i>${r.note}</i>"</span>`:''}
+                  ${latest?'<span style="font-size:10px;font-weight:700;color:#16a34a;margin-left:6px;">● LATEST</span>':''}
+                </span></label>
+              <button type="button" onclick="deleteReleaseFromPicker('${r.id}','${area}','${docId}',${r.releaseNum})"
+                style="flex-shrink:0;background:#fee2e2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;
+                padding:7px 10px;font-size:12px;cursor:pointer;" title="Delete this release">🗑</button>
+            </div>`;
           });
           if(hasMonthly&&!rels.length){
             html+=`<label style="display:flex;gap:10px;align-items:center;cursor:pointer;padding:9px 12px;border-radius:8px;
@@ -2745,6 +2750,26 @@
         updateRotaLabel();
         showStatusMessage(`Loaded ${chosen==='_monthly'?'monthly save':chosen} ✅`);
       } catch(err){ console.error(err); showStatusMessage('Load failed: '+(err?.message||err),'error'); }
+    }
+
+    async function deleteReleaseFromPicker(releaseId,area,docId,releaseNum) {
+      const ok = await showConfirmModal({
+        title: 'Delete this release?',
+        message: `Release R${releaseNum} will be permanently deleted. This cannot be undone.`,
+        confirmLabel: 'Delete',
+        danger: true
+      });
+      if (!ok) return;
+      const key=getKeyOrWarn(); if (!key) return;
+      try {
+        await window.FB.deleteDoc(getReleaseDocRef(key,area,releaseId));
+        const idxRef=getReleasesIndexRef(key,area,docId);
+        const idxSnap=await window.FB.getDoc(idxRef);
+        const rels=idxSnap.exists()?(idxSnap.data().releases||[]).filter(r=>r.id!==releaseId):[];
+        await window.FB.setDoc(idxRef,{releases:rels},{merge:true});
+        showStatusMessage(`Release R${releaseNum} deleted.`);
+        openLoadPicker();
+      } catch(err){ console.error(err); showStatusMessage('Delete failed: '+(err?.message||err),'error'); }
     }
 
     // ── Legacy Save / Load (kept for Settings → Local Storage section) ────────
