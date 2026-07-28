@@ -5087,7 +5087,7 @@
             saveRoleToList(ROLE); rebuildRoleSelects();
             const exBadges=new Set(records.map(s=>(s.badge||"").toString().trim()));
             let added=0,skipped=0,invalid=0,noRate=0;
-            const invalidSamples=[];
+            const invalidSamples=[],dupSamples=[];
             rows.slice(1).forEach((row,i)=>{
               const badge=String(row[bC]??"").trim();
               const name=String(row[nC]??"").trim();
@@ -5097,7 +5097,15 @@
                 if(invalidSamples.length<5) invalidSamples.push(`row ${i+2}: badge=${esc(JSON.stringify(row[bC]))} name=${esc(JSON.stringify(row[nC]))} dept=${esc(JSON.stringify(row[dC]))}`);
                 return;
               }
-              if(exBadges.has(badge)){skipped++;return;}
+              if(exBadges.has(badge)){
+                skipped++;
+                if(dupSamples.length<5){
+                  const existing=records.filter(r=>(r.badge||"").toString().trim()===badge);
+                  dupSamples.push(`file row ${i+2} badge ${esc(badge)} (${esc(name)}) already exists as: `+
+                    existing.map(r=>esc(JSON.stringify({name:r.name,area:r.area,department:r.department,role:r.role}))).join(" &amp; "));
+                }
+                return;
+              }
               const rawRate=rC>=0?parseFloat(row[rC]):NaN;
               const hrr=Number.isFinite(rawRate)?rawRate:0;
               if(!Number.isFinite(rawRate))noRate++;
@@ -5106,8 +5114,11 @@
               added++;
             });
             if(added){writeLocal();renderTable();rebuildUI();}
-            const lines=[`Sheet used: <strong>${esc(usedSheet)}</strong>`,`Added: <strong>${added}</strong>`];
-            if(skipped)lines.push(`Duplicates skipped: ${skipped}`);
+            const lines=[`Sheet used: <strong>${esc(usedSheet)}</strong>`,`Total staff currently in pool: <strong>${records.length}</strong>`,`Added: <strong>${added}</strong>`];
+            if(skipped){
+              lines.push(`Duplicates skipped: ${skipped}`);
+              lines.push(`<br>Sample matches:<br>${dupSamples.join("<br>")}`);
+            }
             if(noRate)lines.push(`No hourly rate found (set to 0 — fix manually): ${noRate}`);
             if(invalid){
               lines.push(`Invalid rows (missing badge/name/department): ${invalid}`);
