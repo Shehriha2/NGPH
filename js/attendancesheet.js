@@ -29,6 +29,43 @@
     return String(eh).padStart(2,'0') + ':' + String(em).padStart(2,'0');
   }
 
+  // ── BCOT-only rule (see js/overtimejustification.js for the same logic) ──
+  // Any assigned duty counts as overtime, distributed as 3h blocks (17:00-20:00),
+  // Sun-Thu only, starting day 1 of the month — so a staff member's Attendance
+  // Sheet lands on the exact same days/times as their Overtime Justification sheet.
+  function isBCOTArea(area) { return (area||'').trim().toUpperCase() === 'BCOT'; }
+
+  function sumAnyDutyHours(daysData, duties) {
+    let total = 0;
+    Object.values(daysData||{}).forEach(v => {
+      const code = String(v||'').toUpperCase().replace(/_O$/,'');
+      const duty = duties[code];
+      if (duty) total += Number(duty.hours) || 0;
+    });
+    return total;
+  }
+
+  function buildDistributedDayRows(totalHours, month, year) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const rows = [];
+    let remaining = Math.max(0, Number(totalHours) || 0);
+    for (let d = 1; d <= 31; d++) {
+      let timeIn='', timeOut='', hrsWorked='';
+      if (d <= daysInMonth && remaining > 0) {
+        const dow = new Date(year, month-1, d).getDay();
+        if (dow >= 0 && dow <= 4) {
+          const block = Math.min(3, remaining);
+          timeIn    = '17:00';
+          timeOut   = calcEndTime(timeIn, block);
+          hrsWorked = block;
+          remaining -= block;
+        }
+      }
+      rows.push({ day:d, timeIn, timeOut, hrsWorked });
+    }
+    return rows;
+  }
+
   // ── Firestore refs ────────────────────────────────────────────────────────
   function monthRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId); }
 
@@ -74,9 +111,14 @@
   // Remark codes only cover what's actually derivable from a duty code:
   // no assignment → Off (6); a leave-listed code → Leave (5). Absent/Late/
   // Permission/Sick require manual entry — there's no duty-level field for them.
-  function dayCell(daysData, day, duties, leaveSet) {
+  function dayCell(s, day, duties, leaveSet) {
     if (!day) return null;
-    const raw = String((daysData||{})['day'+day] || '').trim();
+    if (s.isBCOT) {
+      const dd = s.distDays && s.distDays[day-1];
+      if (!dd || dd.hrsWorked === '') return { timeIn:'', timeOut:'', rem:'6' };
+      return { timeIn: dd.timeIn, timeOut: dd.timeOut, rem:'' };
+    }
+    const raw = String((s.daysData||{})['day'+day] || '').trim();
     if (!raw) return { timeIn:'', timeOut:'', rem:'6' };
     const base = raw.toUpperCase().replace(/_O$/, '');
     if (base === 'L' || leaveSet.has(base)) return { timeIn:'', timeOut:'', rem:'5' };
@@ -121,7 +163,7 @@
 
       const bodyRows = page.group.map(s => {
         const dayCells = page.cols.map(day => {
-          const c = dayCell(s.daysData, day, meta.duties, meta.leaveSet) || { timeIn:'', timeOut:'', rem:'' };
+          const c = dayCell(s, day, meta.duties, meta.leaveSet) || { timeIn:'', timeOut:'', rem:'' };
           return `<td><input type="text" value="${esc(c.timeIn)}"/></td><td><input type="text" value="${esc(c.timeOut)}"/></td><td><input type="text" value="${esc(c.rem)}"/></td>`;
         }).join('');
         const initCells  = page.cols.map(() => `<td colspan="3"><input type="text" placeholder="Emp. Init."/></td>`).join('');
@@ -218,7 +260,7 @@
         if (!snap.exists()) continue;
         const payload = snap.data();
         if (Array.isArray(payload.leaveCodes) && payload.leaveCodes.length) leaveCodes = payload.leaveCodes;
-        (Array.isArray(payload.records) ? payload.records : []).forEach(rec => allRecords.push(rec));
+        (Array.isArray(payload.records) ? payload.records : []).forEach(rec => allRecords.push({ ...rec, _srcArea: area }));
       }
     } catch(e) { console.error(e); showStatus("Load failed: "+(e?.message||e), false); return; }
 
@@ -235,9 +277,12 @@
     const staffRows = allRecords
       .filter(rec => (rec.staffName||'').trim())
       .map(rec => {
-        const name  = stripBadge(rec.staffName);
-        const staff = staffRecs.find(s => s.name.trim() === rec.staffName.trim());
-        return { name, badge: staff?.badge || '—', daysData: rec.daysData || {} };
+        const name     = stripBadge(rec.staffName);
+        const staff    = staffRecs.find(s => s.name.trim() === rec.staffName.trim());
+        const daysData = rec.daysData || {};
+        const isBCOT   = isBCOTArea(rec._srcArea);
+        const distDays = isBCOT ? buildDistributedDayRows(sumAnyDutyHours(daysData, duties), month, year) : null;
+        return { name, badge: staff?.badge || '—', daysData, isBCOT, distDays };
       });
 
     if (!staffRows.length) {
