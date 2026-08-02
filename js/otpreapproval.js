@@ -735,6 +735,79 @@
     </div>`;
   }
 
+  // ── Master summary — by Position Group (auto-classified from each area's Label/Description) ──
+  const POSITION_GROUPS = ['Pharmacists', 'Technicians', 'Pharmacy aide', 'Collaborative Pharmacy aide'];
+
+  function classifyPositionGroup(desc) {
+    const d = (desc || '').toLowerCase();
+    if (d.includes('collaborative')) return 'Collaborative Pharmacy aide';
+    if (d.includes('aide'))          return 'Pharmacy aide';
+    if (d.includes('technician'))    return 'Technicians';
+    if (d.includes('pharm'))         return 'Pharmacists';
+    return 'Unclassified';
+  }
+
+  function positionGroupSummaryHtml(items, month, year, extraRows = []) {
+    const monthName = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
+    let _ameta = {};
+    try { _ameta = JSON.parse(localStorage.getItem('BCOT_AREAS_META_V1') || '{}') || {}; } catch {}
+
+    const allItems = [...items, ...extraRows];
+    const buckets = {};
+    POSITION_GROUPS.forEach(g => buckets[g] = { staffCount:0, totalHours:0, totalCost:0 });
+
+    allItems.forEach(it => {
+      const desc  = _ameta[it.area]?.label || it.area || '';
+      const group = classifyPositionGroup(desc);
+      if (!buckets[group]) buckets[group] = { staffCount:0, totalHours:0, totalCost:0 };
+      buckets[group].staffCount += it.staffCount || 0;
+      buckets[group].totalHours += it.totalHours || 0;
+      buckets[group].totalCost  += it.totalCost  || 0;
+    });
+
+    const extraGroups = Object.keys(buckets).filter(g =>
+      !POSITION_GROUPS.includes(g) && (buckets[g].staffCount || buckets[g].totalHours || buckets[g].totalCost));
+    const rowOrder = [...POSITION_GROUPS, ...extraGroups];
+
+    const grandStaff = allItems.every(i => i.staffCount == null) ? null : allItems.reduce((s,i) => s + (i.staffCount||0), 0);
+    const grandHours = allItems.every(i => i.totalHours == null) ? null : allItems.reduce((s,i) => s + (i.totalHours||0), 0);
+    const grandCost  = allItems.reduce((s,i) => s + (i.totalCost||0), 0);
+
+    const rowsHtml = rowOrder.map(g => `<tr>
+        <td style="padding:6px 8px;border:1px solid #333;">${esc(g)}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${buckets[g].staffCount}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${buckets[g].totalHours}</td>
+        <td class="num" style="padding:6px 8px;border:1px solid #333;">${fmt(buckets[g].totalCost)}</td>
+      </tr>`).join('');
+
+    return `<div class="print-page page-break-after">
+      <div class="form-title">
+        <div class="main-title">Monthly Overtime Pre-Approval — Grand Summary by Position Group</div>
+        <div class="sub-title">King Abdulaziz Medical City<br>National Guard Health Affairs<br>Western Region</div>
+      </div>
+      <div style="margin:10px 0 14px;font-size:11px;color:#374151;">
+        Period: <strong>${monthName} ${year}</strong> &nbsp;·&nbsp; All Selected Areas
+      </div>
+      <table class="ot-table">
+        <thead><tr>
+          <th style="text-align:left;padding:8px;width:40%;">Position Group</th>
+          <th style="text-align:center;padding:8px;width:20%;">Staff Count</th>
+          <th style="text-align:center;padding:8px;width:20%;">Total Hours</th>
+          <th style="text-align:center;padding:8px;width:20%;">Total Cost (﷼)</th>
+        </tr></thead>
+        <tbody>
+          ${rowsHtml}
+          <tr class="total-row" style="background:#fef9c3;">
+            <td style="padding:7px 8px;font-weight:900;border:1px solid #333;text-align:center;">Grand Total</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandStaff||'—'}</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${grandHours||'—'}</td>
+            <td class="num" style="padding:7px 8px;font-weight:900;border:1px solid #333;">${fmt(grandCost)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  }
+
   // ── All-Areas print orchestrator ──────────────────────────────────────────
   async function buildAndPrintAllAreas(selectedAreas, month, year, zeroAction, extraRows = []) {
     const key = (window.BCOT_APP_KEY||'').trim();
@@ -796,7 +869,7 @@
 
     const wrapper = document.getElementById('formWrapper');
     const prevHtml = wrapper.innerHTML;
-    wrapper.innerHTML = fullHtml + masterSummaryHtml(summaryItems, month, year, extraRows) + formFooterHtml();
+    wrapper.innerHTML = fullHtml + masterSummaryHtml(summaryItems, month, year, extraRows) + positionGroupSummaryHtml(summaryItems, month, year, extraRows) + formFooterHtml();
     window.print();
     wrapper.innerHTML = prevHtml;
 
