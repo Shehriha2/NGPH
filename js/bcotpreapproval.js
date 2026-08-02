@@ -34,6 +34,7 @@
   function monthRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId); }
   function releaseIndexRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'release_index',docId); }
   function releaseDocRef(key,area,releaseId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'releases',releaseId); }
+  function formDataRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'ot_form_data',docId); }
 
   // ── Release picker ────────────────────────────────────────────────────────
   let _selectedReleaseId = null;
@@ -218,6 +219,70 @@
     </div>`;
   }
 
+  // ── Per-page renderer — title/meta block + staff table (N rows) + signatures ──
+  function pageHtml(group, meta, pageNum, totalPages, seqStart) {
+    const pgBadge = totalPages > 1
+      ? `<div style="position:absolute;top:0;right:0;font-size:9px;color:#888;font-style:italic;">Page ${pageNum} / ${totalPages}</div>`
+      : '';
+
+    let html = `<div class="print-page page-break-after">
+      <div class="form-title" style="position:relative;">
+        ${pgBadge}
+        <div class="main-title">Monthly Overtime Pre-Approval Form</div>
+        <div class="sub-title">
+          King Abdulaziz Medical City<br>
+          National Guard Health Affairs<br>
+          Western Region
+        </div>
+      </div>
+      <div class="meta-section">
+        <div class="meta-row">
+          <div class="meta-cell"><b>Department Name:</b>
+            <input type="text" class="meta-val" ${pageNum===1?'id="deptName"':''} value="${esc(meta.dept)}"/>
+          </div>
+          <div class="meta-cell"><span>Period covered:</span>
+            <input type="text" class="meta-val" ${pageNum===1?'id="periodCovered"':''} value="${esc(meta.period)}" style="max-width:160px;"/>
+          </div>
+        </div>
+        <div class="meta-row">
+          <div class="meta-cell"><b>Cost Center:</b>
+            <input type="text" class="meta-val" ${pageNum===1?'id="costCenter"':''} value="${esc(meta.cost)}" style="max-width:180px;"/>
+          </div>
+          <div class="meta-cell"><span>Incharge Contact no:</span>
+            <input type="text" class="meta-val" ${pageNum===1?'id="inchargeTel"':''} value="${esc(meta.tel)}" style="max-width:160px;"/>
+          </div>
+        </div>
+      </div>`;
+
+    html += tableHeaderHtml();
+
+    const _PT = 'cursor:pointer;caret-color:transparent;width:100%;border:none;background:transparent;font-size:11px;font-family:Arial,sans-serif;outline:none;padding:0;';
+    let seq = seqStart;
+    group.forEach(r => {
+      html += `<tr>
+        <td class="num">${seq++}</td>
+        <td class="num">${esc(r.badge)}</td>
+        <td>${esc(stripBadge(r.name))}</td>
+        <td class="num">${r.hours}</td>
+        <td class="loc"><input type="text" class="picker-trigger" value="${esc(r.loc||'')}" placeholder="📍 Click to select…" readonly style="${_PT}"/></td>
+        <td class="just"><input type="text" class="picker-trigger" value="${esc(r.just||'')}" placeholder="📋 Click to select…" readonly style="${_PT}"/></td>
+      </tr>`;
+    });
+
+    // Per-page subtotal (hours only — no cost)
+    const pageHours = group.reduce((s,r) => s + r.hours, 0);
+    html += `<tr class="total-row">
+      <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/ Cost</td>
+      <td class="num">${pageHours}</td>
+      <td colspan="2"></td>
+    </tr>`;
+
+    html += `</tbody></table>`;
+    html += sigHtml(meta);
+    html += `</div>`;  // end .print-page
+    return html;
+  }
+
   // ── Main form builder with pagination ────────────────────────────────────
   function buildForm(rows, meta) {
     const wrapper = document.getElementById('formWrapper');
@@ -233,78 +298,86 @@
       while (rem.length) { groups.push(rem.slice(0, rpN)); rem = rem.slice(rpN); }
     }
 
-    const grandTotalHours = rows.reduce((s,r) => s + r.hours, 0);
     const totalPages = groups.length;
     let seq = 1, html = '';
-
     groups.forEach((group, gi) => {
-      const pageNum = gi + 1;
-      html += `<div class="print-page page-break-after">`;
-
-      const pgBadge = totalPages > 1
-        ? `<div style="position:absolute;top:0;right:0;font-size:9px;color:#888;font-style:italic;">Page ${pageNum} / ${totalPages}</div>`
-        : '';
-
-      html += `
-      <div class="form-title" style="position:relative;">
-        ${pgBadge}
-        <div class="main-title">Monthly Overtime Pre-Approval Form</div>
-        <div class="sub-title">
-          King Abdulaziz Medical City<br>
-          National Guard Health Affairs<br>
-          Western Region
-        </div>
-      </div>
-      <div class="meta-section">
-        <div class="meta-row">
-          <div class="meta-cell"><b>Department Name:</b>
-            <input type="text" class="meta-val" ${gi===0?'id="deptName"':''} value="${esc(meta.dept)}"/>
-          </div>
-          <div class="meta-cell"><span>Period covered:</span>
-            <input type="text" class="meta-val" ${gi===0?'id="periodCovered"':''} value="${esc(meta.period)}" style="max-width:160px;"/>
-          </div>
-        </div>
-        <div class="meta-row">
-          <div class="meta-cell"><b>Cost Center:</b>
-            <input type="text" class="meta-val" ${gi===0?'id="costCenter"':''} value="${esc(meta.cost)}" style="max-width:180px;"/>
-          </div>
-          <div class="meta-cell"><span>Incharge Contact no:</span>
-            <input type="text" class="meta-val" ${gi===0?'id="inchargeTel"':''} value="${esc(meta.tel)}" style="max-width:160px;"/>
-          </div>
-        </div>
-      </div>`;
-
-      html += tableHeaderHtml();
-
-      const _PT = 'cursor:pointer;caret-color:transparent;width:100%;border:none;background:transparent;font-size:11px;font-family:Arial,sans-serif;outline:none;padding:0;';
-      group.forEach(r => {
-        html += `<tr>
-          <td class="num">${seq++}</td>
-          <td class="num">${esc(r.badge)}</td>
-          <td>${esc(stripBadge(r.name))}</td>
-          <td class="num">${r.hours}</td>
-          <td class="loc"><input type="text" class="picker-trigger" value="${esc(r.loc||'')}" placeholder="📍 Click to select…" readonly style="${_PT}"/></td>
-          <td class="just"><input type="text" class="picker-trigger" value="${esc(r.just||'')}" placeholder="📋 Click to select…" readonly style="${_PT}"/></td>
-        </tr>`;
-      });
-
-      // Per-page subtotal (hours only — no cost)
-      const pageHours = group.reduce((s,r) => s + r.hours, 0);
-      html += `<tr class="total-row">
-        <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/ Cost</td>
-        <td class="num">${pageHours}</td>
-        <td colspan="2"></td>
-      </tr>`;
-
-      html += `</tbody></table>`;
-
-      html += sigHtml(meta);
-      html += `</div>`;  // end .print-page
+      html += pageHtml(group, meta, gi+1, totalPages, seq);
+      seq += group.length;
     });
 
     html += summaryPageHtml(groups, meta);
     html += formFooterHtml();
     wrapper.innerHTML = html;
+  }
+
+  // ── Individual sheets — one full page per staff member, same outline/signatures, no Grand Summary page ──
+  function buildIndividualSheetsHtml(rows, meta) {
+    let html = '';
+    rows.forEach((r, i) => { html += pageHtml([r], meta, i+1, rows.length, i+1); });
+    html += formFooterHtml();
+    return html;
+  }
+
+  let _cachedRows = null, _cachedMeta = null;
+
+  function printIndividualSheets() {
+    if (!_cachedRows || !_cachedRows.length) {
+      showStatus('Load & Build the form first.', false);
+      return;
+    }
+    const wrapper = document.getElementById('formWrapper');
+    const prevHtml = wrapper.innerHTML;
+    wrapper.innerHTML = buildIndividualSheetsHtml(_cachedRows, _cachedMeta);
+    window.print();
+    wrapper.innerHTML = prevHtml;
+  }
+
+  // ── Form data: save/load loc+just per badge to Firestore ─────────────────
+  function _snapRowSelections() {
+    if (!_cachedRows) return;
+    document.querySelectorAll('#formWrapper .ot-table tbody tr').forEach(tr => {
+      if (tr.classList.contains('total-row')) return;
+      const idx = parseInt(tr.cells[0]?.textContent || '0') - 1;
+      if (!Number.isFinite(idx) || idx < 0 || idx >= _cachedRows.length) return;
+      _cachedRows[idx].loc  = tr.querySelector('td.loc  .picker-trigger')?.value || '';
+      _cachedRows[idx].just = tr.querySelector('td.just .picker-trigger')?.value || '';
+    });
+  }
+
+  async function _loadFormData(key, area, month, year) {
+    try {
+      const docId = `${year}-${String(month).padStart(2,'0')}`;
+      const snap = await window.FB.getDoc(formDataRef(key, area, docId));
+      return snap.exists() ? (snap.data().rows || {}) : null;
+    } catch(e) { console.warn('[BCOT] loadFormData:', e); return null; }
+  }
+
+  function _mergeFormData(rows, savedRows) {
+    if (!savedRows) return rows;
+    return rows.map(r => {
+      const saved = savedRows[r.badge];
+      if (!saved) return r;
+      return { ...r, loc: saved.loc || '', just: saved.just || '' };
+    });
+  }
+
+  async function saveFormData() {
+    if (!_cachedRows) { showStatus('Build the form first.', false); return; }
+    const key = (window.BCOT_APP_KEY||'').trim();
+    if (!key) { showStatus('config.js not found.', false); return; }
+    _snapRowSelections();
+    const month = Number(document.getElementById('monthSel').value);
+    const year  = Number(document.getElementById('yearSel').value) || new Date().getFullYear();
+    const docId = `${year}-${String(month).padStart(2,'0')}`;
+    const rowsData = {};
+    _cachedRows.forEach(r => {
+      if (r.badge && r.badge !== '—') rowsData[r.badge] = { loc: r.loc || '', just: r.just || '' };
+    });
+    try {
+      showStatus('Saving to cloud…');
+      await window.FB.setDoc(formDataRef(key, 'BCOT', docId), { rows: rowsData });
+      showStatus('Saved ✅ — other users will see this on next load.');
+    } catch(e) { showStatus('Save failed: '+(e?.message||e), false); }
   }
 
   // ── Fetch approved extensions from Extension.html's Firestore data ───────
@@ -409,8 +482,12 @@
       return;
     }
 
-    buildForm(rows, meta);
-    showStatus(`BC OT form built — ${rows.length} staff | ${Math.ceil(rows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
+    const _saved    = await _loadFormData(key, 'BCOT', month, year);
+    const finalRows = _mergeFormData(rows, _saved);
+
+    buildForm(finalRows, meta);
+    _cachedRows = finalRows; _cachedMeta = meta;
+    showStatus(`BC OT form built — ${finalRows.length} staff | ${Math.ceil(finalRows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
   }
 
   // Init

@@ -211,7 +211,9 @@
   <input type="number" id="rowsPageN" value="22" min="5" max="45" style="width:56px"/>
   <button class="btn-green" onclick="loadAndBuild()">Load &amp; Build Form</button>
   <button style="background:#6f42c1;" onmouseover="this.style.background='#5a35a1'" onmouseout="this.style.background='#6f42c1'" onclick="pickRelease()">Pick Release</button>
+  <button style="background:#0d6efd;" onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'" onclick="saveFormData()">💾 Save</button>
   <button class="btn-orange" onclick="window.print()">🖨 Print</button>
+  <button style="background:#0f766e;" onmouseover="this.style.background='#0b5c56'" onmouseout="this.style.background='#0f766e'" onclick="printIndividualSheets()">🖨 Print Individual Sheets</button>
   <a href="index.html" style="text-decoration:none;margin-left:auto">
     <button type="button">← Back to Rota</button>
   </a>
@@ -304,7 +306,7 @@
   <script src="js/auth.js?v=10"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
   const firebaseConfig = {
     apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
     authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
@@ -314,7 +316,7 @@
   };
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
-  window.FB = { db, doc, getDoc, collection, getDocs };
+  window.FB = { db, doc, getDoc, setDoc, collection, getDocs };
 </script>
 
 <script src="js/preapproval_picker.js"></script>
