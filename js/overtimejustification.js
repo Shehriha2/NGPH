@@ -69,6 +69,54 @@
     return rows;
   }
 
+  // ── BCOT-only rule: every assigned duty counts as overtime (no _O suffix needed) ──
+  function isBCOTArea(area) { return (area||'').trim().toUpperCase() === 'BCOT'; }
+
+  function hasAnyDutyDay(daysData, duties) {
+    return Object.values(daysData||{}).some(v => {
+      const code = String(v||'').toUpperCase().replace(/_O$/,'');
+      return code && duties[code];
+    });
+  }
+
+  function sumAnyDutyHours(daysData, duties) {
+    let total = 0;
+    Object.values(daysData||{}).forEach(v => {
+      const code = String(v||'').toUpperCase().replace(/_O$/,'');
+      const duty = duties[code];
+      if (duty) total += Number(duty.hours) || 0;
+    });
+    return total;
+  }
+
+  // Distributed representation for BCOT: 3h blocks (17:00-20:00), Sun-Thu only,
+  // starting day 1 of the month, until the true monthly total is used up.
+  // Exact day placement is a starting point — every field stays a plain editable
+  // input, so specific days can be reassigned by hand afterward.
+  function buildDistributedDayRows(totalHours, month, year) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const rows = [];
+    let remaining = Math.max(0, Number(totalHours) || 0);
+    for (let d = 1; d <= 31; d++) {
+      let timeIn='', timeOut='', hrsWorked='', otherCode='', otherHours='';
+      if (d <= daysInMonth && remaining > 0) {
+        const dow = new Date(year, month-1, d).getDay();
+        if (dow >= 0 && dow <= 4) {
+          const block = Math.min(3, remaining);
+          timeIn     = '17:00';
+          timeOut    = calcEndTime(timeIn, block);
+          hrsWorked  = block;
+          otherCode  = '9040';
+          otherHours = block;
+          remaining -= block;
+        }
+      }
+      // Home Department stays blank for BCOT — hours are charged to Other Dept (cost code 9040) instead.
+      rows.push({ day:d, timeIn, timeOut, hrsWorked, otHome:'', otherCode, otherHours });
+    }
+    return rows;
+  }
+
   // ── Signature block (3 approvers, matches the paper form) ────────────────
   function sigHtml(meta, gi) {
     return `<div class="sig-wrapper">
@@ -203,16 +251,18 @@
               <td><input class="cell-in" type="text" value="${esc(r.timeOut)}"/></td>
               <td><input class="cell-in" type="text" value="${esc(r.hrsWorked)}"/></td>
               <td><input class="cell-in" type="text" value="${esc(r.otHome)}"/></td>
-              <td><input class="cell-in" type="text" value=""/></td>
-              <td><input class="cell-in" type="text" value=""/></td>
+              <td><input class="cell-in" type="text" value="${esc(r.otherCode||'')}"/></td>
+              <td><input class="cell-in" type="text" value="${esc(r.otherHours||'')}"/></td>
               <td><input class="cell-in" type="text" value=""/></td>
               <td class="just"><input type="text" value="${r.hrsWorked !== '' ? esc(DEFAULT_JUSTIFICATION) : ''}"/></td>
             </tr>`).join('')}
             <tr class="total-row">
               <td colspan="3" style="text-align:center;">Total</td>
               <td>${entry.totalHours || ''}</td>
-              <td>${entry.totalOT || ''}</td>
-              <td colspan="4"></td>
+              <td>${entry.totalHome || ''}</td>
+              <td></td>
+              <td>${entry.totalOther || ''}</td>
+              <td colspan="2"></td>
             </tr>
           </tbody>
         </table>
@@ -259,7 +309,7 @@
         const snap = await window.FB.getDoc(monthRef(key, area, docId));
         if (!snap.exists()) continue;
         const payload = snap.data();
-        (Array.isArray(payload.records) ? payload.records : []).forEach(rec => allRecords.push(rec));
+        (Array.isArray(payload.records) ? payload.records : []).forEach(rec => allRecords.push({ ...rec, _srcArea: area }));
       }
     } catch(e) { console.error(e); showStatus("Load failed: "+(e?.message||e), false); return; }
 
@@ -276,17 +326,22 @@
 
     const entries = [];
     allRecords.forEach(rec => {
-      if (!hasOvertimeDay(rec.daysData)) return;
+      const isBCOT   = isBCOTArea(rec._srcArea);
+      const qualifies = isBCOT ? hasAnyDutyDay(rec.daysData, duties) : hasOvertimeDay(rec.daysData);
+      if (!qualifies) return;
       const name = (rec.staffName||'').trim(); if (!name) return;
       const staffRec = staffRecs.find(s => s.name.trim() === name);
       const badge    = staffRec?.badge || '—';
       const position = staffRec?.role  || '';
 
-      const days = buildDayRows(rec.daysData, duties);
+      const days = isBCOT
+        ? buildDistributedDayRows(sumAnyDutyHours(rec.daysData, duties), month, year)
+        : buildDayRows(rec.daysData, duties);
       const totalHours = days.reduce((s,r) => s + (Number(r.hrsWorked)||0), 0);
-      const totalOT    = days.reduce((s,r) => s + (Number(r.otHome)||0), 0);
+      const totalHome  = days.reduce((s,r) => s + (Number(r.otHome)||0), 0);
+      const totalOther = days.reduce((s,r) => s + (Number(r.otherHours)||0), 0);
 
-      entries.push({ name: stripBadge(name), badge, position, days, totalHours, totalOT });
+      entries.push({ name: stripBadge(name), badge, position, days, totalHours, totalHome, totalOther });
     });
 
     if (!entries.length) {
