@@ -230,6 +230,14 @@
           ${REMARK_LEGEND.map(r => `<span><b>${r.code}</b> ${r.label}</span>`).join('')}
         </div>
         <div class="submit-note">Note: This sheet must be submitted to Internal Audit and Organizational Development on a monthly basis, within the first 10 days of the following month.</div>
+        <div class="noted-by-line">
+          <span>Noted by:</span>
+          <input type="text" value="Dr. Hassan Alshehri" style="min-width:140px;"/>
+          <span>,</span>
+          <input type="text" value="9155466" style="min-width:70px;"/>
+          <span style="margin-left:12px;">Signature:</span>
+          <span class="sig-blank"></span>
+        </div>
       </div>`;
     });
 

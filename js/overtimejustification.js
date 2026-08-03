@@ -294,8 +294,8 @@
       period:   document.getElementById('periodCovered')?.value || '',
       ext:      document.getElementById('extNo')?.value         || '62998',
       mail:     document.getElementById('mailCode')?.value      || '7330',
-      dirName:  document.getElementById('dirName')?.value       || 'Dr. Mohammed Aseeri',
-      dirBadge: document.getElementById('dirBadge')?.value      || '',
+      dirName:  document.getElementById('dirName')?.value       || 'Dr. Hassan Alshehri',
+      dirBadge: document.getElementById('dirBadge')?.value      || '9155466',
       exDirName:document.getElementById('exDirName')?.value     || '',
       ceoName:  document.getElementById('ceoName')?.value       || '',
     };
