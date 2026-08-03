@@ -30,9 +30,10 @@
   }
 
   // ── BCOT-only rule (see js/overtimejustification.js for the same logic) ──
-  // Any assigned duty counts as overtime, distributed as 3h blocks (17:00-20:00),
-  // Sun-Thu only, starting day 1 of the month — so a staff member's Attendance
-  // Sheet lands on the exact same days/times as their Overtime Justification sheet.
+  // Any assigned duty counts as overtime, distributed as 3h blocks (17:00-20:00)
+  // placed on the staff member's real rota-assigned days (Sun-Thu only, in date
+  // order) — so a staff member's Attendance Sheet lands on the exact same days
+  // and times as their Overtime Justification sheet.
   function isBCOTArea(area) { return (area||'').trim().toUpperCase() === 'BCOT'; }
 
   function sumAnyDutyHours(daysData, duties) {
@@ -45,23 +46,28 @@
     return total;
   }
 
-  function buildDistributedDayRows(totalHours, month, year) {
+  function buildDistributedDayRows(daysData, duties, totalHours, month, year) {
     const daysInMonth = new Date(year, month, 0).getDate();
     const rows = [];
+    for (let d = 1; d <= 31; d++) rows.push({ day:d, timeIn:'', timeOut:'', hrsWorked:'' });
+
+    const candidates = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const code = String((daysData||{})['day'+d] || '').toUpperCase().replace(/_O$/,'');
+      if (!code || !duties[code]) continue;
+      const dow = new Date(year, month-1, d).getDay();
+      if (dow >= 0 && dow <= 4) candidates.push(d);
+    }
+
     let remaining = Math.max(0, Number(totalHours) || 0);
-    for (let d = 1; d <= 31; d++) {
-      let timeIn='', timeOut='', hrsWorked='';
-      if (d <= daysInMonth && remaining > 0) {
-        const dow = new Date(year, month-1, d).getDay();
-        if (dow >= 0 && dow <= 4) {
-          const block = Math.min(3, remaining);
-          timeIn    = '17:00';
-          timeOut   = calcEndTime(timeIn, block);
-          hrsWorked = block;
-          remaining -= block;
-        }
-      }
-      rows.push({ day:d, timeIn, timeOut, hrsWorked });
+    for (const d of candidates) {
+      if (remaining <= 0) break;
+      const block = Math.min(3, remaining);
+      const row = rows[d-1];
+      row.timeIn    = '17:00';
+      row.timeOut   = calcEndTime('17:00', block);
+      row.hrsWorked = block;
+      remaining -= block;
     }
     return rows;
   }
@@ -109,13 +115,15 @@
 
   // ── Per-day cell data (time in/out + remark code) ────────────────────────
   // Remark codes only cover what's actually derivable from a duty code:
-  // no assignment → Off (6); a leave-listed code → Leave (5). Absent/Late/
-  // Permission/Sick require manual entry — there's no duty-level field for them.
+  // a leave-listed code → Leave (5). Absent/Late/Permission/Sick require
+  // manual entry — there's no duty-level field for them. BCOT staff have a
+  // separate primary job, so a day with no BC block is NOT marked Off (6) —
+  // it just means no BC overtime that day, not that they're absent.
   function dayCell(s, day, duties, leaveSet) {
     if (!day) return null;
     if (s.isBCOT) {
       const dd = s.distDays && s.distDays[day-1];
-      if (!dd || dd.hrsWorked === '') return { timeIn:'', timeOut:'', rem:'6' };
+      if (!dd || dd.hrsWorked === '') return { timeIn:'', timeOut:'', rem:'' };
       return { timeIn: dd.timeIn, timeOut: dd.timeOut, rem:'' };
     }
     const raw = String((s.daysData||{})['day'+day] || '').trim();
@@ -164,9 +172,10 @@
       const bodyRows = page.group.map(s => {
         const dayCells = page.cols.map(day => {
           const c = dayCell(s, day, meta.duties, meta.leaveSet) || { timeIn:'', timeOut:'', rem:'' };
-          return `<td><input type="text" value="${esc(c.timeIn)}"/></td><td><input type="text" value="${esc(c.timeOut)}"/></td><td><input type="text" value="${esc(c.rem)}"/></td>`;
+          const onCls = c.timeIn ? ' class="day-on"' : '';
+          return `<td${onCls}><input type="text" value="${esc(c.timeIn)}"/></td><td${onCls}><input type="text" value="${esc(c.timeOut)}"/></td><td${onCls}><input type="text" value="${esc(c.rem)}"/></td>`;
         }).join('');
-        const initCells  = page.cols.map(() => `<td colspan="3"><input type="text" placeholder="Emp. Init."/></td>`).join('');
+        const initCells  = page.cols.map(() => `<td><input type="text"/></td><td><input type="text"/></td><td></td>`).join('');
         const notedCells = page.cols.map(() => `<td colspan="3"><input type="text" placeholder="Noted by:"/></td>`).join('');
         return `<tr>
             <td class="name-cell" rowspan="3"><input type="text" value="${esc(s.name)}"/></td>
@@ -281,7 +290,7 @@
         const staff    = staffRecs.find(s => s.name.trim() === rec.staffName.trim());
         const daysData = rec.daysData || {};
         const isBCOT   = isBCOTArea(rec._srcArea);
-        const distDays = isBCOT ? buildDistributedDayRows(sumAnyDutyHours(daysData, duties), month, year) : null;
+        const distDays = isBCOT ? buildDistributedDayRows(daysData, duties, sumAnyDutyHours(daysData, duties), month, year) : null;
         return { name, badge: staff?.badge || '—', daysData, isBCOT, distDays };
       });
 

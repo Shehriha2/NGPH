@@ -3,6 +3,7 @@
   const DUTIES_KEY     = "BCOT_DUTIES_ALL_V1";
 
   const DEFAULT_JUSTIFICATION = "Overtime required to cover departmental workload / staffing shortage.";
+  const BCOT_JUSTIFICATION    = "Catering Business Center Prescriptions for business patients";
 
   // ── Status ────────────────────────────────────────────────────────────────
   function showStatus(msg, ok=true) {
@@ -89,30 +90,35 @@
     return total;
   }
 
-  // Distributed representation for BCOT: 3h blocks (17:00-20:00), Sun-Thu only,
-  // starting day 1 of the month, until the true monthly total is used up.
-  // Exact day placement is a starting point — every field stays a plain editable
-  // input, so specific days can be reassigned by hand afterward.
-  function buildDistributedDayRows(totalHours, month, year) {
+  // Distributed representation for BCOT: 3h blocks (17:00-20:00) placed on the
+  // staff member's real rota-assigned days (Sun-Thu only, in date order) until
+  // the true monthly total is used up — so the days shown here match the days
+  // they're actually scheduled for in the rota.
+  function buildDistributedDayRows(daysData, duties, totalHours, month, year) {
     const daysInMonth = new Date(year, month, 0).getDate();
     const rows = [];
+    for (let d = 1; d <= 31; d++) rows.push({ day:d, timeIn:'', timeOut:'', hrsWorked:'', otHome:'', otherCode:'', otherHours:'' });
+
+    const candidates = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const code = String((daysData||{})['day'+d] || '').toUpperCase().replace(/_O$/,'');
+      if (!code || !duties[code]) continue;
+      const dow = new Date(year, month-1, d).getDay();
+      if (dow >= 0 && dow <= 4) candidates.push(d);
+    }
+
     let remaining = Math.max(0, Number(totalHours) || 0);
-    for (let d = 1; d <= 31; d++) {
-      let timeIn='', timeOut='', hrsWorked='', otherCode='', otherHours='';
-      if (d <= daysInMonth && remaining > 0) {
-        const dow = new Date(year, month-1, d).getDay();
-        if (dow >= 0 && dow <= 4) {
-          const block = Math.min(3, remaining);
-          timeIn     = '17:00';
-          timeOut    = calcEndTime(timeIn, block);
-          hrsWorked  = block;
-          otherCode  = '9040';
-          otherHours = block;
-          remaining -= block;
-        }
-      }
+    for (const d of candidates) {
+      if (remaining <= 0) break;
+      const block = Math.min(3, remaining);
+      const row = rows[d-1];
       // Home Department stays blank for BCOT — hours are charged to Other Dept (cost code 9040) instead.
-      rows.push({ day:d, timeIn, timeOut, hrsWorked, otHome:'', otherCode, otherHours });
+      row.timeIn     = '17:00';
+      row.timeOut    = calcEndTime('17:00', block);
+      row.hrsWorked  = block;
+      row.otherCode  = '9040';
+      row.otherHours = block;
+      remaining -= block;
     }
     return rows;
   }
@@ -254,7 +260,7 @@
               <td><input class="cell-in" type="text" value="${esc(r.otherCode||'')}"/></td>
               <td><input class="cell-in" type="text" value="${esc(r.otherHours||'')}"/></td>
               <td><input class="cell-in" type="text" value=""/></td>
-              <td class="just"><input type="text" value="${r.hrsWorked !== '' ? esc(DEFAULT_JUSTIFICATION) : ''}"/></td>
+              <td class="just"><input type="text" value="${r.hrsWorked !== '' ? esc(entry.isBCOT ? BCOT_JUSTIFICATION : DEFAULT_JUSTIFICATION) : ''}"/></td>
             </tr>`).join('')}
             <tr class="total-row">
               <td colspan="3" style="text-align:center;">Total</td>
@@ -335,13 +341,13 @@
       const position = staffRec?.role  || '';
 
       const days = isBCOT
-        ? buildDistributedDayRows(sumAnyDutyHours(rec.daysData, duties), month, year)
+        ? buildDistributedDayRows(rec.daysData, duties, sumAnyDutyHours(rec.daysData, duties), month, year)
         : buildDayRows(rec.daysData, duties);
       const totalHours = days.reduce((s,r) => s + (Number(r.hrsWorked)||0), 0);
       const totalHome  = days.reduce((s,r) => s + (Number(r.otHome)||0), 0);
       const totalOther = days.reduce((s,r) => s + (Number(r.otherHours)||0), 0);
 
-      entries.push({ name: stripBadge(name), badge, position, days, totalHours, totalHome, totalOther });
+      entries.push({ name: stripBadge(name), badge, position, days, totalHours, totalHome, totalOther, isBCOT });
     });
 
     if (!entries.length) {
