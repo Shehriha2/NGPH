@@ -1084,6 +1084,7 @@
   const _AREAS_LS      = 'BCOT_AREAS_LIST_V1';
   const _AREAS_META_LS = 'BCOT_AREAS_META_V1';
   const _STAFF_LS      = 'BCOT_STAFF_RECORDS_V2';
+  const _DUTIES_LS     = 'BCOT_DUTIES_ALL_V1';
 
   function _getLocalAreas() {
     try { return JSON.parse(localStorage.getItem(_AREAS_LS) || '[]') || []; } catch { return []; }
@@ -1276,19 +1277,33 @@
     if (meta[oldName]) { meta[newName] = meta[oldName]; delete meta[oldName]; }
     _setLocalAreasMeta(meta);
 
+    let staff = null, staffChanged = false;
     try {
-      const staff = JSON.parse(localStorage.getItem(_STAFF_LS) || '[]');
-      let changed = false;
+      staff = JSON.parse(localStorage.getItem(_STAFF_LS) || '[]');
       staff.forEach(s => {
         if (!s.area) return;
         const parts = s.area.split(',').map(a => a.trim().toUpperCase());
         if (parts.includes(oldName)) {
           s.area = parts.map(a => a === oldName ? newName : a).join(',');
-          changed = true;
+          staffChanged = true;
         }
       });
-      if (changed) localStorage.setItem(_STAFF_LS, JSON.stringify(staff));
-    } catch {}
+      if (staffChanged) localStorage.setItem(_STAFF_LS, JSON.stringify(staff));
+    } catch { staff = null; staffChanged = false; }
+
+    let duties = null, dutiesChanged = false;
+    try {
+      duties = JSON.parse(localStorage.getItem(_DUTIES_LS) || '{}');
+      Object.values(duties).forEach(d => {
+        if (!d.area) return;
+        const parts = d.area.split(',').map(a => a.trim().toUpperCase());
+        if (parts.includes(oldName)) {
+          d.area = parts.map(a => a === oldName ? newName : a).join(',');
+          dutiesChanged = true;
+        }
+      });
+      if (dutiesChanged) localStorage.setItem(_DUTIES_LS, JSON.stringify(duties));
+    } catch { duties = null; dutiesChanged = false; }
 
     let usersChanged = false;
     _users.forEach(u => {
@@ -1301,6 +1316,18 @@
     try {
       await _saveAreasToCloud(_getLocalAreas(), meta);
       if (usersChanged) await saveUsers();
+      if (staffChanged && window.FB && _key) {
+        await window.FB.setDoc(
+          window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'staff_named', 'STAFF_POOL'),
+          { records: staff }, { merge: true }
+        );
+      }
+      if (dutiesChanged && window.FB && _key) {
+        await window.FB.setDoc(
+          window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'duties_named', 'DUTIES_POOL'),
+          { duties }, { merge: true }
+        );
+      }
       _renderAreaList();
     } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
