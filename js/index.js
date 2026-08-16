@@ -2155,9 +2155,20 @@
     // ── Auto-detect schedule type ─────────────────────────────────────────────
     // Scans filled day cells (skips empty + zero-hour duties).
     // All 12h → "12 Hours" | All <12h → "Regular" | Mix or nothing → leave as-is
+    // BCOT area: any row with hours > 0 is always Business Center (BC) — all
+    // hours count as OT there, so the 12h/Regular heuristic below doesn't apply.
     function autoDetectSchedType(row) {
-      const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
+      const hCell = row.querySelector('.hours-cell');
+      const hIdx = Array.from(row.cells).indexOf(hCell);
       if (hIdx <= 0) return;
+      const sel = row.querySelector('.sched-cell select');
+      if (!sel) return;
+
+      if (getCurrentArea() === 'BCOT' && (Number(hCell.textContent) || 0) > 0) {
+        if (sel.value !== 'BC') { sel.value = 'BC'; calcOT(row); }
+        return;
+      }
+
       let has12 = false, hasUnder12 = false;
       for (let i = 1; i < hIdx; i++) {
         const v = row.cells[i].textContent.trim().toUpperCase();
@@ -2172,8 +2183,6 @@
       }
       if (!has12 && !hasUnder12) return; // nothing to judge by
       if (has12 && hasUnder12) return;   // mixed — don't touch
-      const sel = row.querySelector('.sched-cell select');
-      if (!sel) return;
       if (sel.value === 'BC') return;    // never auto-override BC schedule type
       const newType = has12 ? '12 Hours' : 'Regular';
       if (sel.value === newType) return; // already correct — no-op
