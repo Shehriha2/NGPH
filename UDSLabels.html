@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UDS Labels</title>
+  <style>
+    :root{ --primary:#1a4f8b; --secondary:#2e8b57; --bg:#f5f5f5; --card:#fff; }
+    body{ margin:0; padding:12px; font-family:Arial,sans-serif; background:var(--bg); font-size:12px; }
+
+    .header{
+      background:linear-gradient(135deg,var(--primary),var(--secondary));
+      color:#fff; padding:12px; border-radius:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,.12); margin-bottom:12px;
+    }
+    .header h1{ margin:0 0 2px; font-size:14px; }
+
+    .card{ background:var(--card); border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.12); padding:10px; margin-bottom:12px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    input,select,button{ padding:6px 8px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+    button{ background:var(--primary); color:#fff; border:none; cursor:pointer; }
+    button:hover{ background:var(--secondary); }
+    .btn-ok{ background:#28a745; }     .btn-ok:hover{ background:#218838; }
+    .btn-purple{ background:#6f42c1; } .btn-purple:hover{ background:#5a35a1; }
+    .btn-gray{ background:#6b7280; }   .btn-gray:hover{ background:#4b5563; }
+    .hint{ color:#666; font-size:11px; }
+
+    table{ width:100%; border-collapse:collapse; }
+    th,td{ border:1px solid #e5e7eb; padding:6px; text-align:center; font-size:11px; }
+    th{ background:var(--primary); color:#fff; position:sticky; top:0; }
+    .empty-hint{ color:#888; font-size:12px; text-align:center; padding:16px; }
+
+    .form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+    .form-grid label{ display:block; font-size:11px; font-weight:700; color:#374151; margin-bottom:3px; }
+    .form-grid input{ width:100%; box-sizing:border-box; }
+
+    .status{
+      position:fixed; top:18px; right:18px; display:none; z-index:9999;
+      padding:10px 14px; border-radius:8px; color:#fff;
+      max-width:520px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .ok{ background:#28a745; } .err{ background:#dc3545; }
+
+    /* ── Label preview (screen) ─────────────────────────────────────────── */
+    #labelPreviewBox{
+      width:5cm; height:3cm; border:1.5px dashed #9ca3af; border-radius:2px;
+      background:#fff; margin-top:10px;
+    }
+    .uds-label{
+      width:5cm; height:3cm; box-sizing:border-box; padding:0.15cm;
+      display:flex; align-items:center; gap:0.15cm; overflow:hidden;
+      background:#fff;
+    }
+    .uds-label .qr-box{ width:2.2cm; height:2.2cm; flex-shrink:0; }
+    /* QRCode.js sets its own inline width/height on the canvas — override it */
+    .uds-label .qr-box canvas{ width:100% !important; height:100% !important; display:block; }
+    .uds-label .info{ flex:1; min-width:0; font-family:Arial,sans-serif; color:#000; line-height:1.28; }
+    .uds-label .info .drug-name{
+      font-weight:700; font-size:7.5pt; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .uds-label .info .line{ font-size:7pt; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ── Print ─────────────────────────────────────────────────────────── */
+    #printArea{ display:none; }
+    @media print{
+      .no-print{ display:none !important; }
+      body{ background:#fff; padding:0; margin:0; }
+      #printArea{ display:block; }
+      @page{ size:5cm 3cm; margin:0; }
+      .uds-label{ page-break-after:always; break-after:page; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header no-print">
+    <h1>🏷️ UDS Labels</h1>
+    <div class="hint" style="color:rgba(255,255,255,.85);">
+      Print 5cm × 3cm unit-dose labels with a scannable QR code. Drug list is imported once from Excel and reused for every label.
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <div class="row">
+      <b style="color:#3730a3;">Drug List</b>
+      <span id="drugCount" class="hint"></span>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" onclick="document.getElementById('drugXlsxInput').click()">📂 Import Excel</button>
+        <input type="file" id="drugXlsxInput" accept=".xlsx,.xls" style="display:none;" onchange="handleDrugFileSelect(this)"/>
+        <button type="button" class="btn-purple" onclick="loadDrugsFromCloud()">☁ Load from Cloud</button>
+        <button type="button" class="btn-ok" onclick="saveDrugsToCloud()">☁ Save to Cloud</button>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:6px;">Expects two columns: <b>Drug Name</b> and <b>Drug Code</b> (any order, matched by header text).</div>
+  </div>
+
+  <div class="card no-print">
+    <b style="color:#3730a3;">Print a Label</b>
+    <div class="form-grid" style="margin-top:10px;">
+      <div style="grid-column:1/-1;">
+        <label>Drug</label>
+        <input id="drugInput" type="text" list="drugsDatalist" placeholder="Search drug name or code…" oninput="onDrugPicked()"/>
+        <datalist id="drugsDatalist"></datalist>
+      </div>
+      <div>
+        <label>Qty</label>
+        <input id="qtyInput" type="number" min="0" step="1" placeholder="e.g. 30" oninput="updatePreview()"/>
+      </div>
+      <div>
+        <label>Number of Labels (copies)</label>
+        <input id="copiesInput" type="number" min="1" step="1" value="1"/>
+      </div>
+      <div>
+        <label>Lot</label>
+        <input id="lotInput" type="text" placeholder="e.g. D9239" oninput="updatePreview()"/>
+      </div>
+      <div>
+        <label>Expiry Date</label>
+        <input id="expInput" type="date" oninput="updatePreview()"/>
+      </div>
+      <div style="grid-column:1/-1;">
+        <label>Scan Source Package Barcode (GS1) — optional, fills Lot &amp; Expiry automatically</label>
+        <input id="gs1Input" type="text" placeholder="Click here, then scan the manufacturer barcode…" onkeydown="if(event.key==='Enter'){handleGS1Scan(this.value);this.value='';}"/>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px;align-items:flex-start;">
+      <div>
+        <div class="hint" style="margin-bottom:4px;">Preview (true size)</div>
+        <div id="labelPreviewBox"></div>
+      </div>
+      <button type="button" class="btn-ok" style="margin-left:auto;align-self:center;padding:10px 22px;font-size:13px;" onclick="printLabels()">🖨 Print</button>
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <div class="row">
+      <b style="color:#3730a3;">Recent Prints</b>
+      <button type="button" class="btn-gray" style="margin-left:auto;" onclick="loadPrintHistory()">🔄 Refresh</button>
+    </div>
+    <div style="overflow:auto;max-height:40vh;margin-top:8px;">
+      <table>
+        <thead>
+          <tr><th>Date/Time</th><th>Printed By</th><th>Drug</th><th>Lot</th><th>Expiry</th><th>Qty</th><th>Copies</th></tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+      <div id="historyEmptyHint" class="empty-hint">No prints logged yet.</div>
+    </div>
+  </div>
+
+  <div class="no-print">
+    <button type="button" class="btn-gray" onclick="window.location.href='index.html'">⬅ Back to Rota</button>
+  </div>
+
+  <div id="printArea"></div>
+
+  <div class="status" id="statusBox"></div>
+
+  <script src="config.js"></script>
+  <script src="js/version-check.js"></script>
+  <script src="js/auth.js?v=10"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import {
+      getFirestore, doc, setDoc, getDoc,
+      collection, addDoc, query, orderBy, limit, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+      authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+      storageBucket:"bcotrota.firebasestorage.app",
+      messagingSenderId:"659421824894",
+      appId:"1:659421824894:web:f0546879df8808491ad52f"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    window.FB = { db, doc, setDoc, getDoc, collection, addDoc, query, orderBy, limit, getDocs };
+  </script>
+
+  <script src="js/udslabels.js"></script>
+</body>
+</html>
