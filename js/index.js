@@ -5452,7 +5452,7 @@
         return lbl ? `${a} · ${lbl}` : a;
       }
 
-      function _filteredDuties(search) {
+      function _filteredDuties(search, prefixOnly) {
         const area = getCurrentArea();
         const s = (search || '').toLowerCase().trim();
         return Object.entries(DUTIES).filter(([code, d]) => {
@@ -5462,6 +5462,11 @@
             if (areas.length && !areas.includes(area.toUpperCase())) return false;
           }
           if (!s) return true;
+          // While typing an actual code into a cell, match only the code's
+          // prefix — matching label text too (as the search box does) turns
+          // up nearly every duty, since most English labels share common
+          // letters (e.g. typing "i" matched "Sick Leave", "Admin Leave"...).
+          if (prefixOnly) return code.toLowerCase().startsWith(s);
           return code.toLowerCase().includes(s) || (d.label || '').toLowerCase().includes(s);
         });
       }
@@ -5480,9 +5485,10 @@
 
       // search: pass a string to filter by it directly (used while typing in a
       // cell); omit to read from the palette's own search box (Ctrl+Click flow).
-      function render(search) {
+      // prefixOnly: true for the in-cell typing flow — see _filteredDuties.
+      function render(search, prefixOnly) {
         const s       = search !== undefined ? search : ($('dp-search')?.value || '');
-        const duties  = _filteredDuties(s);
+        const duties  = _filteredDuties(s, prefixOnly);
         const total   = _filteredDuties('').length;
         const chipsEl = $('dp-chips');
         const cntEl   = $('dp-count');
@@ -5590,7 +5596,7 @@
         const text = td.textContent || '';
         if (!text) { if (_anchor === td) close(); return; }
         if (_anchor !== td) _openForTyping(td);
-        render(text);
+        render(text, true);
       }
 
       // ArrowDown jumps from the cell into the chip grid; Enter picks the first
