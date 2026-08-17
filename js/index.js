@@ -5466,26 +5466,37 @@
         });
       }
 
-      function render() {
-        const search  = ($('dp-search')?.value || '');
-        const duties  = _filteredDuties(search);
+      function _chipHtml([code, d]) {
+        const bg  = d.color || '#1a4f8b';
+        const fg  = contrastColor(bg);
+        const lbl = (d.label || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        const tip = `${code}${d.label?' — '+d.label:''} · ${d.hours||0}h`;
+        return `<button type="button" class="dp-chip" onclick="DP.pick('${code}')"
+          style="background:${bg};color:${fg};" title="${tip.replace(/"/g,'&quot;')}">
+          <span class="dp-code">${code}</span>
+          <span class="dp-lbl">${lbl}</span>
+        </button>`;
+      }
+
+      // search: pass a string to filter by it directly (used while typing in a
+      // cell); omit to read from the palette's own search box (Ctrl+Click flow).
+      function render(search) {
+        const s       = search !== undefined ? search : ($('dp-search')?.value || '');
+        const duties  = _filteredDuties(s);
         const total   = _filteredDuties('').length;
         const chipsEl = $('dp-chips');
         const cntEl   = $('dp-count');
         if (!chipsEl) return;
 
+        // Regular area duties first, fixed leave/holiday codes grouped after a
+        // caption divider — one live-filtered list (typing "S" still matches
+        // both), just visually easy to tell apart at a glance.
+        const regular = duties.filter(([code]) => !FIXED_LEAVE_DUTIES[code]);
+        const leave   = duties.filter(([code]) =>  FIXED_LEAVE_DUTIES[code]);
+
         chipsEl.innerHTML = duties.length
-          ? duties.map(([code, d]) => {
-              const bg  = d.color || '#1a4f8b';
-              const fg  = contrastColor(bg);
-              const lbl = (d.label || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-              const tip = `${code}${d.label?' — '+d.label:''} · ${d.hours||0}h`;
-              return `<button type="button" class="dp-chip" onclick="DP.pick('${code}')"
-                style="background:${bg};color:${fg};" title="${tip.replace(/"/g,'&quot;')}">
-                <span class="dp-code">${code}</span>
-                <span class="dp-lbl">${lbl}</span>
-              </button>`;
-            }).join('')
+          ? regular.map(_chipHtml).join('')
+            + (leave.length ? '<div class="dp-group-label">Leave / Holiday</div>' + leave.map(_chipHtml).join('') : '')
           : '<div style="padding:14px;color:#9ca3af;font-size:12px;text-align:center;width:100%;">No duties match</div>';
 
         if (cntEl) cntEl.textContent = duties.length < total
@@ -5501,6 +5512,22 @@
         close();
       }
 
+      // Smart position: prefer below the cell, flip up if near viewport bottom
+      function _positionPalette(cell) {
+        const pal = $('dutyPalette');
+        if (!pal) return;
+        const rect = cell.getBoundingClientRect();
+        const palW = 364, palH = 330;
+        let top  = rect.bottom + 5;
+        let left = rect.left;
+        if (top  + palH > window.innerHeight - 8) top  = rect.top - palH - 5;
+        if (left + palW > window.innerWidth  - 8) left = window.innerWidth - palW - 8;
+        if (top  < 8) top  = 8;
+        if (left < 8) left = 8;
+        pal.style.top  = top  + 'px';
+        pal.style.left = left + 'px';
+      }
+
       function open(cell) {
         if (!cell) return;
         _anchor = cell;
@@ -5510,23 +5537,25 @@
         const aHdr = $('dp-area-label');
         if (aHdr) aHdr.textContent = _areaLbl();
 
-        // Smart position: prefer below the cell, flip up if near viewport bottom
-        const rect = cell.getBoundingClientRect();
-        const palW = 364, palH = 330;
-        let top  = rect.bottom + 5;
-        let left = rect.left;
-        if (top  + palH > window.innerHeight - 8) top  = rect.top - palH - 5;
-        if (left + palW > window.innerWidth  - 8) left = window.innerWidth - palW - 8;
-        if (top  < 8) top  = 8;
-        if (left < 8) left = 8;
-
-        pal.style.top     = top  + 'px';
-        pal.style.left    = left + 'px';
+        _positionPalette(cell);
         pal.style.display = 'block';
 
         const s = $('dp-search');
         if (s) { s.value = ''; s.focus(); }
         render();
+      }
+
+      // Opens/repositions the palette while the user types directly in a cell —
+      // deliberately leaves focus in the cell rather than the search box, since
+      // typing there IS the search.
+      function _openForTyping(cell) {
+        _anchor = cell;
+        const pal = $('dutyPalette');
+        if (!pal) return;
+        const aHdr = $('dp-area-label');
+        if (aHdr) aHdr.textContent = _areaLbl();
+        _positionPalette(cell);
+        pal.style.display = 'block';
       }
 
       function close() {
@@ -5552,10 +5581,45 @@
         open(td);
       }
 
+      // Typing in a cell opens/updates the palette live-filtered to what's been
+      // typed so far; clearing the cell back to empty closes it again —
+      // Ctrl+Click stays the way to browse the full list without typing.
+      function _onInput(e) {
+        const td = e.target.closest('td');
+        if (!_shouldOpen(td)) return;
+        const text = td.textContent || '';
+        if (!text) { if (_anchor === td) close(); return; }
+        if (_anchor !== td) _openForTyping(td);
+        render(text);
+      }
+
+      // ArrowDown jumps from the cell into the chip grid; Enter picks the first
+      // match — both mirror the search box's existing shortcuts, so the
+      // type-to-filter flow behaves the same as the Ctrl+Click one.
+      function _onCellKeydown(e) {
+        const td = e.target.closest('td');
+        if (!td || td !== _anchor) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); document.querySelector('#dp-chips .dp-chip')?.focus(); }
+        if (e.key === 'Enter')     { e.preventDefault(); document.querySelector('#dp-chips .dp-chip')?.click(); }
+      }
+
+      // Closes the palette if focus leaves the anchor cell for anywhere other
+      // than the palette itself (e.g. ArrowDown into the chip grid shouldn't).
+      function _onFocusOut(e) {
+        if (!_anchor || e.target !== _anchor) return;
+        setTimeout(() => {
+          const pal = $('dutyPalette');
+          if (pal && !pal.contains(document.activeElement) && document.activeElement !== _anchor) close();
+        }, 0);
+      }
+
       function init() {
         const tbl = document.getElementById('rotaTable');
         if (tbl) {
           tbl.addEventListener('click', _onClick);
+          tbl.addEventListener('input', _onInput);
+          tbl.addEventListener('keydown', _onCellKeydown);
+          tbl.addEventListener('focusout', _onFocusOut);
         }
         // Escape closes palette
         document.addEventListener('keydown', e => {
