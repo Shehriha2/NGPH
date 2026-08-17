@@ -228,14 +228,37 @@
         </div>`;
       const canvas = wrap.querySelector("canvas");
       const ready = new Promise(resolve => {
-        // 300px native resolution keeps the code crisp at thermal-printer DPI even
-        // though it's CSS-scaled down to the qr-box's physical 2.2cm on screen/print.
-        QRCode.toCanvas(canvas, data.qrText, { width: 300, margin: 0 }, function(err) {
+        // 500px native resolution keeps the code crisp at thermal-printer DPI even
+        // though it's CSS-scaled down to the qr-box's physical 2.6cm on screen/print.
+        QRCode.toCanvas(canvas, data.qrText, { width: 500, margin: 0 }, function(err) {
           if (err) console.error("QR render failed:", err);
           resolve();
         });
       });
       return { el: wrap, ready };
+    }
+
+    // Drug names vary a lot in length and must never be cut off, so the name
+    // wraps (CSS) and this shrinks its font-size until the wrapped block plus
+    // the three fixed lines actually fit the label's height — rather than
+    // betting on one static size that could clip an unusually long name.
+    // Must run after `wrap` is attached to the document (needs real layout).
+    function fitDrugName(wrap) {
+      const nameEl = wrap.querySelector(".drug-name");
+      const lineEls = Array.from(wrap.querySelectorAll(".line"));
+      const cs = getComputedStyle(wrap);
+      const padTop = parseFloat(cs.paddingTop) || 0;
+      const padBottom = parseFloat(cs.paddingBottom) || 0;
+      const available = wrap.clientHeight - padTop - padBottom - 2; // small safety margin
+      const linesHeight = lineEls.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+      const budget = Math.max(available - linesHeight, 0);
+
+      let fontSize = 14;
+      nameEl.style.fontSize = fontSize + "pt";
+      while (nameEl.scrollHeight > budget && fontSize > 7) {
+        fontSize -= 0.5;
+        nameEl.style.fontSize = fontSize + "pt";
+      }
     }
 
     function updatePreview() {
@@ -245,6 +268,7 @@
       if (!data) return;
       const { el } = buildLabelEl(data);
       box.appendChild(el);
+      fitDrugName(el);
     }
 
     // ── Print + log ──────────────────────────────────────────────────────────
@@ -288,6 +312,7 @@
       for (let i = 0; i < copies; i++) {
         const { el, ready } = buildLabelEl(data);
         area.appendChild(el);
+        fitDrugName(el);
         readies.push(ready);
       }
       await Promise.all(readies); // wait for every QR canvas to finish drawing before printing

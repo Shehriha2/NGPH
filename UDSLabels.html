@@ -45,22 +45,22 @@
 
     /* ── Label preview (screen) ─────────────────────────────────────────── */
     #labelPreviewBox{
-      width:5cm; height:3cm; border:1.5px dashed #9ca3af; border-radius:2px;
+      width:10cm; height:5cm; border:1.5px dashed #9ca3af; border-radius:2px;
       background:#fff; margin-top:10px;
     }
     .uds-label{
-      width:5cm; height:3cm; box-sizing:border-box; padding:0.15cm;
-      display:flex; align-items:center; gap:0.15cm; overflow:hidden;
+      width:10cm; height:5cm; box-sizing:border-box; padding:0.35cm;
+      display:flex; align-items:center; gap:0.4cm; overflow:hidden;
       background:#fff;
     }
-    .uds-label .qr-box{ width:2.2cm; height:2.2cm; flex-shrink:0; }
+    .uds-label .qr-box{ width:2.6cm; height:2.6cm; flex-shrink:0; }
     /* QRCode.js sets its own inline width/height on the canvas — override it */
     .uds-label .qr-box canvas{ width:100% !important; height:100% !important; display:block; }
-    .uds-label .info{ flex:1; min-width:0; font-family:Arial,sans-serif; color:#000; line-height:1.28; }
+    .uds-label .info{ flex:1; min-width:0; font-family:Arial,sans-serif; color:#000; line-height:1.32; }
     .uds-label .info .drug-name{
-      font-weight:700; font-size:7.5pt; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      font-weight:700; font-size:14pt; white-space:normal; overflow-wrap:break-word; word-break:break-word; margin-bottom:2px;
     }
-    .uds-label .info .line{ font-size:7pt; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .uds-label .info .line{ font-size:12pt; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
     /* ── Print ─────────────────────────────────────────────────────────── */
     #printArea{ display:none; }
@@ -68,7 +68,7 @@
       .no-print{ display:none !important; }
       body{ background:#fff; padding:0; margin:0; }
       #printArea{ display:block; }
-      @page{ size:5cm 3cm; margin:0; }
+      @page{ size:10cm 5cm; margin:0; }
       .uds-label{ page-break-after:always; break-after:page; }
     }
   </style>
@@ -78,7 +78,7 @@
   <div class="header no-print">
     <h1>🏷️ UDS Labels</h1>
     <div class="hint" style="color:rgba(255,255,255,.85);">
-      Print 5cm × 3cm unit-dose labels with a scannable QR code. Drug list is imported once from Excel and reused for every label.
+      Print 10cm × 5cm unit-dose labels with a scannable QR code. Drug list is imported once from Excel and reused for every label.
     </div>
   </div>
 
