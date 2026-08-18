@@ -11,6 +11,22 @@
 
   var STORE_KEY = 'BCOT_APP_VERSION_V1';
 
+  // ── Version dot (small circle above the logo) ────────────────────────────
+  // Fixed, ordered palette — Publish Version always advances to the NEXT
+  // color (see version-admin.js), so it's guaranteed to change every publish
+  // rather than risk landing on the same color twice in a row (a hash could).
+  var VERSION_DOT_COLORS = ['#dc2626','#16a34a','#2563eb','#d97706','#7c3aed','#0d9488','#db2777','#111827'];
+  window.BCOT_VERSION_DOT_COLORS = VERSION_DOT_COLORS;
+
+  window.BCOT_applyVersionDot = function (colorIndex, versionStr) {
+    var dot = document.getElementById('app-version-dot');
+    if (!dot) return;
+    var n   = VERSION_DOT_COLORS.length;
+    var idx = ((parseInt(colorIndex, 10) || 0) % n + n) % n;
+    dot.style.background = VERSION_DOT_COLORS[idx];
+    dot.title = 'App version: ' + (versionStr || '?');
+  };
+
   function check() {
     var appKey = (window.BCOT_APP_KEY     || '').trim();
     var fbKey  = (window.BCOT_FB_API_KEY  || '').trim();
@@ -27,9 +43,12 @@
     fetch(url, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : Promise.reject('no-doc'); })
       .then(function (data) {
-        // Firestore REST response: { fields: { v: { stringValue: "..." } } }
+        // Firestore REST response: { fields: { v: { stringValue: "..." }, c: { integerValue: "..." } } }
         var latest = (data.fields && data.fields.v && data.fields.v.stringValue) || '';
         if (!latest) return;
+
+        var colorIdx = data.fields && data.fields.c && data.fields.c.integerValue;
+        window.BCOT_applyVersionDot(colorIdx, latest);
 
         var stored = localStorage.getItem(STORE_KEY) || '';
         localStorage.setItem(STORE_KEY, latest);  // always update

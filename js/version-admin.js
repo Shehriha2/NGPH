@@ -32,23 +32,39 @@ window.bumpAppVersion = async function () {
   v = v.trim();
   if (!v) return;
 
-  // PATCH the Firestore document via REST API
-  var url = 'https://firestore.googleapis.com/v1/projects/' + projId
-          + '/databases/(default)/documents/bcot_overtime_secure/'
-          + encodeURIComponent(appKey) + '/app_config/version'
-          + '?key=' + encodeURIComponent(fbKey)
-          + '&updateMask.fieldPaths=v';
+  var docUrl = 'https://firestore.googleapis.com/v1/projects/' + projId
+             + '/databases/(default)/documents/bcot_overtime_secure/'
+             + encodeURIComponent(appKey) + '/app_config/version'
+             + '?key=' + encodeURIComponent(fbKey);
 
   try {
+    // Read the current color index so we can advance to the next one — the
+    // dot must always change, so this is a fixed rotation, not a hash.
+    var paletteLen = (window.BCOT_VERSION_DOT_COLORS || []).length || 8;
+    var curColorIdx = -1;
+    try {
+      var getR = await fetch(docUrl + '&_=' + Date.now(), { cache: 'no-store' });
+      if (getR.ok) {
+        var cur = await getR.json();
+        var raw = cur.fields && cur.fields.c && cur.fields.c.integerValue;
+        if (raw !== undefined) curColorIdx = parseInt(raw, 10) || 0;
+      }
+    } catch (e) { /* first-ever publish, or offline — fall back to index 0 */ }
+    var nextColorIdx = (curColorIdx + 1 + paletteLen) % paletteLen;
+
+    // PATCH the Firestore document via REST API
+    var url = docUrl + '&updateMask.fieldPaths=v&updateMask.fieldPaths=c';
     var r = await fetch(url, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ fields: { v: { stringValue: v } } })
+      body:    JSON.stringify({ fields: { v: { stringValue: v }, c: { integerValue: String(nextColorIdx) } } })
     });
     if (!r.ok) throw new Error('Firestore returned HTTP ' + r.status);
 
-    // Update admin's own localStorage so they don't self-trigger a reload
+    // Update admin's own localStorage so they don't self-trigger a reload,
+    // and reflect the new color on this screen right away.
     localStorage.setItem('BCOT_APP_VERSION_V1', v);
+    if (window.BCOT_applyVersionDot) window.BCOT_applyVersionDot(nextColorIdx, v);
 
     var msg = 'Version set to <strong>' + v + '</strong>.<br><br>'
             + 'All users will hard-refresh on their next page load.';
