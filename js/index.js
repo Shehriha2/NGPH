@@ -1411,13 +1411,16 @@
     }
 
     // ── Calendar ──────────────────────────────────────────────────────────────
-    function getDaysInMonth(month) { return new Date(new Date().getFullYear(), month, 0).getDate(); }
+    function getDaysInMonth(month) {
+      const year=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
+      return new Date(year, month, 0).getDate();
+    }
     function isWeekend(year, month, day) { const d = new Date(year, month-1, day).getDay(); return d===5||d===6; }
 
     // ── Table ─────────────────────────────────────────────────────────────────
     function updateTable() {
       const month = parseInt(document.getElementById('monthSelect').value, 10);
-      const year  = new Date().getFullYear();
+      const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
       const days  = getDaysInMonth(month);
       const headerRow = document.getElementById('rotaHeaderRow');
       headerRow.innerHTML = '';
@@ -2297,7 +2300,8 @@
     // ── Firestore paths (area-scoped for rotas) ───────────────────────────────
     function monthDocId() {
       const month=Number(document.getElementById('monthSelect').value);
-      return `${new Date().getFullYear()}-${String(month).padStart(2,'0')}`;
+      const year=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
+      return `${year}-${String(month).padStart(2,'0')}`;
     }
     function getMonthDocRef(key,docId)    { return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',getCurrentArea(),'months',docId); }
     function getNamedDocRef(key,saveName) { return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',getCurrentArea(),'named',saveName); }
@@ -2565,23 +2569,13 @@
 
     function applyPayloadToTable(payload, fromDraft=false) {
       if (!fromDraft) clearDraft();  // loading from cloud/file clears the draft
+      // No area re-filtering here: a release is stored under areas/{area}/releases/...,
+      // so the storage path is already the source of truth for which area it belongs
+      // to. Re-checking each staff member's CURRENT area tag against a release saved
+      // earlier was actively harmful — any drift (reassignment, multi-area staff,
+      // even a saved tag no longer matching) would silently drop that person's whole
+      // row on load, which could wipe the entire table if it happened broadly enough.
       let records=Array.isArray(payload?.records)?payload.records:[];
-      // Filter to current area — saved rotas may include staff from other areas
-      const _loadArea=getCurrentArea();
-      if (_loadArea&&_loadArea!=='ALL') {
-        try {
-          const _pool=JSON.parse(localStorage.getItem(STAFF_RECORDS_KEY)||'[]')||[];
-          if (_pool.length) {
-            const _areaMap=new Map(_pool.map(s=>[(s.name||'').trim(),
-              (s.area||'').toUpperCase().split(',').map(x=>x.trim()).filter(Boolean)]));
-            records=records.filter(rec=>{
-              const _a=_areaMap.get((rec.staffName||'').trim());
-              if(!_a) return true; // not in local pool — keep to be safe
-              return _a.includes(_loadArea);
-            });
-          }
-        } catch {}
-      }
       if (payload?.month) document.getElementById('monthSelect').value=String(payload.month);
       if (payload?.year) { const yi=document.getElementById('yearInput'); if(yi) yi.value=String(payload.year); }
       document.getElementById('rotaTitleInput').value=(payload?.rotaTitle||'').trim();
@@ -2696,7 +2690,7 @@
       try {
         const docId=monthDocId();
         const month=Number(document.getElementById('monthSelect').value);
-        const year=new Date().getFullYear();
+        const year=Number(document.getElementById('yearInput')?.value)||new Date().getFullYear();
         const mName=new Date(year,month-1,1).toLocaleString('default',{month:'long'});
         const idxSnap=await window.FB.getDoc(getReleasesIndexRef(key,area,docId));
         let rels=idxSnap.exists()?[...(idxSnap.data().releases||[])].reverse():[];
