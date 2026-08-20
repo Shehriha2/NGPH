@@ -2114,7 +2114,7 @@
     }
 
     let _legendTimer = null;
-    function updateHours(row) {
+    function updateHours(row, skipAutoDetect) {
       const hCell = row.querySelector('.hours-cell');
       if (!hCell) return;
       const hIdx  = Array.from(row.cells).indexOf(hCell);
@@ -2140,7 +2140,9 @@
         hCell.classList.add(s==='over'?'hours-over':s==='under'?'hours-warn':'hours-ok');
       }
       calcOT(row);
-      autoDetectSchedType(row);  // may update sched type + re-run calcOT internally
+      // Skipped when restoring a saved row (e.g. loading a release) — the
+      // saved Sched. Type is authoritative there, not a guess to overwrite.
+      if (!skipAutoDetect) autoDetectSchedType(row);
       updateDashboard();
       // Refresh banner hours, OT and duty chip if this is the active row
       if (_activeEditRow === row) {
@@ -2606,7 +2608,7 @@
           const dot=row.querySelector('.note-dot');
           if (dot) { dot.classList.add('visible'); dot.title=rec.note; }
         }
-        updateHours(row);
+        updateHours(row, true);
         if (rec.otOverride!=null) {
           const otCell=row.querySelector('.ot-cell');
           otCell.dataset.override='true';
