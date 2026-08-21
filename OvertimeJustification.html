@@ -23,8 +23,8 @@
 
     /* ── Form wrapper ── */
     .form-wrapper{
-      background:#fff; padding:20px 28px 16px; border-radius:6px;
-      box-shadow:0 1px 6px rgba(0,0,0,.1); max-width:960px; margin:0 auto;
+      background:#fff; padding:16px 22px; border:1px solid #333; max-width:960px; margin:0 auto;
+      box-shadow:0 1px 6px rgba(0,0,0,.1);
     }
 
     /* ── Page section: one employee per page ── */
@@ -35,10 +35,28 @@
       padding-bottom:24px;
     }
 
+    /* ── Official bilingual header (Kingdom / crest / Arabic) ── */
+    .official-header{
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      padding-bottom:10px; margin-bottom:10px;
+    }
+    .official-header .oh-en{ text-align:center; font-size:12.5px; line-height:1.6; flex:1; }
+    .official-header .oh-ar{ text-align:center; font-size:12.5px; line-height:1.6; direction:rtl; flex:1; font-family:Arial,sans-serif; }
+    .official-header .oh-logo{ width:70px; height:70px; flex-shrink:0; }
+    .official-header .oh-logo img{ width:100%; height:100%; object-fit:contain; }
+
     /* ── Title block ── */
-    .form-title{ text-align:center; margin-bottom:14px; }
-    .form-title .main-title{ font-size:14px; font-weight:900; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
-    .form-title .sub-title{ font-size:12.5px; font-weight:400; line-height:1.7; }
+    .form-title{
+      text-align:center; margin:0 0 8px; background:#e5e5e5; border:1px solid #333; padding:6px 10px;
+    }
+    .form-title .main-title{ font-size:15px; font-weight:600; }
+
+    /* ── Part section header bars (Part I / II / III) ── */
+    .part-header{
+      text-align:center; background:#dcdcdc; border:3px double #333;
+      padding:5px 10px; font-size:11px; margin:10px 0 8px;
+    }
+    .part-header b{ font-weight:800; }
 
     /* ── Meta fields ── */
     .meta-section{ margin-bottom:10px; }
@@ -50,10 +68,11 @@
       display:grid; grid-template-columns:2fr 1fr 1fr; gap:0 14px;
       margin-bottom:5px; align-items:baseline;
     }
-    .meta-cell{ display:flex; align-items:baseline; gap:5px; font-size:11px; }
-    .meta-cell b{ white-space:nowrap; font-weight:700; }
+    .meta-cell{ display:flex; align-items:baseline; gap:0; font-size:11px; }
+    .meta-cell b, .meta-cell > span:first-child{ white-space:nowrap; font-weight:700; }
+    .meta-cell .m-colon{ margin:0 4px; }
     .meta-cell .meta-val{
-      flex:1; border:none; border-bottom:1px solid #333; border-radius:0;
+      flex:1; border:none; border-bottom:1px dotted #333; border-radius:0;
       padding:1px 4px; font-size:11px; font-family:Arial,sans-serif;
       background:transparent; outline:none; min-width:50px;
     }
@@ -62,7 +81,7 @@
     /* ── Day table ── */
     .day-table{ width:100%; border-collapse:collapse; border:1px solid #333; margin-top:6px; table-layout:fixed; }
     .day-table th{
-      background:#ffd700; color:#000; font-weight:700; font-size:9px;
+      background:#e5e5e5; color:#000; font-weight:700; font-size:9px;
       border:1px solid #333; padding:3px 2px; text-align:center; line-height:1.25;
     }
     .day-table td{
@@ -76,57 +95,53 @@
     }
     .day-table td.just input{ text-align:left; }
     .day-table td input:focus{ background:#fffde7; }
-    .total-row td{ font-weight:700; font-size:9.5px; background:#f8fafc; }
+    .total-row td{ font-weight:700; font-size:9.5px; background:#e5e5e5; }
 
-    /* ── Signature section — 3 approvers ── */
-    .sig-wrapper{
-      margin-top:16px;
-      break-inside:avoid;
-      page-break-inside:avoid;
+    /* ── Approvals — 4 columns: Director | Badge No. | Executive Director | CEO/CMO/COO ── */
+    .sig-wrapper{ margin-top:14px; break-inside:avoid; page-break-inside:avoid; }
+    .approvals-label{ font-weight:700; font-size:11px; margin-bottom:4px; }
+    .sig-row{ display:flex; }
+    .sig-block{ padding:0 10px 4px 0; }
+    .sig-line{ border-bottom:1px solid #333; height:20px; }
+    .sig-role{ font-weight:700; font-size:9.5px; text-align:center; padding-top:3px; line-height:1.4; }
+    .sig-role .sig-sub{ font-weight:400; display:block; }
+    .sig-director{ flex:0 0 26%; }
+    .sig-badge   { flex:0 0 14%; padding-right:12px; border-right:1px solid #333; }
+    .sig-exdir   { flex:0 0 30%; padding-left:12px; padding-right:12px; border-right:1px solid #333; }
+    .sig-ceo     { flex:1; padding-left:12px; padding-right:0; }
+    .sig-footnote{
+      font-size:8.5px; background:#f0f0f0; border:1px solid #333; padding:5px 8px; margin-top:10px; line-height:1.4;
     }
-    .sig-row1{
-      display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start;
-      margin-bottom:16px;
-    }
-    .sig-row2{ display:flex; justify-content:center; margin-bottom:8px; }
-    .sig-row2 .sig-block{ min-width:220px; }
-    .sig-block{ font-size:10.5px; line-height:1.8; }
-    .sig-label{ font-weight:400; margin-bottom:0; line-height:1.6; min-height:44px; display:block; }
-    .sig-line{ border-bottom:1px solid #333; margin:0 0 6px; }
-    .sig-field{ display:flex; gap:4px; align-items:baseline; font-size:10.5px; line-height:1.8; }
-    .sig-field .sf-key{ white-space:nowrap; min-width:52px; font-weight:400; }
-    .sig-block input[type="text"]{
-      flex:1; border:none; border-bottom:1px solid transparent; border-radius:0;
-      padding:1px 3px; font-size:10.5px; font-family:Arial,sans-serif;
-      background:transparent; outline:none;
-    }
-    .sig-block input[type="text"]:focus{ background:#fffde7; border-bottom-color:#aaa; }
-    .sig-footnote{ font-size:8.5px; color:#555; font-style:italic; line-height:1.4; margin-top:4px; }
 
     /* ── Part II / Part III sections ── */
-    .part-section{ margin-top:14px; break-inside:avoid; page-break-inside:avoid; }
-    .part-title{
-      background:#e2e8f0; font-weight:700; font-size:10px; padding:4px 8px;
-      border:1px solid #333; border-bottom:none;
-    }
+    .part-section{ margin-top:4px; break-inside:avoid; page-break-inside:avoid; }
     .part-table{ width:100%; border-collapse:collapse; border:1px solid #333; }
-    .part-table td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; vertical-align:top; }
-    .part-table td b{ display:block; font-size:8.5px; color:#555; font-weight:700; margin-bottom:2px; }
-    .part-table input[type="text"]{
-      width:100%; border:none; border-bottom:1px solid #ccc; background:transparent;
-      font-size:10px; font-family:Arial,sans-serif; outline:none; padding:1px 2px;
-    }
-    .part-table input[type="text"]:focus{ background:#fffde7; }
+    .part-table td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; vertical-align:top; height:22px; }
+    .part-table td.lbl{ font-weight:700; font-size:9.5px; white-space:nowrap; vertical-align:middle; }
 
-    /* ── Footer ── */
-    .form-footer{
-      display:flex; align-items:baseline;
-      margin-top:14px; font-size:8pt; color:#666;
-      border-top:1px solid #e5e7eb; padding-top:5px;
+    /* Part II: two side-by-side boxes */
+    .part2-wrap{ display:flex; gap:8px; align-items:flex-start; }
+    .part2-left{ flex:0 0 58%; width:58%; border-collapse:collapse; border:1px solid #333; }
+    .part2-left td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
+    .part2-left td.lbl{ font-weight:700; white-space:nowrap; }
+    .part2-left td.total-lbl{ font-weight:700; white-space:nowrap; width:16%; }
+    .part2-right{ flex:1; width:42%; border-collapse:collapse; border:1px solid #333; }
+    .part2-right td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
+    .part2-right td.lbl{ font-weight:700; white-space:nowrap; width:38%; }
+
+    /* Part III: shaded label row + blank data row */
+    .part3-table th{
+      background:#dcdcdc; border:1px solid #333; padding:4px 6px; font-size:9.5px; font-weight:700;
     }
-    .ff-left  { flex:1; text-align:left; }
-    .ff-center{ flex:1; text-align:center; font-size:7.5pt; color:#aaa; }
-    .ff-right { flex:1; text-align:right; }
+    .part3-table td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
+
+    /* ── Footer — six items in one shaded bar, always shows Page X of Y ── */
+    .form-footer{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-top:10px; font-size:8pt; color:#333;
+      border:1px solid #333; background:#e5e5e5; padding:5px 10px;
+    }
+    .form-footer .ff-page{ font-size:11pt; color:#000; }
 
     /* ── Status ── */
     .status-message{
@@ -135,12 +150,12 @@
     }
     .status-ok{ background:#28a745; } .status-err{ background:#dc3545; }
 
-    /* ── PRINT ── */
+    /* ── PRINT — tuned so one employee's form fits exactly one A4 page ── */
     @media print{
-      @page{ size:A4 portrait; margin:12mm 10mm 12mm 10mm; }
+      @page{ size:A4 portrait; margin:9mm 9mm 8mm 9mm; }
       body{ background:#fff; padding:0; }
       .controls-bar{ display:none !important; }
-      .form-wrapper{ box-shadow:none; padding:0; max-width:100%; border-radius:0; }
+      .form-wrapper{ box-shadow:none; padding:0; max-width:100%; }
 
       .print-page.page-break-after{
         page-break-after:always;
@@ -149,15 +164,25 @@
         padding-bottom:0;
       }
 
+      .official-header{ padding-bottom:6px; margin-bottom:6px; font-size:9.5pt; }
+      .form-title{ margin:0 0 5px; padding:4px 8px; }
       .form-title .main-title{ font-size:12.5pt; }
-      .form-title .sub-title{ font-size:10pt; }
+      .part-header{ margin:6px 0 5px; padding:3px 8px; }
+      .meta-section{ margin-bottom:6px; }
+      .meta-row, .meta-row3{ margin-bottom:3px; }
       .meta-cell{ font-size:8.5pt; }
-      .meta-cell .meta-val{ border-bottom:1px solid #333 !important; }
-      .day-table th, .day-table td{ font-size:7.5pt; }
-      .sig-block, .sig-field{ font-size:9pt; }
-      .sig-block input[type="text"]{ border-bottom:none !important; }
-      .sig-label{ min-height:16mm; }
-      .part-table input[type="text"]{ border-bottom:none !important; }
+      .meta-cell .meta-val{ border-bottom:1px dotted #333 !important; }
+      .day-table{ margin-top:3px; }
+      .day-table th{ padding:2px; }
+      .day-table td{ padding:0.5px 2px; }
+      .day-table th, .day-table td{ font-size:7pt; }
+      .sig-wrapper{ margin-top:8px; }
+      .approvals-label{ margin-bottom:3px; }
+      .sig-role{ font-size:8.5pt; }
+      .sig-footnote{ margin-top:6px; padding:3px 6px; }
+      .part-section{ margin-top:3px; }
+      .part-table td, .part2-left td, .part2-right td{ padding:2px 6px; height:16px; }
+      .form-footer{ margin-top:6px; padding:3px 8px; }
       *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
     }
   </style>
@@ -188,14 +213,12 @@
 
 <!-- Form wrapper — rebuilt by buildForm() each time data is loaded -->
 <div class="form-wrapper" id="formWrapper">
-  <div class="form-title">
-    <div class="main-title">Overtime Justification (Non-Physicians)</div>
-    <div class="sub-title">
-      King Abdulaziz Medical City<br>
-      National Guard Health Affairs<br>
-      Western Region
-    </div>
+  <div class="official-header">
+    <div class="oh-en">Kingdom of Saudi Arabia<br>Ministry of National Guard Health Affairs</div>
+    <div class="oh-logo"><img src="MNGHA-Crest.png" alt="Ministry of National Guard Health Affairs Crest" onerror="this.style.visibility='hidden'"></div>
+    <div class="oh-ar">المملكة العربية السعودية<br>الشؤون الصحية بوزارة الحرس الوطني</div>
   </div>
+  <div class="form-title"><div class="main-title">Overtime Justification (Non-Physicians)</div></div>
   <div style="text-align:center;color:#888;padding:30px;">
     Click "Load &amp; Build Forms" to generate one Overtime Justification sheet per staff member with overtime this month.
   </div>

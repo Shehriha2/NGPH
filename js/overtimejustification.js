@@ -123,62 +123,82 @@
     return rows;
   }
 
-  // ── Signature block (3 approvers, matches the paper form) ────────────────
-  function sigHtml(meta, gi) {
+  // ── Official bilingual header + title (identical on every printed page) ──
+  function officialHeaderHtml() {
+    return `<div class="official-header">
+      <div class="oh-en">Kingdom of Saudi Arabia<br>Ministry of National Guard Health Affairs</div>
+      <div class="oh-logo"><img src="MNGHA-Crest.png" alt="Ministry of National Guard Health Affairs Crest" onerror="this.style.visibility='hidden'"></div>
+      <div class="oh-ar">المملكة العربية السعودية<br>الشؤون الصحية بوزارة الحرس الوطني</div>
+    </div>
+    <div class="form-title"><div class="main-title">Overtime Justification (Non-Physicians)</div></div>`;
+  }
+
+  // ── Approvals + Part II + Part III (matches the paper form exactly — blank
+  // signature lines only, no typed Name/Badge fields) ──────────────────────
+  function sigHtml() {
     return `<div class="sig-wrapper">
-      <div class="sig-row1">
-        <div class="sig-block">
-          <div class="sig-label">Director (or equivalent):<br>(Name and Signature)</div>
+      <div class="approvals-label">Approvals:</div>
+      <div class="sig-row">
+        <div class="sig-block sig-director">
           <div class="sig-line"></div>
-          <div class="sig-field"><span class="sf-key">Name:</span>     <input type="text" ${gi===0?'id="dirName"':''} value="${esc(meta.dirName)}"/></div>
-          <div class="sig-field"><span class="sf-key">Badge No:</span> <input type="text" ${gi===0?'id="dirBadge"':''} value="${esc(meta.dirBadge)}"/></div>
+          <div class="sig-role">Director (or equivalent)<span class="sig-sub">(Name and Signature)</span></div>
         </div>
-        <div class="sig-block">
-          <div class="sig-label">Executive Director (or equivalent):<br>(Name and Signature)</div>
+        <div class="sig-block sig-badge">
           <div class="sig-line"></div>
-          <div class="sig-field"><span class="sf-key">Name:</span> <input type="text" ${gi===0?'id="exDirName"':''} value="${esc(meta.exDirName)}"/></div>
+          <div class="sig-role">Badge No.</div>
+        </div>
+        <div class="sig-block sig-exdir">
+          <div class="sig-line"></div>
+          <div class="sig-role">Executive Director (or equivalent)<span class="sig-sub">(Name and Signature)</span></div>
+        </div>
+        <div class="sig-block sig-ceo">
+          <div class="sig-line"></div>
+          <div class="sig-role">CEO/CMO/COO *<span class="sig-sub">(Name and Signature)</span></div>
         </div>
       </div>
-      <div class="sig-row2">
-        <div class="sig-block">
-          <div class="sig-label" style="text-align:center;">CEO/CMO/COO * :<br>(Name and Signature)</div>
-          <div class="sig-line"></div>
-          <div class="sig-field"><span class="sf-key">Name:</span> <input type="text" ${gi===0?'id="ceoName"':''} value="${esc(meta.ceoName)}"/></div>
-        </div>
+      <div class="sig-footnote">* For employees reporting directly to Senior Executive Management or for employees with overtime greater than 75 hours per month not to exceed 128 hours at any given month.</div>
+    </div>
+    <div class="part-section">
+      <div class="part-header"><b>Part II -</b> To be completed by Corporate Human Resources (or equivalent)</div>
+      <div class="part2-wrap">
+        <table class="part2-left">
+          <tr>
+            <td class="lbl">Department OU No</td><td></td><td></td><td></td>
+            <td class="total-lbl">Total Hours</td>
+          </tr>
+          <tr>
+            <td class="lbl">Overtime Hours</td><td></td><td></td><td></td>
+          </tr>
+        </table>
+        <table class="part2-right">
+          <tr><td class="lbl">Verified by</td><td></td></tr>
+          <tr><td class="lbl">Approved by</td><td></td></tr>
+          <tr><td class="lbl">Remarks/Notes</td><td></td></tr>
+        </table>
       </div>
-      <div class="sig-footnote">* For employees reporting directly to Senior Executive Management, or for employees with overtime greater than 75 hours per month, not to exceed 128 hours in any given month.</div>
     </div>
     <div class="part-section">
-      <div class="part-title">Part II - To be completed by Corporate Human Resources (or equivalent)</div>
-      <table class="part-table">
+      <div class="part-header"><b>Part III -</b> To be completed by Corporate Payroll Services (or equivalent)</div>
+      <table class="part-table part3-table">
         <tr>
-          <td style="width:25%;"><b>Department OU No</b><input type="text"/></td>
-          <td style="width:20%;"><b>Total Hours</b><input type="text"/></td>
-          <td style="width:20%;"><b>Overtime Hours</b><input type="text"/></td>
-          <td style="width:17.5%;"><b>Verified by</b><input type="text"/></td>
-          <td style="width:17.5%;"><b>Approved by</b><input type="text"/></td>
+          <th style="width:20%;">Overtime hours</th>
+          <th style="width:20%;">Basic salary</th>
+          <th style="width:25%;">Amount of Overtime</th>
+          <th style="width:35%;">Remarks/Notes</th>
         </tr>
-        <tr><td colspan="5"><b>Remarks/Notes</b><input type="text"/></td></tr>
-      </table>
-    </div>
-    <div class="part-section">
-      <div class="part-title">Part III - To be completed by Corporate Payroll Services (or equivalent)</div>
-      <table class="part-table">
-        <tr>
-          <td style="width:25%;"><b>Overtime hours</b><input type="text"/></td>
-          <td style="width:25%;"><b>Basic salary</b><input type="text"/></td>
-          <td style="width:25%;"><b>Amount of Overtime</b><input type="text"/></td>
-          <td style="width:25%;"><b>Remarks/Notes</b><input type="text"/></td>
-        </tr>
+        <tr><td></td><td></td><td></td><td></td></tr>
       </table>
     </div>`;
   }
 
-  function formFooterHtml() {
+  function formFooterHtml(pageNum, totalPages) {
     return `<div class="form-footer">
-      <span class="ff-left">Non-Clinical Form Rev. 03/2025</span>
-      <span class="ff-center">Ref# APP 1431-23 &nbsp;·&nbsp; Appendix F</span>
-      <span class="ff-right">CPRA # 0602-0626</span>
+      <span>Non-Clinical Form</span>
+      <span>Rev. 03/2025</span>
+      <span>Ref# APP 1431-23</span>
+      <span class="ff-page">Page ${pageNum} of ${totalPages}</span>
+      <span>Appendix F</span>
+      <span>CPRA # 0602-0626</span>
     </div>`;
   }
 
@@ -189,45 +209,34 @@
     let html = '';
 
     entries.forEach((entry, gi) => {
-      const pgBadge = totalPages > 1
-        ? `<div style="position:absolute;top:0;right:0;font-size:9px;color:#888;font-style:italic;">Page ${gi+1} / ${totalPages}</div>`
-        : '';
-
       html += `<div class="print-page page-break-after">
-        <div class="form-title" style="position:relative;">
-          ${pgBadge}
-          <div class="main-title">Overtime Justification (Non-Physicians)</div>
-          <div class="sub-title">
-            King Abdulaziz Medical City<br>
-            National Guard Health Affairs<br>
-            Western Region
-          </div>
-        </div>
+        ${officialHeaderHtml()}
+        <div class="part-header"><b>Part I -</b> To be completed by the Requester</div>
         <div class="meta-section">
           <div class="meta-row3">
-            <div class="meta-cell"><b>Employee Name:</b>
+            <div class="meta-cell"><b>Employee Name</b><span class="m-colon">:</span>
               <input type="text" class="meta-val" value="${esc(entry.name)}"/>
             </div>
-            <div class="meta-cell"><span>Badge No.:</span>
+            <div class="meta-cell"><span>Badge No.</span><span class="m-colon">:</span>
               <input type="text" class="meta-val" value="${esc(entry.badge)}"/>
             </div>
-            <div class="meta-cell"><span>Ext. No.:</span>
+            <div class="meta-cell"><span>Ext. No.</span><span class="m-colon">:</span>
               <input type="text" class="meta-val" ${gi===0?'id="extNo"':''} value="${esc(meta.ext)}"/>
             </div>
           </div>
           <div class="meta-row">
-            <div class="meta-cell"><b>Position:</b>
+            <div class="meta-cell"><b>Position</b><span class="m-colon">:</span>
               <input type="text" class="meta-val" value="${esc(entry.position)}"/>
             </div>
-            <div class="meta-cell"><span>Month of:</span>
+            <div class="meta-cell"><span>Month of</span><span class="m-colon">:</span>
               <input type="text" class="meta-val" ${gi===0?'id="periodCovered"':''} value="${esc(meta.period)}"/>
             </div>
           </div>
           <div class="meta-row">
-            <div class="meta-cell"><b>Department:</b>
+            <div class="meta-cell"><b>Department</b><span class="m-colon">:</span>
               <input type="text" class="meta-val" ${gi===0?'id="deptName"':''} value="${esc(meta.dept)}"/>
             </div>
-            <div class="meta-cell"><span>Mail Code:</span>
+            <div class="meta-cell"><span>Mail Code</span><span class="m-colon">:</span>
               <input type="text" class="meta-val" ${gi===0?'id="mailCode"':''} value="${esc(meta.mail)}"/>
             </div>
           </div>
@@ -273,11 +282,11 @@
           </tbody>
         </table>
 
-        ${sigHtml(meta, gi)}
+        ${sigHtml()}
+        ${formFooterHtml(gi+1, totalPages)}
       </div>`;
     });
 
-    html += formFooterHtml();
     wrapper.innerHTML = html;
   }
 
@@ -290,14 +299,10 @@
     const areaSelVal = (document.getElementById("areaSel").value||'ALL').trim().toUpperCase();
 
     const meta = {
-      dept:     document.getElementById('deptName')?.value      || 'PHARMACEUTICAL CARE SERVICES',
-      period:   document.getElementById('periodCovered')?.value || '',
-      ext:      document.getElementById('extNo')?.value         || '62998',
-      mail:     document.getElementById('mailCode')?.value      || '7330',
-      dirName:  document.getElementById('dirName')?.value       || 'Dr. Hassan Alshehri',
-      dirBadge: document.getElementById('dirBadge')?.value      || '9155466',
-      exDirName:document.getElementById('exDirName')?.value     || '',
-      ceoName:  document.getElementById('ceoName')?.value       || '',
+      dept:   document.getElementById('deptName')?.value      || 'PHARMACEUTICAL CARE SERVICES',
+      period: document.getElementById('periodCovered')?.value || '',
+      ext:    document.getElementById('extNo')?.value         || '62998',
+      mail:   document.getElementById('mailCode')?.value      || '7330',
     };
 
     showStatus("Loading from cloud…");
