@@ -102,7 +102,10 @@
     .approvals-label{ font-weight:700; font-size:11px; margin-bottom:4px; }
     .sig-row{ display:flex; }
     .sig-block{ padding:0 10px 4px 0; }
-    .sig-line{ border-bottom:1px solid #333; height:20px; }
+    .sig-line{
+      border-bottom:1px solid #333; height:20px; font-size:10px; text-align:center;
+      padding-top:2px; box-sizing:border-box; overflow:hidden; white-space:nowrap;
+    }
     .sig-role{ font-weight:700; font-size:9.5px; text-align:center; padding-top:3px; line-height:1.4; }
     .sig-role .sig-sub{ font-weight:400; display:block; }
     .sig-director{ flex:0 0 26%; }
@@ -135,13 +138,41 @@
     }
     .part3-table td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
 
-    /* ── Footer — six items in one shaded bar, always shows Page X of Y ── */
+    /* ── Footer — five items in one shaded bar ── */
     .form-footer{
       display:flex; align-items:center; justify-content:space-between;
       margin-top:10px; font-size:8pt; color:#333;
       border:1px solid #333; background:#e5e5e5; padding:5px 10px;
     }
-    .form-footer .ff-page{ font-size:11pt; color:#000; }
+
+    /* ── Approvers modal ── */
+    .apr-modal{
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2000;
+      align-items:center; justify-content:center;
+    }
+    .apr-modal-inner{
+      background:#fff; border-radius:12px; padding:20px 24px; width:min(480px,92vw);
+      max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.25);
+    }
+    .apr-modal-inner h3{ margin:0 0 14px; font-size:15px; color:var(--primary); }
+    .apr-section{ margin-bottom:10px; }
+    .apr-section label{ display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:3px; }
+    .apr-section select{ width:100%; box-sizing:border-box; }
+    .apr-modal-inner hr{ border:none; border-top:1px solid #e5e7eb; margin:14px 0; }
+    .apr-manage b{ font-size:12px; color:#334155; }
+    .apr-list-row{
+      display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; border-bottom:1px solid #f1f5f9;
+    }
+    .apr-list-row .apr-name{ flex:1; font-weight:700; }
+    .apr-list-row .apr-badge{ color:#6b7280; font-size:11px; }
+    .apr-list-row button{ background:#dc3545; padding:3px 8px; font-size:11px; }
+    .apr-list-row button:hover{ background:#b91c1c; }
+    .apr-add-row{ display:flex; gap:6px; margin-top:8px; }
+    .apr-add-row input{ flex:1; min-width:0; }
+    .apr-add-row button{ flex-shrink:0; }
+    .apr-hint{ font-size:10.5px; color:#888; margin-top:4px; }
+    .apr-modal-btns{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+    .btn-gray{ background:#6b7280; } .btn-gray:hover{ background:#4b5563; }
 
     /* ── Status ── */
     .status-message{
@@ -205,10 +236,45 @@
     <option value="ALL">All Areas</option>
   </select>
   <button class="btn-green" onclick="loadAndBuild()">Load &amp; Build Forms</button>
+  <button onclick="openApproversModal()">👤 Approvers</button>
   <button class="btn-orange" onclick="window.print()">🖨 Print</button>
   <a href="index.html" style="text-decoration:none;margin-left:auto">
     <button type="button">← Back to Rota</button>
   </a>
+</div>
+
+<!-- Approvers modal: pick who signs this batch + manage the saved list -->
+<div id="approversModal" class="apr-modal">
+  <div class="apr-modal-inner">
+    <h3>👤 Approvers for this batch</h3>
+    <div class="apr-section">
+      <label>Director (or equivalent)</label>
+      <select id="aprDirectorSel"><option value="">— None —</option></select>
+    </div>
+    <div class="apr-section">
+      <label>Executive Director (or equivalent)</label>
+      <select id="aprExDirSel"><option value="">— None —</option></select>
+    </div>
+    <div class="apr-section">
+      <label>CEO/CMO/COO</label>
+      <select id="aprCeoSel"><option value="">— None —</option></select>
+    </div>
+    <hr/>
+    <div class="apr-manage">
+      <b>Saved Approvers</b>
+      <div id="aprList"></div>
+      <div class="apr-add-row">
+        <input type="text" id="aprNewName" placeholder="Name"/>
+        <input type="text" id="aprNewBadge" placeholder="Badge No. (optional)"/>
+        <button id="aprAddBtn" onclick="addApprover()">+ Add</button>
+      </div>
+      <div class="apr-hint" id="aprHint">Only Director uses Badge No. — leave it blank for the others.</div>
+    </div>
+    <div class="apr-modal-btns">
+      <button class="btn-gray" onclick="closeApproversModal()">Cancel</button>
+      <button class="btn-green" onclick="applyApprovers()">Apply</button>
+    </div>
+  </div>
 </div>
 
 <!-- Form wrapper — rebuilt by buildForm() each time data is loaded -->
@@ -231,7 +297,7 @@
 <script src="js/auth.js?v=10"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
   const firebaseConfig = {
     apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
     authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
@@ -241,7 +307,7 @@
   };
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
-  window.FB = { db, doc, getDoc, collection, getDocs };
+  window.FB = { db, doc, getDoc, setDoc, collection, getDocs };
 </script>
 
 <script src="js/overtimejustification.js"></script>

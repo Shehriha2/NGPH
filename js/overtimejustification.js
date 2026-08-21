@@ -2,6 +2,14 @@
   const STAFF_KEY      = "BCOT_STAFF_RECORDS_V2";
   const DUTIES_KEY     = "BCOT_DUTIES_ALL_V1";
 
+  const APPROVERS_KEY       = "BCOT_APPROVERS_POOL_V1";        // localStorage cache: Approver[]
+  const APPROVERS_SEL_KEY   = "BCOT_APPROVERS_SELECTION_V1";   // localStorage: last-applied selection
+  const APPROVERS_CLOUD_DOC = "APPROVERS_POOL";
+  const MAX_APPROVERS       = 5;
+
+  let _approversPool     = [];                                 // {id, name, badge}[]
+  let _approverSelection = { director:null, exDir:null, ceo:null };
+
   const DEFAULT_JUSTIFICATION = "Overtime required to cover departmental workload / staffing shortage.";
   const BCOT_JUSTIFICATION    = "Catering Business Center Prescriptions for business patients";
 
@@ -31,6 +39,154 @@
 
   // ── Firestore refs ────────────────────────────────────────────────────────
   function monthRef(key,area,docId){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'areas',area,'months',docId); }
+  function approversDocRef(key){ return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'approvers_named',APPROVERS_CLOUD_DOC); }
+
+  // ── Approvers: storage + cloud sync ─────────────────────────────────────
+  async function waitForFB() {
+    let t = 0;
+    while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+    return !!window.FB;
+  }
+
+  function loadApproversLocal() {
+    try { _approversPool = JSON.parse(localStorage.getItem(APPROVERS_KEY) || "[]") || []; }
+    catch { _approversPool = []; }
+    return _approversPool;
+  }
+  function saveApproversLocal() { localStorage.setItem(APPROVERS_KEY, JSON.stringify(_approversPool)); }
+
+  function loadSelectionLocal() {
+    try { _approverSelection = JSON.parse(localStorage.getItem(APPROVERS_SEL_KEY) || "null") || { director:null, exDir:null, ceo:null }; }
+    catch { _approverSelection = { director:null, exDir:null, ceo:null }; }
+    return _approverSelection;
+  }
+  function saveSelectionLocal() { localStorage.setItem(APPROVERS_SEL_KEY, JSON.stringify(_approverSelection)); }
+
+  async function loadApproversFromCloud() {
+    const key = (window.BCOT_APP_KEY || '').trim();
+    if (!key) return;
+    if (!(await waitForFB())) return;
+    try {
+      const snap = await window.FB.getDoc(approversDocRef(key));
+      if (!snap.exists()) return;
+      const arr = Array.isArray(snap.data()?.approvers) ? snap.data().approvers : [];
+      _approversPool = arr.slice(0, MAX_APPROVERS);
+      saveApproversLocal();
+    } catch(e) { console.error(e); }
+  }
+
+  async function saveApproversToCloud() {
+    const key = (window.BCOT_APP_KEY || '').trim();
+    if (!key) { showStatus("config.js not found.", false); return; }
+    if (!(await waitForFB())) { showStatus("Cloud unavailable — saved locally only.", false); return; }
+    try {
+      await window.FB.setDoc(approversDocRef(key), { savedAt:new Date().toISOString(), approvers:_approversPool }, { merge:true });
+    } catch(e) { console.error(e); showStatus("Cloud sync failed: "+(e?.message||e), false); }
+  }
+
+  // ── Approvers: modal UI ──────────────────────────────────────────────────
+  function genApproverId() { return 'apr_' + Date.now() + '_' + Math.floor(Math.random()*9999); }
+  function resolveApprover(id) { return _approversPool.find(a => a.id === id) || null; }
+
+  function renderApproverList() {
+    const box = document.getElementById('aprList');
+    if (!_approversPool.length) {
+      box.innerHTML = '<div class="apr-hint">No saved approvers yet — add one below.</div>';
+    } else {
+      box.innerHTML = _approversPool.map(a => `<div class="apr-list-row">
+        <span class="apr-name">${esc(a.name)}</span>
+        ${a.badge ? `<span class="apr-badge">Badge ${esc(a.badge)}</span>` : ''}
+        <button onclick="removeApprover('${esc(a.id)}')">✕</button>
+      </div>`).join('');
+    }
+    const addBtn = document.getElementById('aprAddBtn');
+    if (addBtn) addBtn.disabled = _approversPool.length >= MAX_APPROVERS;
+  }
+
+  function renderApproverSelects() {
+    const opts = '<option value="">— None —</option>' +
+      _approversPool.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
+    const map = { aprDirectorSel:'director', aprExDirSel:'exDir', aprCeoSel:'ceo' };
+    Object.entries(map).forEach(([elId, role]) => {
+      const sel = document.getElementById(elId);
+      if (!sel) return;
+      sel.innerHTML = opts;
+      sel.value = _approverSelection[role]?.id || '';
+    });
+  }
+
+  function openApproversModal() {
+    loadApproversLocal();
+    document.getElementById('aprNewName').value  = '';
+    document.getElementById('aprNewBadge').value = '';
+    renderApproverList();
+    renderApproverSelects();
+    document.getElementById('approversModal').style.display = 'flex';
+    loadApproversFromCloud().then(() => { renderApproverList(); renderApproverSelects(); });
+  }
+
+  function closeApproversModal() {
+    document.getElementById('approversModal').style.display = 'none';
+    document.getElementById('aprNewName').value  = '';
+    document.getElementById('aprNewBadge').value = '';
+  }
+
+  async function addApprover() {
+    const name  = document.getElementById('aprNewName').value.trim();
+    const badge = document.getElementById('aprNewBadge').value.trim();
+    if (!name) { showStatus("Enter a name first.", false); return; }
+    if (_approversPool.length >= MAX_APPROVERS) { showStatus("Maximum 5 approvers reached — remove one first.", false); return; }
+    _approversPool.push({ id:genApproverId(), name, badge });
+    saveApproversLocal();
+    document.getElementById('aprNewName').value  = '';
+    document.getElementById('aprNewBadge').value = '';
+    renderApproverList();
+    renderApproverSelects();
+    showStatus("Approver added ✅");
+    await saveApproversToCloud();
+  }
+
+  async function removeApprover(id) {
+    if (!confirm("Remove this approver?")) return;
+    _approversPool = _approversPool.filter(a => a.id !== id);
+    saveApproversLocal();
+    let selectionChanged = false;
+    ['director','exDir','ceo'].forEach(role => {
+      if (_approverSelection[role]?.id === id) { _approverSelection[role] = null; selectionChanged = true; }
+    });
+    if (selectionChanged) { saveSelectionLocal(); patchApproversIntoDOM(); }
+    renderApproverList();
+    renderApproverSelects();
+    showStatus("Approver removed.");
+    await saveApproversToCloud();
+  }
+
+  function applyApprovers() {
+    _approverSelection = {
+      director: resolveApprover(document.getElementById('aprDirectorSel').value),
+      exDir:    resolveApprover(document.getElementById('aprExDirSel').value),
+      ceo:      resolveApprover(document.getElementById('aprCeoSel').value),
+    };
+    saveSelectionLocal();
+    closeApproversModal();
+    const n = patchApproversIntoDOM();
+    showStatus(n ? `Approvers applied — ${n} form(s) updated ✅` : "Approvers saved — will apply to your next Build.");
+  }
+
+  function patchApproversIntoDOM() {
+    const pages = document.querySelectorAll('.print-page');
+    pages.forEach(page => {
+      const dirLine = page.querySelector('.sig-director .sig-line');
+      const badLine = page.querySelector('.sig-badge .sig-line');
+      const exdLine = page.querySelector('.sig-exdir .sig-line');
+      const ceoLine = page.querySelector('.sig-ceo .sig-line');
+      if (dirLine) dirLine.textContent = _approverSelection.director?.name  || '';
+      if (badLine) badLine.textContent = _approverSelection.director?.badge || '';
+      if (exdLine) exdLine.textContent = _approverSelection.exDir?.name     || '';
+      if (ceoLine) ceoLine.textContent = _approverSelection.ceo?.name       || '';
+    });
+    return pages.length;
+  }
 
   // ── Area select ───────────────────────────────────────────────────────────
   function buildAreaSelect() {
@@ -136,23 +292,27 @@
   // ── Approvals + Part II + Part III (matches the paper form exactly — blank
   // signature lines only, no typed Name/Badge fields) ──────────────────────
   function sigHtml() {
+    const dirName = esc(_approverSelection.director?.name  || '');
+    const dirBadge= esc(_approverSelection.director?.badge || '');
+    const exdName = esc(_approverSelection.exDir?.name      || '');
+    const ceoName = esc(_approverSelection.ceo?.name        || '');
     return `<div class="sig-wrapper">
       <div class="approvals-label">Approvals:</div>
       <div class="sig-row">
         <div class="sig-block sig-director">
-          <div class="sig-line"></div>
+          <div class="sig-line">${dirName}</div>
           <div class="sig-role">Director (or equivalent)<span class="sig-sub">(Name and Signature)</span></div>
         </div>
         <div class="sig-block sig-badge">
-          <div class="sig-line"></div>
+          <div class="sig-line">${dirBadge}</div>
           <div class="sig-role">Badge No.</div>
         </div>
         <div class="sig-block sig-exdir">
-          <div class="sig-line"></div>
+          <div class="sig-line">${exdName}</div>
           <div class="sig-role">Executive Director (or equivalent)<span class="sig-sub">(Name and Signature)</span></div>
         </div>
         <div class="sig-block sig-ceo">
-          <div class="sig-line"></div>
+          <div class="sig-line">${ceoName}</div>
           <div class="sig-role">CEO/CMO/COO *<span class="sig-sub">(Name and Signature)</span></div>
         </div>
       </div>
@@ -191,12 +351,11 @@
     </div>`;
   }
 
-  function formFooterHtml(pageNum, totalPages) {
+  function formFooterHtml() {
     return `<div class="form-footer">
       <span>Non-Clinical Form</span>
       <span>Rev. 03/2025</span>
       <span>Ref# APP 1431-23</span>
-      <span class="ff-page">Page ${pageNum} of ${totalPages}</span>
       <span>Appendix F</span>
       <span>CPRA # 0602-0626</span>
     </div>`;
@@ -205,7 +364,6 @@
   // ── Main builder — one full print page per staff member ─────────────────
   function buildForm(entries, meta) {
     const wrapper = document.getElementById('formWrapper');
-    const totalPages = entries.length;
     let html = '';
 
     entries.forEach((entry, gi) => {
@@ -283,7 +441,7 @@
         </table>
 
         ${sigHtml()}
-        ${formFooterHtml(gi+1, totalPages)}
+        ${formFooterHtml()}
       </div>`;
     });
 
@@ -369,4 +527,7 @@
     document.getElementById("monthSel").value = String(new Date().getMonth()+1);
     document.getElementById("yearSel").value  = String(new Date().getFullYear());
     buildAreaSelect();
+    loadApproversLocal();
+    loadSelectionLocal();
+    loadApproversFromCloud();
   })();
