@@ -177,7 +177,7 @@
 
     return `<div class="print-page">
       <div class="form-title">
-        <div class="main-title" style="color:#0f766e;">Monthly Overtime Pre-Approval — Grand Summary</div>
+        <div class="main-title" style="color:#0f766e;">Monthly Overtime Pre-Approval — Grand Summary — ${esc(meta.roleLabel||'')}</div>
         <div class="sub-title">
           King Abdulaziz Medical City<br>National Guard Health Affairs<br>Western Region
         </div>
@@ -228,7 +228,7 @@
     let html = `<div class="print-page page-break-after">
       <div class="form-title" style="position:relative;">
         ${pgBadge}
-        <div class="main-title">Monthly Overtime Pre-Approval Form</div>
+        <div class="main-title">Monthly Overtime Pre-Approval Form — ${esc(meta.roleLabel||'')}</div>
         <div class="sub-title">
           King Abdulaziz Medical City<br>
           National Guard Health Affairs<br>
@@ -375,7 +375,9 @@
     });
     try {
       showStatus('Saving to cloud…');
-      await window.FB.setDoc(formDataRef(key, 'BCOT', docId), { rows: rowsData });
+      // merge:true — this save only covers the currently-loaded role group's badges;
+      // a plain (non-merge) setDoc would wipe out the other group's saved picks.
+      await window.FB.setDoc(formDataRef(key, 'BCOT', docId), { rows: rowsData }, { merge:true });
       showStatus('Saved ✅ — other users will see this on next load.');
     } catch(e) { showStatus('Save failed: '+(e?.message||e), false); }
   }
@@ -404,6 +406,8 @@
     if (!key) { showStatus("config.js not found.", false); return; }
     const month = Number(document.getElementById("monthSel").value);
     const year  = Number(document.getElementById("yearSel").value) || new Date().getFullYear();
+    const roleFilter = document.getElementById('roleFilterSel')?.value || 'Pharmacist';
+    const roleLabel   = roleFilter === 'Technician' ? 'Technicians' : 'Pharmacists';
 
     // Snapshot current meta/sig field values before rebuilding
     const meta = {
@@ -417,6 +421,7 @@
       revTitle: document.getElementById('revTitle')?.value     || 'Claim Section (IP.OP.ER), Business Center WR',
       appName:  document.getElementById('appName')?.value      || 'Mr. Saeed Al Muosa',
       appTitle: document.getElementById('appTitle')?.value     || 'Director, Operations, Business Center WR',
+      roleLabel,
     };
 
     showStatus("Loading from cloud…");
@@ -455,6 +460,8 @@
       if ((rec.schedType||'') !== 'BC') return;  // only BC rows
       const name = (rec.staffName||'').trim(); if (!name) return;
       const staffRec = staffRecs.find(s => s.name.trim() === name);
+      const role     = staffRec?.role || 'Pharmacist';
+      if (role !== roleFilter) return;
       const badge    = staffRec?.badge || '—';
       const location = detectLocation(rec.daysData, duties);
 
@@ -478,7 +485,7 @@
     });
 
     if (!rows.length) {
-      showStatus("No BC staff with hours found. Make sure rows in the rota have schedule type set to BC.", false);
+      showStatus(`No BC ${roleLabel} with hours found. Make sure rows in the rota have schedule type set to BC.`, false);
       return;
     }
 
@@ -487,7 +494,7 @@
 
     buildForm(finalRows, meta);
     _cachedRows = finalRows; _cachedMeta = meta;
-    showStatus(`BC OT form built — ${finalRows.length} staff | ${Math.ceil(finalRows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
+    showStatus(`BC OT form built — ${finalRows.length} ${roleLabel} | ${Math.ceil(finalRows.length / (parseInt(document.getElementById('rowsPage1').value,10)||18)) || 1} page(s) ✅`);
   }
 
   // Init
