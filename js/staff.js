@@ -1,7 +1,9 @@
     const AREAS_LIST_KEY     = "BCOT_AREAS_LIST_V1";
     const STAFF_RECORDS_KEY  = "BCOT_STAFF_RECORDS_V2";   // unified pool
     const ROLES_KEY          = "BCOT_ROLES_LIST";
-    const DEFAULT_ROLES      = ["Pharmacist", "Technician", "Pharmacy Aide"];
+    const DEFAULT_ROLES      = ["Pharmacist", "Technician", "Pharmacy Aide",
+      "Admin Assistant", "Associate Clinical Pharmacist", "Clinical Pharmacist",
+      "Clinical Pharmacy Specialist", "Manager", "Supervisor", "Assistant Director", "Director"];
 
     let staffRecords = [];   // full in-memory list (all areas)
 
@@ -300,6 +302,7 @@
           <td>${escapeHtml(s.name)}</td>
           <td>${escapeHtml(s.badge)}</td>
           <td>${escapeHtml(s.role)}</td>
+          <td>${escapeHtml(s.contractDate || '—')}</td>
           <td>${Number(s.hrr || 0).toFixed(2)}</td>
           <td>
             <button type="button" class="area-pick-btn ${s.area ? '' : 'empty'}" data-i="${idx}" data-areas="${escapeHtml(s.area)}">
@@ -871,6 +874,128 @@
         } catch(err) {
           console.error(err);
           showStatusMessage("HRR import failed: " + (err?.message || err), true);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ── Manpower Report Import (Role + Contract Date, existing staff only) ─────
+    // Raw "Position Title" text (as it appears in the report) → this app's role.
+    // Titles not listed here are left unmapped: contract date still updates,
+    // but the person's existing role is not touched.
+    const MANPOWER_ROLE_MAP = {
+      'ADMINISTRATIVE ASSISTANT II':                    'Admin Assistant',
+      'ADMINISTRATIVE ASSISTANT III':                   'Admin Assistant',
+      'ASSISTANT DIRECTOR CLINICAL PHARMACY SERVICES':  'Assistant Director',
+      'ASSISTANT DIRECTOR PHARMACY SERVICES':           'Assistant Director',
+      'ASSOCIATE CLINICAL PHARMACIST':                  'Associate Clinical Pharmacist',
+      'CLINICAL PHARMACIST':                            'Clinical Pharmacist',
+      'CLINICAL PHARMACY SPECIALIST':                   'Clinical Pharmacy Specialist',
+      'DIRECTOR PHARMACEUTICAL CARE SERVICES':          'Director',
+      'MANAGER PHARMACY SERVICES':                      'Manager',
+      'SUPERVISOR PHARMACY SERVICES':                   'Supervisor',
+      'PHARMACIST I':                                   'Pharmacist',
+      'PHARMACIST II':                                  'Pharmacist',
+      'PHARMACY TECHNICIAN I':                           'Technician',
+      'PHARMACY TECHNICIAN II':                          'Technician',
+      'PHARMACY TECHNICIAN III':                         'Technician',
+      'PHARMACY AIDE':                                   'Pharmacy Aide',
+    };
+
+    // Excel dates come through as JS Date objects (cellDates:true) or, rarely,
+    // as raw serial numbers if a cell is formatted as text — handle both.
+    // Uses UTC getters throughout so the date can't shift a day off in local time.
+    function _manpowerDateToISO(v) {
+      if (v instanceof Date && !isNaN(v.getTime())) {
+        return `${v.getUTCFullYear()}-${String(v.getUTCMonth()+1).padStart(2,'0')}-${String(v.getUTCDate()).padStart(2,'0')}`;
+      }
+      if (typeof v === 'number' && v > 0) {
+        const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+      }
+      return '';
+    }
+
+    function importManpowerReport(input) {
+      const file = input.files[0];
+      if (!file) return;
+      input.value = "";   // allow re-selecting same file
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb     = XLSX.read(e.target.result, { type: "array", cellDates: true });
+          const wsName = wb.SheetNames.find(n => /employee/i.test(n)) || wb.SheetNames[0];
+          const ws     = wb.Sheets[wsName];
+          const rows   = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+          if (rows.length < 2) { showStatusMessage("File is empty or has no data rows.", true); return; }
+
+          // Detect columns by header text (case-insensitive) rather than fixed
+          // positions, so the report's exact column order doesn't matter.
+          const header = rows[0].map(h => String(h||'').trim().toLowerCase());
+          let badgeCol = -1, titleCol = -1, dateCol = -1;
+          header.forEach((h, i) => {
+            // "^employee" (not just "employee") so "Dept Code (Employee)" doesn't
+            // get mistaken for the "Employee #" badge column.
+            if (/^employee/.test(h))  badgeCol = i;
+            else if (/title/.test(h)) titleCol = i;
+            else if (/hire/.test(h))  dateCol  = i;
+          });
+          if (badgeCol < 0 || titleCol < 0) {
+            showStatusMessage('Could not find "Employee #" / "Position Title" columns — expected the Manpower report\'s Employees sheet.', true);
+            return;
+          }
+
+          let roleUpdates = 0, dateOnlyUpdates = 0, notFound = 0;
+          const plan = [];   // { badge, role|null, date }
+
+          rows.slice(1).forEach(row => {
+            const badge = String(row[badgeCol] ?? '').trim();
+            if (!badge) return;
+            if (!staffRecords.some(s => String(s.badge).trim() === badge)) { notFound++; return; }
+
+            const titleRaw = String(row[titleCol] ?? '').trim().toUpperCase();
+            const role = MANPOWER_ROLE_MAP[titleRaw] || null;
+            const date = dateCol >= 0 ? _manpowerDateToISO(row[dateCol]) : '';
+
+            plan.push({ badge, role, date });
+            if (role) roleUpdates++; else dateOnlyUpdates++;
+          });
+
+          if (!plan.length) {
+            showStatusMessage("No matching staff found (matched by Employee # / Badge No.).", true);
+            return;
+          }
+
+          const dateNote = dateCol < 0 ? '\n(No hire-date column found — contract dates will not be updated.)' : '';
+          const ok = confirm(
+            `Manpower report import:\n\n` +
+            `${roleUpdates} staff — role + contract date will update\n` +
+            `${dateOnlyUpdates} staff — contract date only (title not recognized, role left as-is)\n` +
+            `${notFound} row(s) skipped — not in your current staff list${dateNote}\n\n` +
+            `Continue?`
+          );
+          if (!ok) { showStatusMessage("Import cancelled."); return; }
+
+          // Update ALL records sharing this badge (across all areas) — same
+          // rule the manual Edit form uses for role/contractDate.
+          plan.forEach(({ badge, role, date }) => {
+            staffRecords.forEach(r => {
+              if (String(r.badge).trim() === badge) {
+                if (role) r.role = role;
+                if (date) r.contractDate = date;
+              }
+            });
+          });
+
+          renderTable();
+          writeLocalKeys();
+          applyAreaFilter();
+          showStatusMessage(`Manpower import: ${plan.length} staff updated (${roleUpdates} role+date, ${dateOnlyUpdates} date-only) ✅`);
+        } catch(err) {
+          console.error(err);
+          showStatusMessage("Manpower import failed: " + (err?.message || err), true);
         }
       };
       reader.readAsArrayBuffer(file);

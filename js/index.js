@@ -4736,7 +4736,9 @@
       }
 
       const SM_ROLES_KEY     = "BCOT_ROLES_LIST";
-      const SM_DEFAULT_ROLES = ["Pharmacist","Technician","Pharmacy Aide"];
+      const SM_DEFAULT_ROLES = ["Pharmacist","Technician","Pharmacy Aide",
+        "Admin Assistant","Associate Clinical Pharmacist","Clinical Pharmacist",
+        "Clinical Pharmacy Specialist","Manager","Supervisor","Assistant Director","Director"];
 
       function getRolesList() {
         try { const r=JSON.parse(localStorage.getItem(SM_ROLES_KEY)||"[]"); return (Array.isArray(r)&&r.length)?r:[...SM_DEFAULT_ROLES]; }

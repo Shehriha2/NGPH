@@ -204,6 +204,18 @@
 
     <hr style="border:none;border-top:1px solid #eee;margin:10px 0;"/>
 
+    <!-- Import Manpower Report (role + contract date) -->
+    <div class="control-group">
+      <label><b>Update from Manpower Report:</b></label>
+      <button type="button" style="background:#b45309;" onclick="document.getElementById('manpowerFileInput').click()">
+        📋 Choose Manpower Report
+      </button>
+      <input type="file" id="manpowerFileInput" accept=".xlsx,.xls" style="display:none;" onchange="importManpowerReport(this)"/>
+      <span class="hint">Reads the "Employees" sheet — matches by <b>Employee # / Badge No.</b> and updates Role + Contract Date. Only updates existing staff — does not add new records. Shows a summary to confirm before applying.</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #eee;margin:10px 0;"/>
+
     <div class="control-group">
       <label><b>Copy to Area:</b></label>
       <select id="copyTargetAreaBulk" style="min-width:130px">
@@ -229,6 +241,7 @@
           <th>Name</th>
           <th>Badge</th>
           <th>Role</th>
+          <th>Contract Date</th>
           <th>HRR</th>
           <th>Area</th>
           <th>Action</th>
