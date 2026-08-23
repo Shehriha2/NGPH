@@ -4832,6 +4832,7 @@
             <td style="padding:4px;">${s.name.replace(/&/g,"&amp;").replace(/</g,"&lt;")}${s.department?` <span style="background:#ede9fe;color:#6d28d9;font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;white-space:nowrap;" title="External collaborator">🔗 ${s.department.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`:""}</td>
             <td style="padding:4px;text-align:center;">${s.badge}</td>
             <td style="padding:4px;">${s.role}</td>
+            <td style="padding:4px;text-align:center;">${s.contractDate||"—"}</td>
             <td style="padding:4px;text-align:center;">${Number(s.hrr||0).toFixed(2)}</td>
             <td style="padding:4px;">
               <button type="button" class="sm-area-btn" data-i="${idx}" data-areas="${s.area}"
