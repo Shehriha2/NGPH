@@ -5186,6 +5186,82 @@
         reader.readAsArrayBuffer(file);
       }
 
+      // Manpower Report import — matches existing staff by Employee #/Badge No.,
+      // updates Role (via a Position-Title→role map) + Contract Date (Original
+      // Hire Date). Unmatched rows are skipped, never added. Confirms with a
+      // count summary before touching anything.
+      const MANPOWER_ROLE_MAP = {
+        'ADMINISTRATIVE ASSISTANT II':                    'Admin Assistant',
+        'ADMINISTRATIVE ASSISTANT III':                   'Admin Assistant',
+        'ASSISTANT DIRECTOR CLINICAL PHARMACY SERVICES':  'Assistant Director',
+        'ASSISTANT DIRECTOR PHARMACY SERVICES':           'Assistant Director',
+        'ASSOCIATE CLINICAL PHARMACIST':                  'Associate Clinical Pharmacist',
+        'CLINICAL PHARMACIST':                            'Clinical Pharmacist',
+        'CLINICAL PHARMACY SPECIALIST':                   'Clinical Pharmacy Specialist',
+        'DIRECTOR PHARMACEUTICAL CARE SERVICES':          'Director',
+        'MANAGER PHARMACY SERVICES':                      'Manager',
+        'SUPERVISOR PHARMACY SERVICES':                   'Supervisor',
+        'PHARMACIST I':                                   'Pharmacist',
+        'PHARMACIST II':                                  'Pharmacist',
+        'PHARMACY TECHNICIAN I':                          'Technician',
+        'PHARMACY TECHNICIAN II':                         'Technician',
+        'PHARMACY TECHNICIAN III':                        'Technician',
+        'PHARMACY AIDE':                                  'Pharmacy Aide',
+      };
+      function _manpowerDateToISO(v) {
+        if (v instanceof Date && !isNaN(v.getTime())) return `${v.getUTCFullYear()}-${String(v.getUTCMonth()+1).padStart(2,'0')}-${String(v.getUTCDate()).padStart(2,'0')}`;
+        if (typeof v === 'number' && v > 0) { const d=new Date(Math.round((v-25569)*86400*1000)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; }
+        return '';
+      }
+      async function importManpower(input) {
+        const file=input.files[0]; if(!file)return; input.value="";
+        const reader=new FileReader();
+        reader.onload=async function(e){
+          try{
+            const wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
+            const wsName=wb.SheetNames.find(n=>/employee/i.test(n))||wb.SheetNames[0];
+            const ws=wb.Sheets[wsName];
+            const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+            if(rows.length<2){showStatusMessage("File is empty or has no data rows.","error");return;}
+            const header=rows[0].map(h=>String(h||"").trim().toLowerCase());
+            let badgeCol=-1,titleCol=-1,dateCol=-1;
+            header.forEach((h,i)=>{
+              if(/^employee/.test(h))badgeCol=i;   // "^employee" so "Dept Code (Employee)" isn't mistaken for it
+              else if(/title/.test(h))titleCol=i;
+              else if(/hire/.test(h))dateCol=i;
+            });
+            if(badgeCol<0||titleCol<0){showStatusMessage('Could not find "Employee #" / "Position Title" columns — expected the Manpower report\'s Employees sheet.',"error");return;}
+
+            let roleUpdates=0,dateOnlyUpdates=0,notFound=0; const plan=[];
+            rows.slice(1).forEach(row=>{
+              const badge=String(row[badgeCol]??"").trim(); if(!badge)return;
+              if(!records.some(s=>String(s.badge).trim()===badge)){notFound++;return;}
+              const titleRaw=String(row[titleCol]??"").trim().toUpperCase();
+              const role=MANPOWER_ROLE_MAP[titleRaw]||null;
+              const date=dateCol>=0?_manpowerDateToISO(row[dateCol]):'';
+              plan.push({badge,role,date});
+              if(role)roleUpdates++; else dateOnlyUpdates++;
+            });
+            if(!plan.length){showStatusMessage("No matching staff found (matched by Employee # / Badge No.).","error");return;}
+
+            const dateNote=dateCol<0?' No hire-date column was found, so contract dates will not be updated.':'';
+            const ok=await showConfirmModal({
+              title:"Manpower Report Import",
+              message:`${roleUpdates} staff will have role + contract date updated.<br>${dateOnlyUpdates} staff will have contract date only (title not recognized, role left as-is).<br>${notFound} row(s) skipped — not in your current staff list.${dateNote}<br><br>Continue?`,
+              confirmLabel:"Import"
+            });
+            if(!ok){showStatusMessage("Import cancelled.");return;}
+
+            plan.forEach(({badge,role,date})=>{
+              records.forEach(r=>{ if(String(r.badge).trim()===badge){ if(role)r.role=role; if(date)r.contractDate=date; } });
+            });
+            writeLocal(); renderTable();
+            showStatusMessage(`Manpower import: ${plan.length} staff updated (${roleUpdates} role+date, ${dateOnlyUpdates} date-only)`);
+          }catch(err){console.error(err);showStatusMessage("Manpower import failed: "+(err?.message||err),"error");}
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
       function doCopyToArea(sourceRecs, targetArea) {
         if(!targetArea){showStatusMessage("Select a target area.","error");return;}
         let copied=0,skipped=0;
@@ -5222,7 +5298,7 @@
         else doOpen();
       }
 
-      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importExternalStaff,importHRR,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName,addCustomRole,removeRole};
+      return {open,close,addStaff,saveNow,loadFromCloud,importFromExcel,importExternalStaff,importHRR,importManpower,addNewArea,applyFilter,clearSearch,copyVisible,copyAll,renderTable,openAreaPicker,openEditModal,openEditByName,addCustomRole,removeRole};
     })();
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -1085,7 +1085,7 @@
     window.FB = { db, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc };
   </script>
 
-  <script src="js/index.js?v=24"></script>
+  <script src="js/index.js?v=25"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL
@@ -1274,6 +1274,12 @@
             <button type="button" onclick="document.getElementById('sm-hrrInput').click()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">💰 Import HRR</button>
             <input type="file" id="sm-hrrInput" accept=".xlsx,.xls" style="display:none;" onchange="SM.importHRR(this)"/>
             <span style="font-size:11px;color:#555;">Columns: Badge No. · Name · HRR</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:12px;">Update from Manpower Report:</b>
+            <button type="button" onclick="document.getElementById('sm-manpowerInput').click()" style="background:#b45309;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">📋 Choose File</button>
+            <input type="file" id="sm-manpowerInput" accept=".xlsx,.xls" style="display:none;" onchange="SM.importManpower(this)"/>
+            <span style="font-size:11px;color:#555;">Reads the "Employees" sheet — matches by Employee # / Badge No., updates Role + Contract Date. Only updates existing staff; shows a summary to confirm first.</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <b style="font-size:12px;">Copy to Area:</b>
