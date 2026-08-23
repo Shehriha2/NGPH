@@ -53,6 +53,21 @@
   }
   function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
+  /**
+   * Firestore's one-shot getDoc/setDoc calls have no built-in timeout — on a
+   * connection that can't cleanly reach Firestore (restrictive network,
+   * captive portal, flaky Wi-Fi), they can hang indefinitely with nothing
+   * ever thrown, which left the login gate stuck forever with no error shown.
+   * Races the call against a plain timer so a stuck connection surfaces as a
+   * rejection instead of a silent hang.
+   */
+  function _withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error((label || 'Request') + ' timed out')), ms))
+    ]);
+  }
+
   /* ── Firebase helpers — Auth ───────────────────────────────────────────── */
   function authDoc() {
     return window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'app_auth', 'USERS');
@@ -67,7 +82,7 @@
     try {
       let t = 0;
       while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await loadUsers();
+      await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) { console.warn('[BCOT_AUTH] _ensureUsers:', e); }
   }
   async function saveUsers() {
@@ -243,7 +258,7 @@
     const idx = _users.findIndex(u => u.id === _pendingUser.id);
     if (idx >= 0) _users[idx] = Object.assign({}, _pendingUser);
     try {
-      await saveUsers();
+      await _withTimeout(saveUsers(), 10000, 'Save password');
     } catch (e) { console.error('Auth save error:', e); }
     if ($id('bcot-new-pwd'))     $id('bcot-new-pwd').value = '';
     if ($id('bcot-confirm-pwd')) $id('bcot-confirm-pwd').value = '';
@@ -261,7 +276,7 @@
                    badge, name, password: '12345', firstLogin: true };
     _users = [user];
     try {
-      await saveUsers();
+      await _withTimeout(saveUsers(), 10000, 'Save user');
     } catch (e) { if (errEl) errEl.textContent = 'Could not save — check connection.'; return; }
     _pendingUser = user;
     showScreen('changepwd');
@@ -522,7 +537,7 @@
     try {
       let t = 0;
       while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await loadUsers();
+      await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) {
       await _bcotAlert('Could not load users — check your connection.', 'Connection Error');
       return;
@@ -867,7 +882,7 @@
     if (!_users.length) {
       let t = 0;
       while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await loadUsers();
+      try { await _withTimeout(loadUsers(), 10000, 'Load users'); } catch (e) { console.warn('[BCOT_AUTH] fetchExtUsers:', e); }
     }
     return _users.map(u => ({
       id:              u.id,
@@ -889,7 +904,7 @@
     try {
       let t = 0;
       while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await loadIPs();
+      await _withTimeout(loadIPs(), 10000, 'Load IPs');
       if (!_myIP) _myIP = await _getMyIP();
     } catch (e) {
       await _bcotAlert('Could not load IP list — check your connection.', 'Connection Error');
@@ -1119,7 +1134,7 @@
     try {
       let t = 0;
       while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await loadUsers();
+      await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) {
       await _bcotAlert('Could not load users — check your connection.', 'Connection Error');
       return;
@@ -1499,11 +1514,11 @@
     }
 
     // 5. Log this device's IP for the admin's records — never blocks login
-    await _logIP();
+    try { await _withTimeout(_logIP(), 6000, 'IP log'); } catch {}
 
     // 6. Load user list
     try {
-      await loadUsers();
+      await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) {
       $id('bcot-error-msg').textContent = 'Could not load user list — check connection.';
       showScreen('error');
