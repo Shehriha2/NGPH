@@ -1513,10 +1513,7 @@
       return;
     }
 
-    // 5. Log this device's IP for the admin's records — never blocks login
-    try { await _withTimeout(_logIP(), 6000, 'IP log'); } catch {}
-
-    // 6. Load user list
+    // 5. Load user list
     try {
       await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) {
@@ -1525,13 +1522,13 @@
       return;
     }
 
-    // 7. No users yet → first-time setup
+    // 6. No users yet → first-time setup
     if (!_users.length) {
       showScreen('setup');
       return;
     }
 
-    // 8. Show login form
+    // 7. Show login form
     buildUserDropdown();
     showScreen('login');
   })();

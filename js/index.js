@@ -3751,7 +3751,11 @@
       const _key  = () => (window.BCOT_APP_KEY||'').trim();
       const _dur  = () => Math.max(60, Math.min(3600, Number(localStorage.getItem(DUR_KEY))||600));
       const _lid  = () => `${_area}_${_ym}`;
-      const _ref  = () => { const k=_key(); return k?window.FB.doc(window.FB.db,'bcot_overtime_secure',k,COLL,_lid()):null; };
+      const _ref  = async () => {
+        const k=_key(); if(!k) return null;
+        let t=0; while(!window.FB && t++<80) await new Promise(r=>setTimeout(r,50));
+        return window.FB ? window.FB.doc(window.FB.db,'bcot_overtime_secure',k,COLL,_lid()) : null;
+      };
       const _exp  = l => !l||!l.expiresAt||new Date(l.expiresAt)<=new Date();
       const _mine = l => !!(l&&l.sessionId===SID);
       const _secs = l => Math.max(0,l&&l.expiresAt?Math.round((new Date(l.expiresAt)-Date.now())/1000):0);
@@ -3766,7 +3770,7 @@
 
       // ── Write / extend ────────────────────────────────────────────────────
       async function _write() {
-        const ref=_ref(); if(!ref) return null;
+        const ref=await _ref(); if(!ref) return null;
         const dur=_dur();
         const d={ sessionId:SID, userId:_uid(), displayName:_who(),
                   lockedAt:new Date().toISOString(),
@@ -3775,7 +3779,7 @@
         return d;
       }
       async function _doExt() {
-        const ref=_ref(); if(!ref||!_mine(_lock)) return;
+        const ref=await _ref(); if(!ref||!_mine(_lock)) return;
         const ex=new Date(Date.now()+_dur()*1000).toISOString();
         await window.FB.setDoc(ref,{expiresAt:ex},{merge:true});
         if(_lock) _lock.expiresAt=ex;
@@ -3878,13 +3882,13 @@
         else if(_sub){_sub();_sub=null;}
         _area=area; _ym=ym; _lock=null; _stopT();
         _setReadonly(false); _renderBar();
-        const ref=_ref(); if(!ref) return;
+        const ref=await _ref(); if(!ref) return;
         _sub=window.FB.onSnapshot(ref,_onSnap,e=>console.warn('LockManager:',e));
         await _acquire();
       }
 
       async function _acquire() {
-        const ref=_ref(); if(!ref) return;
+        const ref=await _ref(); if(!ref) return;
         try {
           const snap=await window.FB.getDoc(ref);
           const ex=snap.exists()?snap.data():null;
@@ -3898,7 +3902,7 @@
 
       async function release() {
         _stopT();
-        const ref=_ref();
+        const ref=await _ref();
         if(ref&&_mine(_lock)){
           try { await window.FB.setDoc(ref,{expiresAt:new Date(0).toISOString()},{merge:true}); } catch{}
         }
@@ -3918,7 +3922,7 @@
       function nudge() { _act=Date.now(); }
 
       async function recheck() {
-        const ref=_ref(); if(!ref) return;
+        const ref=await _ref(); if(!ref) return;
         try { const snap=await window.FB.getDoc(ref); _onSnap(snap); } catch{}
       }
 
