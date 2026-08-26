@@ -301,7 +301,7 @@
 
 <script type="module">
   import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc }
+  import { getFirestore, collection, getDocs, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc }
     from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -314,6 +314,7 @@
   };
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
+  window.FB = { db, doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, deleteDoc };
 
   // ── Constants ─────────────────────────────────────────────────────────────
   const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
