@@ -1476,6 +1476,7 @@
      Main init — runs automatically on every page
      ══════════════════════════════════════════════════════════════════════════ */
   (async function init() {
+   try {
     // 1. Show overlay immediately (blocks all page content)
     createOverlay();
     showScreen('loading');
@@ -1531,6 +1532,22 @@
     // 7. Show login form
     buildUserDropdown();
     showScreen('login');
+   } catch (e) {
+    // Catch-all: any uncaught error above previously left the "Checking
+    // access…" spinner frozen forever with zero feedback. Surface it
+    // instead, so a failure on an unusual device/browser is at least
+    // visible and reportable rather than an opaque, silent hang.
+    console.error('[BCOT_AUTH] init crashed:', e);
+    try {
+      document.documentElement.style.visibility = 'visible';
+      createOverlay();
+      $id('bcot-error-msg').textContent =
+        'Startup error: ' + (e && e.message || String(e)) + ' — please reload the page.';
+      showScreen('error');
+    } catch (e2) {
+      alert('BCOT app failed to start: ' + (e && e.message || e));
+    }
+   }
   })();
 
   /* ── Public API ────────────────────────────────────────────────────────── */
