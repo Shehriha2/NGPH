@@ -166,6 +166,7 @@
       #printSummary .ps-table th{ background:#1a4f8b; color:#fff; text-align:left; }
       #printSummary .ps-table td.num{ text-align:right; white-space:nowrap; }
       #printSummary .ps-table tbody tr:nth-child(even){ background:#eef3f9; }
+      #printSummary .ps-table tr.ps-total td{ border-top:2px solid #333; font-weight:800; background:#e2e8f0; }
       #printSummary .ps-foot{ margin-top:6mm; font-size:8pt; color:#333; }
       #printSummary thead{ display:table-header-group; }
       #printSummary tr{ page-break-inside:avoid; }
@@ -696,44 +697,53 @@
       </tr>`).join('');
   }
 
-  // ── Print Summary (alphabetical, one row per staff) ──────────────────────
+  // ── Print Summary (one row per entry, sorted by staff name) ──────────────
   function printSummary() {
     const month = currentMonth();
     const year  = currentYear();
     const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
-    const rows = _allAdjustments.filter(a => a.month === month && a.year === year);
+
+    const rows = _allAdjustments
+      .filter(a => a.month === month && a.year === year)
+      .slice()
+      .sort((x, y) => {
+        const byName = (x.staffName || '').localeCompare(y.staffName || '', undefined, { sensitivity: 'base' });
+        return byName !== 0 ? byName : (x.submittedAt || '').localeCompare(y.submittedAt || '');
+      });
 
     if (!rows.length) {
       showStatus(`No adjustments recorded for ${monthName} ${year}.`, false);
       return;
     }
 
-    // Aggregate per staff — group by badge, fall back to name when badge is blank
-    const map = new Map();
-    rows.forEach(a => {
-      const badge = String(a.badge || '').trim();
-      const key   = badge || ('name:' + (a.staffName || '').trim().toLowerCase());
-      let rec = map.get(key);
-      if (!rec) { rec = { badge, name: a.staffName || '', regular: 0, business: 0 }; map.set(key, rec); }
-      if (!rec.name && a.staffName) rec.name = a.staffName;
-      const h = Number(a.additionalHours) || 0;
-      if (a.otType === 'Business OT') rec.business += h;
-      else rec.regular += h;
-    });
-
-    const list = [...map.values()]
-      .sort((x, y) => (x.name || '').localeCompare(y.name || '', undefined, { sensitivity: 'base' }));
-
     const hrs = n => String(Math.round((Number(n) || 0) * 100) / 100);
+    const fmtDay = iso => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
 
-    const body = list.map(r => `
+    let totalReg = 0, totalBus = 0;
+    const body = rows.map(a => {
+      const h = Number(a.additionalHours) || 0;
+      const isBus = a.otType === 'Business OT';
+      if (isBus) totalBus += h; else totalReg += h;
+      return `
       <tr>
-        <td>${esc(r.badge) || '—'}</td>
-        <td>${esc(r.name)}</td>
-        <td class="num">${hrs(r.regular)}</td>
-        <td class="num">${hrs(r.business)}</td>
-        <td class="num">${hrs(r.regular + r.business)}</td>
-      </tr>`).join('');
+        <td>${fmtDay(a.submittedAt)}</td>
+        <td>${esc(a.badge) || '—'}</td>
+        <td>${esc(a.staffName)}</td>
+        <td class="num">${isBus ? '' : hrs(h)}</td>
+        <td class="num">${isBus ? hrs(h) : ''}</td>
+      </tr>`;
+    }).join('');
+
+    const totalRow = `
+      <tr class="ps-total">
+        <td></td><td></td><td>TOTAL</td>
+        <td class="num">${hrs(totalReg)}</td>
+        <td class="num">${hrs(totalBus)}</td>
+      </tr>`;
 
     document.getElementById('printSummary').innerHTML = `
       <div class="ps-header">
@@ -748,13 +758,13 @@
       <table class="ps-table">
         <thead>
           <tr>
-            <th>Badge No</th><th>Name</th>
-            <th>Regular OT (hrs)</th><th>Business OT (hrs)</th><th>Total OT (hrs)</th>
+            <th>Date</th><th>Badge No</th><th>Name</th>
+            <th>Regular OT (hrs)</th><th>Business OT (hrs)</th>
           </tr>
         </thead>
-        <tbody>${body}</tbody>
+        <tbody>${body}${totalRow}</tbody>
       </table>
-      <div class="ps-foot">${list.length} staff &middot; generated ${fmtDate(new Date().toISOString())}</div>`;
+      <div class="ps-foot">${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} &middot; generated ${fmtDate(new Date().toISOString())}</div>`;
 
     document.body.classList.add('print-summary-mode');
     window.print();
