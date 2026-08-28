@@ -143,7 +143,34 @@
     }
 
     /* ── Print ── */
-    @media print{ .controls-bar,.no-print{ display:none !important; } }
+    #printSummary{ display:none; }
+    @media print{
+      .controls-bar,.no-print{ display:none !important; }
+
+      /* Print Summary mode: hide the working layout, show the summary sheet */
+      body.print-summary-mode .main-layout{ display:none !important; }
+      body.print-summary-mode #editModal,
+      body.print-summary-mode #statusBox{ display:none !important; }
+      body.print-summary-mode #printSummary{ display:block !important; }
+      body.print-summary-mode{ background:#fff; }
+
+      @page{ size:A4 portrait; margin:14mm 12mm; }
+      #printSummary{ font-family:Arial,sans-serif; color:#000; }
+      #printSummary .ps-header{ text-align:center; margin-bottom:9mm; }
+      #printSummary .ps-org{ font-size:10pt; line-height:1.5; }
+      #printSummary .ps-title{ font-size:15pt; font-weight:800; margin-top:5mm; }
+      #printSummary .ps-period{ font-size:12pt; font-weight:700; margin-top:2mm; }
+      #printSummary .ps-table{ width:100%; border-collapse:collapse; font-size:10pt; }
+      #printSummary .ps-table th,
+      #printSummary .ps-table td{ border:1px solid #333; padding:5pt 7pt; }
+      #printSummary .ps-table th{ background:#1a4f8b; color:#fff; text-align:left; }
+      #printSummary .ps-table td.num{ text-align:right; white-space:nowrap; }
+      #printSummary .ps-table tbody tr:nth-child(even){ background:#eef3f9; }
+      #printSummary .ps-foot{ margin-top:6mm; font-size:8pt; color:#333; }
+      #printSummary thead{ display:table-header-group; }
+      #printSummary tr{ page-break-inside:avoid; }
+      *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    }
   </style>
 </head>
 <body>
@@ -168,6 +195,7 @@
   <label>Year</label>
   <input type="number" id="yearSel" value="2026" style="width:76px"/>
   <button onclick="refreshLog()" class="btn-ghost">🔄 Refresh Log</button>
+  <button onclick="printSummary()" class="btn-orange">🖨 Print Summary</button>
   <a href="index.html" style="text-decoration:none;margin-left:auto;">
     <button type="button" class="btn-ghost">← Back to Rota</button>
   </a>
@@ -250,6 +278,9 @@
   </div>
 
 </div>
+
+<!-- Print-only: alphabetical OT summary, built on demand by printSummary() -->
+<div id="printSummary"></div>
 
 <!-- Edit modal -->
 <div id="editModal">
@@ -665,10 +696,79 @@
       </tr>`).join('');
   }
 
+  // ── Print Summary (alphabetical, one row per staff) ──────────────────────
+  function printSummary() {
+    const month = currentMonth();
+    const year  = currentYear();
+    const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+    const rows = _allAdjustments.filter(a => a.month === month && a.year === year);
+
+    if (!rows.length) {
+      showStatus(`No adjustments recorded for ${monthName} ${year}.`, false);
+      return;
+    }
+
+    // Aggregate per staff — group by badge, fall back to name when badge is blank
+    const map = new Map();
+    rows.forEach(a => {
+      const badge = String(a.badge || '').trim();
+      const key   = badge || ('name:' + (a.staffName || '').trim().toLowerCase());
+      let rec = map.get(key);
+      if (!rec) { rec = { badge, name: a.staffName || '', regular: 0, business: 0 }; map.set(key, rec); }
+      if (!rec.name && a.staffName) rec.name = a.staffName;
+      const h = Number(a.additionalHours) || 0;
+      if (a.otType === 'Business OT') rec.business += h;
+      else rec.regular += h;
+    });
+
+    const list = [...map.values()]
+      .sort((x, y) => (x.name || '').localeCompare(y.name || '', undefined, { sensitivity: 'base' }));
+
+    const hrs = n => String(Math.round((Number(n) || 0) * 100) / 100);
+
+    const body = list.map(r => `
+      <tr>
+        <td>${esc(r.badge) || '—'}</td>
+        <td>${esc(r.name)}</td>
+        <td class="num">${hrs(r.regular)}</td>
+        <td class="num">${hrs(r.business)}</td>
+        <td class="num">${hrs(r.regular + r.business)}</td>
+      </tr>`).join('');
+
+    document.getElementById('printSummary').innerHTML = `
+      <div class="ps-header">
+        <div class="ps-org">
+          King Abdulaziz Medical City &ndash; Western Region<br>
+          National Guard Health Affairs<br>
+          Pharmaceutical Care Department
+        </div>
+        <div class="ps-title">Overtime Adjustment Summary</div>
+        <div class="ps-period">${monthName} ${year}</div>
+      </div>
+      <table class="ps-table">
+        <thead>
+          <tr>
+            <th>Badge No</th><th>Name</th>
+            <th>Regular OT (hrs)</th><th>Business OT (hrs)</th><th>Total OT (hrs)</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+      <div class="ps-foot">${list.length} staff &middot; generated ${fmtDate(new Date().toISOString())}</div>`;
+
+    document.body.classList.add('print-summary-mode');
+    window.print();
+    setTimeout(() => document.body.classList.remove('print-summary-mode'), 1000);
+  }
+
+  window.addEventListener('afterprint', () =>
+    document.body.classList.remove('print-summary-mode'));
+
   // ── Expose to HTML onclick handlers ───────────────────────────────────────
   window.searchStaff      = searchStaff;
   window.submitAdjustment = submitAdjustment;
   window.refreshLog       = refreshLog;
+  window.printSummary     = printSummary;
   window.openEditModal    = openEditModal;
   window.closeEditModal   = closeEditModal;
   window.saveEdit         = saveEdit;
