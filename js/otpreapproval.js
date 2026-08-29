@@ -151,6 +151,21 @@
   // Strip trailing badge "(digits)" from staff name — badge column already shows it separately
   function stripBadge(name){ return String(name||'').replace(/\s*\(\d+\)\s*$/, '').trim(); }
 
+  // Top-right corner tag text for a form page: "CODE · Label" (falls back to just CODE)
+  function _areaCornerText(area){
+    if (!area) return '';
+    let meta = {};
+    try { meta = JSON.parse(localStorage.getItem('BCOT_AREAS_META_V1') || '{}') || {}; } catch {}
+    let label = meta[area] && meta[area].label ? meta[area].label : '';
+    if (!label) {
+      const up = String(area).toUpperCase();
+      for (const k of Object.keys(meta)) {
+        if (k.toUpperCase() === up && meta[k] && meta[k].label) { label = meta[k].label; break; }
+      }
+    }
+    return label ? `${area} · ${label}` : String(area);
+  }
+
   function tableHeaderHtml(){
     return `<table class="ot-table">
       <thead><tr>
@@ -207,7 +222,7 @@
   }
 
   // ── Summary page (last page — grand totals across all regular pages) ─────
-  function summaryPageHtml(groups, meta, mode) {
+  function summaryPageHtml(groups, meta, mode, area) {
     const showCost = mode !== 'noSR';
     const pages = groups.map((g, gi) => ({
       pageNum: gi + 1,
@@ -230,7 +245,8 @@
     });
 
     return `<div class="print-page">
-      <div class="form-title">
+      <div class="form-title" style="position:relative;">
+        <div style="position:absolute;top:0;right:0;max-width:48%;text-align:right;font-size:10px;font-weight:700;color:#1a4f8b;">${esc(_areaCornerText(area))}</div>
         <div class="main-title" style="color:#1a4f8b;">Monthly Overtime Pre-Approval — Grand Summary</div>
         <div class="sub-title">
           King Abdulaziz Medical City<br>National Guard Health Affairs<br>Western Region
@@ -304,14 +320,16 @@
 
       html += `<div class="print-page page-break-after">`;
 
-      const pgBadge = totalPages > 1
-        ? `<div style="position:absolute;top:0;right:0;font-size:9px;color:#888;font-style:italic;">
-             Page ${pageNum} / ${totalPages}</div>`
-        : '';
+      const cornerTag = `<div style="position:absolute;top:0;right:0;max-width:48%;text-align:right;line-height:1.35;">
+        <div style="font-size:10px;font-weight:700;color:#1a4f8b;">${esc(_areaCornerText(area))}</div>
+        ${totalPages > 1
+          ? `<div style="font-size:9px;color:#888;font-style:italic;">Page ${pageNum} / ${totalPages}</div>`
+          : ''}
+      </div>`;
 
       html += `
       <div class="form-title" style="position:relative;">
-        ${pgBadge}
+        ${cornerTag}
         <div class="main-title">Monthly Overtime Pre-Approval Form</div>
         <div class="sub-title">
           King Abdulaziz Medical City<br>
@@ -380,7 +398,7 @@
       if (mode === 'full') {
         html += `<tr class="total-row">
           <td colspan="3" style="text-align:center;font-weight:700;">Total Overtime Hours/Cost</td>
-          <td class="num"></td>
+          <td class="num" style="font-weight:900;">${pageHours}</td>
           <td class="num" style="font-weight:900;">${fmt(pageTotal)}</td>
           <td colspan="2" class="total-note">
             The overtime amount is _______ the ceiling that is defined through the formula to practice,
@@ -411,7 +429,7 @@
       html += `</div>`;  // end .print-page
     });
 
-    if (includeSummary) html += summaryPageHtml(groups, meta, mode);
+    if (includeSummary) html += summaryPageHtml(groups, meta, mode, area);
     return html;
   }
 
