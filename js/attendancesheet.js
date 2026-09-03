@@ -146,7 +146,31 @@
     </div>`;
   }
 
+  // ── Does this staff member have assigned hours within a week's days? ─────
+  // Only such staff appear on that week's page(s). BCOT: a distributed OT
+  // block on any day of the week. Others: any rota duty (with or without the
+  // _O suffix) that resolves to a pool duty with hours > 0 — blank days and
+  // leave codes don't count.
+  function staffHasWorkInWeek(s, cols, meta) {
+    return cols.some(day => {
+      if (!day) return false;
+      if (s.isBCOT) {
+        const dd = s.distDays && s.distDays[day-1];
+        return !!(dd && Number(dd.hrsWorked) > 0);
+      }
+      const raw = String((s.daysData||{})['day'+day] || '').trim();
+      if (!raw) return false;
+      const base = raw.toUpperCase().replace(/_O$/, '');
+      if (base === 'L' || meta.leaveSet.has(base)) return false;
+      const duty = meta.duties[base];
+      return !!(duty && (Number(duty.hours) || 0) > 0);
+    });
+  }
+
   // ── Main builder — one page per (week, staff group) ──────────────────────
+  // A staff member is included on a week's page only when they have assigned
+  // hours that week (staffHasWorkInWeek); weeks where nobody qualifies produce
+  // no page at all.
   function buildForm(staffRows, weeks, month, year, meta) {
     const wrapper = document.getElementById('formWrapper');
     const rowsPerPage = Math.max(2, parseInt(document.getElementById('rowsPage').value,10) || 8);
@@ -154,11 +178,26 @@
     const pages = [];
     weeks.forEach(weekDays => {
       const cols = weekToColumns(weekDays, month, year);
-      for (let i = 0; i < staffRows.length; i += rowsPerPage) {
-        pages.push({ weekDays, cols, group: staffRows.slice(i, i + rowsPerPage) });
+      const weekStaff = staffRows.filter(s => staffHasWorkInWeek(s, cols, meta));
+      for (let i = 0; i < weekStaff.length; i += rowsPerPage) {
+        pages.push({ weekDays, cols, group: weekStaff.slice(i, i + rowsPerPage) });
       }
     });
     const totalPages = pages.length;
+
+    if (!totalPages) {
+      wrapper.innerHTML = `<div class="form-title">
+          <div class="main-title">Attendance Sheet</div>
+          <div class="sub-title">
+            Kingdom of Saudi Arabia<br>
+            Ministry of National Guard - Health Affairs
+          </div>
+        </div>
+        <div style="text-align:center;color:#888;padding:30px;">
+          No staff have overtime hours in the selected month.
+        </div>`;
+      return 0;
+    }
 
     let html = '';
     pages.forEach((page, gi) => {
@@ -176,14 +215,12 @@
           return `<td${onCls}><input type="text" value="${esc(c.timeIn)}"/></td><td${onCls}><input type="text" value="${esc(c.timeOut)}"/></td><td${onCls}><input type="text" value="${esc(c.rem)}"/></td>`;
         }).join('');
         const initCells  = page.cols.map(() => `<td><input type="text"/></td><td><input type="text"/></td><td></td>`).join('');
-        const notedCells = page.cols.map(() => `<td colspan="3"><input type="text" placeholder="Noted by:"/></td>`).join('');
         return `<tr>
-            <td class="name-cell" rowspan="3"><input type="text" value="${esc(s.name)}"/></td>
-            <td rowspan="3"><input type="text" value="${esc(s.badge)}"/></td>
+            <td class="name-cell" rowspan="2"><input type="text" value="${esc(s.name)}"/></td>
+            <td rowspan="2"><input type="text" value="${esc(s.badge)}"/></td>
             ${dayCells}
           </tr>
-          <tr>${initCells}</tr>
-          <tr>${notedCells}</tr>`;
+          <tr>${initCells}</tr>`;
       }).join('');
 
       html += `<div class="print-page page-break-after">
@@ -243,6 +280,7 @@
 
     html += formFooterHtml();
     wrapper.innerHTML = html;
+    return totalPages;
   }
 
   // ── Load & Build ──────────────────────────────────────────────────────────
@@ -308,8 +346,12 @@
     }
 
     const weeks = getMonthWeeks(month, year);
-    buildForm(staffRows, weeks, month, year, meta);
-    showStatus(`Built ${weeks.length} week(s) × ${staffRows.length} staff ✅`);
+    const pagesBuilt = buildForm(staffRows, weeks, month, year, meta);
+    if (!pagesBuilt) {
+      showStatus(`No staff have overtime hours in ${meta.monthLabel} ${year}.`, false);
+      return;
+    }
+    showStatus(`Built ${pagesBuilt} attendance sheet page(s) ✅`);
   }
 
   // Init
