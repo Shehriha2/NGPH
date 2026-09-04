@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>General Remarks — BCOT Rota</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial,sans-serif;margin:0;padding:10px;background:#f5f5f5;font-size:12px;color:#1f2937;}
+
+    /* Header */
+    .header{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#1a4f8b,#0f766e);padding:10px 16px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);margin-bottom:14px;}
+    .header-text{flex:1;text-align:center;color:#fff;}
+    .header-text h1{margin:2px 0;font-size:14px;}
+    .header-text h2{margin:1px 0;font-size:11px;opacity:.85;}
+    .logo{width:64px;height:64px;background:#fff;border-radius:6px;padding:4px;flex-shrink:0;}
+    .logo img{width:100%;height:100%;object-fit:contain;}
+
+    /* Controls */
+    .ctrl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:#fff;border-radius:10px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+    select,input[type="text"],input[type="date"],textarea{padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;background:#fff;}
+    button{padding:6px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:Arial,sans-serif;font-weight:600;transition:opacity .15s;}
+    button:hover{opacity:.85;}
+    .btn-navy {background:#1a4f8b;color:#fff;}
+    .btn-teal {background:#0f766e;color:#fff;}
+    .btn-green{background:#16a34a;color:#fff;}
+    .btn-red  {background:#dc2626;color:#fff;}
+    .btn-gray {background:#6b7280;color:#fff;}
+    .btn-blue {background:#2563eb;color:#fff;}
+    .btn-sm   {padding:3px 8px;font-size:11px;}
+
+    /* Table */
+    .table-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow-x:auto;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th{background:#1a4f8b;color:#fff;padding:8px 10px;text-align:left;white-space:nowrap;font-size:11px;}
+    td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+    tbody tr:hover td{background:#f8faff;}
+    td.col-remark{white-space:pre-wrap;word-break:break-word;max-width:420px;}
+    td.col-dt,td.col-followup,td.col-by{white-space:nowrap;}
+    td.col-actions{white-space:nowrap;text-align:right;}
+    .row-author{font-size:10px;color:#9ca3af;}
+
+    /* Chips */
+    .chip{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;}
+    .chip-overdue{background:#fee2e2;color:#dc2626;}
+    .chip-today  {background:#fef3c7;color:#d97706;}
+    .chip-soon   {background:#dbeafe;color:#1d4ed8;}
+    .chip-future {background:#f1f5f9;color:#64748b;}
+    .chip-none   {color:#cbd5e1;}
+
+    /* Empty state */
+    .empty-msg{text-align:center;padding:40px 20px;color:#9ca3af;}
+    .empty-msg i{font-size:38px;display:block;margin-bottom:10px;opacity:.35;}
+
+    /* Modal */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:9000;align-items:center;justify-content:center;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(520px,96%);overflow:hidden;max-height:92vh;overflow-y:auto;}
+    .modal-hdr{background:linear-gradient(135deg,#1a4f8b,#0f766e);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
+    .modal-hdr-title{font-size:15px;font-weight:700;color:#fff;}
+    .modal-body{padding:18px 20px;}
+    .modal-ftr{padding:10px 20px 16px;border-top:1px solid #f3f4f6;display:flex;gap:8px;justify-content:flex-end;}
+    .fg{display:flex;flex-direction:column;gap:12px;}
+    .fl{font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;}
+    .fi{width:100%;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;}
+    .fi:focus{outline:none;border-color:#1a4f8b;box-shadow:0 0 0 2px rgba(26,79,139,.1);}
+    .ta-wrap{position:relative;}
+    .ta-counter{position:absolute;bottom:6px;right:8px;font-size:10px;color:#9ca3af;pointer-events:none;}
+
+    /* Toast */
+    #toast{position:fixed;top:18px;right:18px;padding:9px 18px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;z-index:99999;display:none;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:360px;}
+    .t-ok{background:#16a34a;} .t-err{background:#dc2626;} .t-info{background:#2563eb;}
+
+    @media print{
+      .no-print,button,.ctrl-bar,.col-actions{display:none!important;}
+      body{background:#fff;padding:0;}
+      .table-wrap{box-shadow:none;}
+      th{background:#1a4f8b!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    }
+  </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<div class="header">
+  <div class="logo">
+    <img src="MNGHA-Logo.png" alt="Logo"
+      onerror="this.src='data:image/svg+xml;charset=UTF-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;64&quot; height=&quot;64&quot;><rect width=&quot;64&quot; height=&quot;64&quot; fill=&quot;%23f0f0f0&quot;/><text x=&quot;50%25&quot; y=&quot;50%25&quot; font-size=&quot;10&quot; text-anchor=&quot;middle&quot; dy=&quot;.3em&quot;>Logo</text></svg>'">
+  </div>
+  <div class="header-text">
+    <h1>الشؤون الصحية – وزارة الحرس الوطني</h1>
+    <h1>Ministry of National Guard Health Affairs</h1>
+    <h2>KAMC-WR — Pharmaceutical Care Department</h2>
+    <h2>General Remarks</h2>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;" class="no-print">
+    <a href="index.html" style="text-decoration:none;"><button class="btn-navy" style="font-size:11px;"><i class="bi bi-arrow-left"></i> Back to Rota</button></a>
+    <button onclick="window.print()" class="btn-gray" style="font-size:11px;"><i class="bi bi-printer"></i> Print</button>
+  </div>
+</div>
+
+<!-- ── Controls ────────────────────────────────────────────────────────── -->
+<div class="ctrl-bar no-print">
+  <input id="fSearch" type="text" placeholder="🔍 Search remarks…" style="min-width:200px;" oninput="applyFilters()"/>
+  <label style="font-weight:700;color:#1a4f8b;">Follow-up:</label>
+  <select id="fFollowUp" onchange="applyFilters()">
+    <option value="ALL">All Remarks</option>
+    <option value="pending">Needs Follow-up</option>
+    <option value="overdue">Overdue Follow-up</option>
+  </select>
+  <button class="btn-green" onclick="openAddModal()" style="margin-left:auto;"><i class="bi bi-plus-lg"></i> New Remark</button>
+  <button class="btn-teal" onclick="syncCloud()"><i class="bi bi-cloud-arrow-down"></i> Sync</button>
+</div>
+
+<!-- ── Table ───────────────────────────────────────────────────────────── -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:13%;">Date &amp; Time</th>
+        <th>Remark</th>
+        <th style="width:15%;">Follow-up</th>
+        <th style="width:12%;">Logged by</th>
+        <th class="no-print" style="width:9%;">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="remarksBody"></tbody>
+  </table>
+</div>
+
+<!-- ══════════ REMARK MODAL ═══════════════════════════════════════════════ -->
+<div id="remarkModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-hdr-title" id="modalTitle"><i class="bi bi-journal-plus"></i> New Remark</span>
+      <button onclick="closeModal()" style="background:rgba(255,255,255,.2);color:#fff;border-radius:4px;border:none;cursor:pointer;padding:3px 8px;font-size:14px;">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <div>
+          <label class="fl">Remark <span style="color:#dc2626;">*</span></label>
+          <div class="ta-wrap">
+            <textarea id="mText" class="fi" rows="4" maxlength="1000" placeholder="Enter the remark…"
+              style="resize:vertical;" oninput="document.getElementById('mCounter').textContent=(1000-this.value.length)+' left'"></textarea>
+            <span id="mCounter" class="ta-counter">1000 left</span>
+          </div>
+        </div>
+        <div>
+          <label class="fl">Follow-up Date <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+          <input id="mFollowUp" class="fi" type="date"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button onclick="closeModal()" class="btn-gray"><i class="bi bi-x-lg"></i> Cancel</button>
+      <button onclick="saveRemark()" class="btn-navy"><i class="bi bi-check-lg"></i> <span id="saveBtnLabel">Save Remark</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCRIPTS ════════════════════════════════════════════════════ -->
+<script src="config.js"></script>
+<script src="js/version-check.js"></script>
+<script src="js/auth.js?v=13"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  const app = initializeApp({
+    apiKey:"AIzaSyDA9hjUxU_DlArK6UIOdfS0PavTgNsUBbw",
+    authDomain:"bcotrota.firebaseapp.com", projectId:"bcotrota",
+    storageBucket:"bcotrota.firebasestorage.app",
+    messagingSenderId:"659421824894",
+    appId:"1:659421824894:web:f0546879df8808491ad52f"
+  });
+  window.FB = { db: getFirestore(app), doc, setDoc, getDoc };
+  window._fbReady = true;
+</script>
+
+<script>
+'use strict';
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const REMARKS_LS  = 'BCOT_REMARKS_V1';
+const REMARKS_DOC = 'REMARKS_POOL';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let REMARKS        = [];
+let currentUser     = '';
+let currentUserId   = '';
+let currentUserRole = 'user';
+let editingId       = null;
+let filters         = { search:'', followUp:'ALL' };
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function uid() { return 'rm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 't-'+type; el.style.display='block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.display='none'; }, 3200);
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function fmtDT(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} `
+       + `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function todayMidnight() { const t = new Date(); t.setHours(0,0,0,0); return t; }
+
+function followUpChip(followUpDate) {
+  if (!followUpDate) return `<span class="chip chip-none">—</span>`;
+  const due  = new Date(followUpDate);
+  const diff = Math.round((due - todayMidnight()) / 86400000);
+  if (diff < 0)   return `<span class="chip chip-overdue"><i class="bi bi-exclamation-circle-fill"></i> Overdue · ${fmtDate(followUpDate)}</span>`;
+  if (diff === 0) return `<span class="chip chip-today"><i class="bi bi-clock-fill"></i> Today</span>`;
+  if (diff <= 3)  return `<span class="chip chip-soon"><i class="bi bi-calendar-event"></i> In ${diff}d · ${fmtDate(followUpDate)}</span>`;
+  return `<span class="chip chip-future"><i class="bi bi-calendar"></i> ${fmtDate(followUpDate)}</span>`;
+}
+
+function getSession() {
+  try { return JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1')||'{}') || {}; } catch { return {}; }
+}
+
+function canModify(r) {
+  return currentUserRole === 'admin' || r.createdBy === currentUser || r.createdById === currentUserId;
+}
+
+// ── Firebase ────────────────────────────────────────────────────────────────
+async function waitFB() { let t=0; while(!window.FB && t++<80) await new Promise(r=>setTimeout(r,50)); }
+
+function remarksRef(key) {
+  return window.FB.doc(window.FB.db,'bcot_overtime_secure',key,'remarks',REMARKS_DOC);
+}
+
+async function syncCloud() {
+  const key = (window.BCOT_APP_KEY||'').trim();
+  if (!key) { showToast('config.js not loaded — offline only.','err'); return; }
+  await waitFB();
+  try {
+    const snap = await window.FB.getDoc(remarksRef(key));
+    if (snap.exists()) {
+      const remote = snap.data();
+      if (Array.isArray(remote.remarks)) {
+        // Merge strategy: cloud wins if it has more entries, otherwise keep local
+        if (remote.remarks.length >= REMARKS.length) {
+          REMARKS = remote.remarks;
+          localStorage.setItem(REMARKS_LS, JSON.stringify(REMARKS));
+          showToast('Synced from cloud ✓');
+        } else {
+          showToast('Local data is newer — no cloud changes applied.','info');
+        }
+      }
+    } else {
+      showToast('No cloud data yet — local only.','info');
+    }
+  } catch(e) { showToast('Sync failed: '+(e?.message||e),'err'); }
+  render();
+}
+
+async function saveToCloud() {
+  localStorage.setItem(REMARKS_LS, JSON.stringify(REMARKS));
+  const key = (window.BCOT_APP_KEY||'').trim(); if (!key) return;
+  await waitFB();
+  try {
+    await window.FB.setDoc(remarksRef(key),
+      { remarks: REMARKS, savedAt: new Date().toISOString() },
+      { merge: true });
+  } catch(e) { console.error('Cloud save error:', e); showToast('Cloud save failed','err'); }
+}
+
+// ── Data access ──────────────────────────────────────────────────────────────
+function getFiltered() {
+  let list = REMARKS.slice();
+  const q = filters.search.trim().toLowerCase();
+  if (q) list = list.filter(r => (r.text||'').toLowerCase().includes(q));
+  if (filters.followUp === 'pending') {
+    list = list.filter(r => r.followUpDate && new Date(r.followUpDate) >= todayMidnight());
+  } else if (filters.followUp === 'overdue') {
+    list = list.filter(r => r.followUpDate && new Date(r.followUpDate) < todayMidnight());
+  }
+  return list.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────
+function render() {
+  const list = getFiltered();
+  const tbody = document.getElementById('remarksBody');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-msg"><i class="bi bi-journal-x"></i>No remarks match your filters.<br><small style="margin-top:6px;display:block;">Click <b>+ New Remark</b> to log one.</small></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(r => rowHTML(r)).join('');
+}
+
+function rowHTML(r) {
+  const mod = canModify(r);
+  return `<tr id="rr_${r.id}">
+    <td class="col-dt">${fmtDT(r.createdAt)}</td>
+    <td class="col-remark">${esc(r.text)}</td>
+    <td class="col-followup">${followUpChip(r.followUpDate)}</td>
+    <td class="col-by"><span class="row-author"><i class="bi bi-person-fill"></i> ${esc(r.createdBy)}</span></td>
+    <td class="col-actions no-print">
+      ${mod ? `<button class="btn-blue btn-sm" title="Edit" onclick="openEditModal('${r.id}')"><i class="bi bi-pencil"></i></button>` : ''}
+      ${mod ? `<button class="btn-red btn-sm" title="Delete" onclick="deleteRemarkRow('${r.id}')"><i class="bi bi-trash"></i></button>` : ''}
+    </td>
+  </tr>`;
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').innerHTML = '<i class="bi bi-journal-plus"></i> New Remark';
+  document.getElementById('saveBtnLabel').textContent = 'Save Remark';
+  document.getElementById('mText').value = '';
+  document.getElementById('mCounter').textContent = '1000 left';
+  document.getElementById('mFollowUp').value = '';
+  document.getElementById('remarkModal').classList.add('open');
+  setTimeout(() => document.getElementById('mText').focus(), 60);
+}
+
+function openEditModal(id) {
+  const r = REMARKS.find(x=>x.id===id); if (!r) return;
+  if (!canModify(r)) { showToast('You can only edit your own remarks.','err'); return; }
+  editingId = id;
+  document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil-square"></i> Edit Remark';
+  document.getElementById('saveBtnLabel').textContent = 'Save Changes';
+  document.getElementById('mText').value = r.text || '';
+  document.getElementById('mCounter').textContent = (1000-(r.text||'').length)+' left';
+  document.getElementById('mFollowUp').value = r.followUpDate || '';
+  document.getElementById('remarkModal').classList.add('open');
+  setTimeout(() => document.getElementById('mText').focus(), 60);
+}
+
+function closeModal() {
+  document.getElementById('remarkModal').classList.remove('open');
+  editingId = null;
+}
+
+function saveRemark() {
+  const text = document.getElementById('mText').value.trim();
+  if (!text) { showToast('Remark cannot be empty.','err'); document.getElementById('mText').focus(); return; }
+  const followUpDate = document.getElementById('mFollowUp').value || '';
+
+  if (editingId) {
+    const r = REMARKS.find(x=>x.id===editingId); if (!r) return;
+    if (!canModify(r)) { showToast('You can only edit your own remarks.','err'); return; }
+    r.text = text;
+    r.followUpDate = followUpDate;
+    r.updatedAt = new Date().toISOString();
+    showToast('Remark updated ✓');
+  } else {
+    REMARKS.push({
+      id: uid(), text, followUpDate,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser, createdById: currentUserId,
+    });
+    showToast('Remark added ✓');
+  }
+
+  closeModal();
+  saveToCloud();
+  render();
+}
+
+function deleteRemarkRow(id) {
+  const r = REMARKS.find(x=>x.id===id); if (!r) return;
+  if (!canModify(r)) { showToast('You can only delete your own remarks.','err'); return; }
+  if (!confirm('Delete this remark?\nThis action cannot be undone.')) return;
+  REMARKS = REMARKS.filter(x=>x.id!==id);
+  saveToCloud();
+  render();
+  showToast('Remark deleted','info');
+}
+
+// ── Filters ──────────────────────────────────────────────────────────────────
+function applyFilters() {
+  filters.search   = document.getElementById('fSearch').value;
+  filters.followUp = document.getElementById('fFollowUp').value;
+  render();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  const session    = getSession();
+  currentUser      = session.name || session.id || 'Unknown';
+  currentUserId    = session.id   || '';
+  currentUserRole  = session.app_role || 'user';
+
+  // Instant render from localStorage
+  try { REMARKS = JSON.parse(localStorage.getItem(REMARKS_LS)||'[]') || []; } catch { REMARKS=[]; }
+  render();
+
+  // Then pull from cloud
+  await syncCloud();
+});
+
+// Close modal on overlay click
+document.getElementById('remarkModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('remarkModal')) closeModal();
+});
+</script>
+</body>
+</html>
