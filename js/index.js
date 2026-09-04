@@ -577,6 +577,28 @@
         if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
         if (e.key === 'Escape') { e.preventDefault(); span.textContent = td.dataset.savedVal || '—'; span.blur(); }
       });
+      // Live preview while typing — updates the Extra OT split and the active
+      // banner's hours/OT/cost chips on every keystroke, without touching this
+      // span's own text (that would fight the caret mid-type) and without
+      // committing anything: the override is only actually set on blur.
+      span.addEventListener('input', () => {
+        const schedType = td.closest('tr')?.querySelector('.sched-cell select')?.value || '';
+        const parsed = parseFloat(span.textContent.trim().replace('+',''));
+        if (Number.isFinite(parsed)) {
+          const splits = OT_SPLIT_SCHED_TYPES.has(schedType);
+          const extra  = splits ? Math.max(0, parsed - OT_SPLIT_THRESHOLD) : 0;
+          const exVal  = td.parentElement?.querySelector('.extraot-val');
+          if (exVal) {
+            exVal.textContent = splits ? ((extra>0?'+':'')+extra) : '—';
+            exVal.className = 'extraot-val' + (splits && extra>0 ? ' extraot-positive' : '');
+          }
+        }
+        const row = td.closest('tr');
+        if (row && _activeEditRow === row) {
+          _refreshBannerStats(row);
+          updateBannerBudget();
+        }
+      });
       // Edit the true (pre-split) total, not the capped display value
       span.addEventListener('focus', () => {
         const trueVal = td.dataset.trueVal != null ? td.dataset.trueVal : span.textContent.replace('+','');
@@ -3641,19 +3663,23 @@
     });
 
     function setActiveRow(row) {
-      if (_activeEditRow === row) return;   // already set — nothing to do
-      // Remove from previous row
-      if (_activeEditRow) _activeEditRow.classList.remove('active-editing-row');
-      _activeEditRow = row;
+      const isNewRow = _activeEditRow !== row;
+      if (isNewRow) {
+        // Swap the highlight from the previous row (only actually changes on a real row switch)
+        if (_activeEditRow) _activeEditRow.classList.remove('active-editing-row');
+        _activeEditRow = row;
+      }
       const banner  = document.getElementById('activeStaffBanner');
       const nameEl  = document.getElementById('activeStaffName');
       if (row) {
-        row.classList.add('active-editing-row');
+        if (isNewRow) row.classList.add('active-editing-row');
         // Strip trailing "(badge)" from stored name for display
         const raw  = row.cells[0]?.querySelector('input')?.value?.trim() || '—';
         const name = raw.replace(/\s*\(\d+\)\s*$/, '').trim() || raw;
         if (nameEl)  nameEl.textContent  = name;
         if (banner)  banner.style.display = 'flex';
+        // Always refresh, even when re-focusing the same row — keeps hours/OT/
+        // budget honest across every focus change instead of only on row switch.
         _refreshBannerStats(row);
         updateBannerBudget();
       } else {
@@ -3803,6 +3829,9 @@
 
       tbl.addEventListener('focusout', function() {
         clearTimeout(_clearRowTimer);
+        // A bit more slack than a plain input's blur→focus handoff needs, since
+        // the OT cell's own blur handler does real work (recompute, repaint,
+        // possibly a password modal) before focus lands on the next cell.
         _clearRowTimer = setTimeout(() => {
           const active = document.activeElement;
           if (!tbl.querySelector('tbody')?.contains(active)) {
@@ -3811,7 +3840,7 @@
             const dutyEl = document.getElementById('activeStaffDuty');
             if (dutyEl) dutyEl.style.display = 'none';
           }
-        }, 120);
+        }, 200);
       });
     })();
 
