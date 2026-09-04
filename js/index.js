@@ -397,6 +397,40 @@
       return {all, sunThu};
     }
 
+    // ── OT / Extra OT split ─────────────────────────────────────────────────
+    // Regular/12 Hours/Mixed staff are paid OT from one budget up to 75h/month;
+    // anything beyond that comes from a separate source, so it's tracked in its
+    // own Extra OT column instead of inflating the OT figure. BC and On Call
+    // rows are a different comp category (all scheduled hours are OT there)
+    // and are never split — Extra OT stays "—" for them.
+    const OT_SPLIT_THRESHOLD   = 75;
+    const OT_SPLIT_SCHED_TYPES = new Set(['Regular', '12 Hours', 'Mixed']);
+
+    // Paints the OT + Extra OT cells for a row from a single true total,
+    // splitting it when the schedule type qualifies. Used by both the
+    // auto-calculation path and every manual/imported override path so the
+    // two cells are always painted the same way. Stamps ot-cell.dataset.trueVal
+    // so re-opening the cell for editing recovers the pre-split number.
+    function paintSplitOT(otCell, trueVal, schedType, { override=false, imported=false } = {}) {
+      const val   = otCell.querySelector('.ot-val');
+      const exVal = otCell.parentElement?.querySelector('.extraot-val');
+      otCell.dataset.trueVal = String(trueVal);
+
+      const splits = OT_SPLIT_SCHED_TYPES.has(schedType);
+      const capped = splits ? Math.min(trueVal, OT_SPLIT_THRESHOLD) : trueVal;
+      const extra  = splits ? Math.max(0, trueVal - OT_SPLIT_THRESHOLD) : 0;
+
+      val.textContent = (capped>0?'+':'')+capped;
+      val.className = 'ot-val' + (override?' ot-override':'') + (imported?' ot-imported':'') +
+        (capped>0?' ot-positive':capped<0?' ot-negative':'');
+
+      if (exVal) {
+        exVal.textContent = splits ? ((extra>0?'+':'')+extra) : '—';
+        exVal.className = 'extraot-val' + (splits && extra>0 ? ' extraot-positive' : '');
+      }
+      return { capped, extra };
+    }
+
     // ── OT calculation ────────────────────────────────────────────────────────
     function calcOT(row) {
       const otCell = row.querySelector('.ot-cell');
@@ -404,13 +438,19 @@
       if (otCell.dataset.override==='true') return;
       const schedType = row.querySelector('.sched-cell select')?.value||'';
       const val = otCell.querySelector('.ot-val');
-      if (!schedType) { val.textContent='—'; val.className='ot-val'; otCell.title=''; return; }
+      const exVal = row.querySelector('.extraot-val');
+      if (!schedType) {
+        val.textContent='—'; val.className='ot-val'; otCell.title='';
+        if (exVal) { exVal.textContent='—'; exVal.className='extraot-val'; }
+        return;
+      }
       const totalHours = Number(row.querySelector('.hours-cell')?.textContent)||0;
       const month = Number(document.getElementById('monthSelect').value);
       const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
       const leave = countLeaveDays(row, month, year);
       let standard = 0;
       let tipDetail = '';
+      let trueVal;
       if (schedType==='Regular') {
         const totalWT   = countSunThuInMonth(month, year);
         const holWT     = countHolidaySunThu(month, year);
@@ -434,25 +474,24 @@
       } else if (schedType==='BC') {
         // Business Center — all hours are overtime; include extension hours to match pre-approval
         const extHours = Number(row.querySelector('.ext-cell input')?.value) || 0;
-        const bcOT = extHours > 0 ? Math.ceil(totalHours + extHours) : totalHours;
-        val.textContent = (bcOT>0?'+':'')+bcOT;
-        val.className   = 'ot-val'+(bcOT>0?' ot-positive':'');
-        otCell.title    = extHours > 0
-          ? `BC — ${totalHours}h scheduled + ${extHours}h extension = ${bcOT}h OT`
+        trueVal = extHours > 0 ? Math.ceil(totalHours + extHours) : totalHours;
+        paintSplitOT(otCell, trueVal, schedType);
+        otCell.title = extHours > 0
+          ? `BC — ${totalHours}h scheduled + ${extHours}h extension = ${trueVal}h OT`
           : `BC — all ${totalHours}h are overtime (Business Center)`;
         return;
       } else if (schedType==='On Call') {
         // On Call — all scheduled hours are OT, costed at HRR × hours × 0.1
-        val.textContent = totalHours > 0 ? '+' + totalHours : '0';
-        val.className   = 'ot-val' + (totalHours > 0 ? ' ot-positive' : '');
-        otCell.title    = `On Call — all ${totalHours}h are OT (rate: ×0.1)`;
+        trueVal = totalHours;
+        paintSplitOT(otCell, trueVal, schedType);
+        otCell.title = `On Call — all ${totalHours}h are OT (rate: ×0.1)`;
         return;
       }
       const rawOT = totalHours - standard;
-      const ot = Math.max(0, schedType === '12 Hours' ? Math.ceil(rawOT) : Math.round(rawOT * 10) / 10);
-      val.textContent = ot > 0 ? '+' + ot : '0';
-      val.className = 'ot-val' + (ot > 0 ? ' ot-positive' : '');
-      otCell.title = `Actual: ${totalHours}h | Standard: ${standard}h | OT: ${ot > 0 ? '+' : ''}${ot}h\n${tipDetail}`;
+      trueVal = Math.max(0, schedType === '12 Hours' ? Math.ceil(rawOT) : Math.round(rawOT * 10) / 10);
+      const { capped, extra } = paintSplitOT(otCell, trueVal, schedType);
+      otCell.title = `Actual: ${totalHours}h | Standard: ${standard}h | OT: ${trueVal > 0 ? '+' : ''}${trueVal}h\n${tipDetail}` +
+        (extra > 0 ? `\nSplit: OT ${capped}h (capped at ${OT_SPLIT_THRESHOLD}h) + Extra OT ${extra}h` : '');
     }
     function recalculateAllOT() {
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => calcOT(row));
@@ -506,10 +545,20 @@
     }
 
     // ── OT cell builder ───────────────────────────────────────────────────────
-    function buildOTCell(overrideVal=null, isOverride=false) {
+    // The visible number is capped at OT_SPLIT_THRESHOLD for split-eligible
+    // schedule types (paintSplitOT fills the companion Extra OT cell with the
+    // overflow), but editing always operates on the true, pre-split total via
+    // ot-cell.dataset.trueVal — so typing into this cell still means "the full
+    // OT total", exactly as before the split existed.
+    function buildOTCell(overrideVal=null, isOverride=false, overrideExtra=null) {
       const td  = document.createElement('td');
       td.className = 'ot-cell';
-      if (isOverride) td.dataset.override = 'true';
+      if (isOverride) {
+        td.dataset.override = 'true';
+        const cappedNum = parseFloat(String(overrideVal).replace('+',''))||0;
+        const extraNum  = parseFloat(String(overrideExtra).replace('+',''))||0;
+        td.dataset.trueVal = String(cappedNum + extraNum);
+      }
 
       const span = document.createElement('span');
       span.className = 'ot-val' + (isOverride?' ot-override':'');
@@ -517,7 +566,7 @@
       span.contentEditable = 'true';
       span.tabIndex = -1;   // skip via Tab — click or use lock button to override
       span.spellcheck = false;
-      span.title = 'Type a number to override, or type "auto" to reset';
+      span.title = `Type the full OT total to override (auto-split at ${OT_SPLIT_THRESHOLD}h), or type "auto" to reset`;
       span.style.cssText = 'min-width:28px;display:inline-block;outline:none;cursor:text;border-radius:3px;padding:0 2px;';
 
       span.addEventListener('focus', () => {
@@ -528,56 +577,64 @@
         if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
         if (e.key === 'Escape') { e.preventDefault(); span.textContent = td.dataset.savedVal || '—'; span.blur(); }
       });
-      span.addEventListener('focus', () => { td.dataset.savedVal = span.textContent; });
+      // Edit the true (pre-split) total, not the capped display value
+      span.addEventListener('focus', () => {
+        const trueVal = td.dataset.trueVal != null ? td.dataset.trueVal : span.textContent.replace('+','');
+        span.textContent = trueVal;
+        td.dataset.savedVal = trueVal;
+      });
       span.addEventListener('blur', () => {
         span.style.background = '';
         span.style.outline = '';
         const raw = span.textContent.trim();
         const saved = (td.dataset.savedVal || '').trim();
-        // If nothing changed and not already 'auto', do nothing — prevents accidental overrides
-        if (raw === saved && raw.toLowerCase() !== 'auto') return;
+        const schedType = td.closest('tr')?.querySelector('.sched-cell select')?.value || '';
+        const repaint = (trueVal, override, imported) => paintSplitOT(td, trueVal, schedType, { override, imported });
+
         if (raw.toLowerCase() === 'auto' || raw === '') {
           // Reset to calculated
           delete td.dataset.override;
           delete td.dataset.imported;
-          span.className = 'ot-val';
+          delete td.dataset.trueVal;
           btn.textContent = '🔒'; btn.title = 'Override manually';
           calcOT(td.parentElement);
           showStatusMessage('OT reset to auto-calculated ✅');
-        } else {
-          const parsed = parseFloat(raw.replace('+',''));
-          if (!Number.isFinite(parsed)) {
-            // Invalid — restore saved value
-            span.textContent = saved || '—';
-            showStatusMessage('Invalid OT value — restored previous.', 'error');
-            return;
-          }
-          // Set manual override — admin bypasses password; others use modal
-          if (_getAppRole() === 'admin') _setOTUnlocked(true);
-          const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
-          if (pwd && td.dataset.override !== 'true' && !_otUnlocked) {
-            span.textContent = saved || '—';  // restore while modal is open
-            _askOTPwd(
-              () => {
-                td.dataset.override = 'true';
-                delete td.dataset.imported;
-                td.title = '';
-                span.textContent = (parsed>0?'+':'')+parsed;
-                span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
-                btn.textContent = '🔓'; btn.title = 'Reset to calculated';
-                td.dataset.savedVal = span.textContent;
-              },
-              () => { span.textContent = saved || '—'; }
-            );
-            return;
-          }
+          return;
+        }
+
+        const parsed = parseFloat(raw.replace('+',''));
+        if (!Number.isFinite(parsed)) {
+          // Invalid — restore saved (true) value, repainted through the split
+          repaint(parseFloat(saved)||0, td.dataset.override==='true', td.dataset.imported==='true');
+          showStatusMessage('Invalid OT value — restored previous.', 'error');
+          return;
+        }
+        if (raw === saved) {
+          // Nothing changed — just repaint the split display from the unchanged true value
+          repaint(parsed, td.dataset.override==='true', td.dataset.imported==='true');
+          return;
+        }
+
+        // Set manual override — admin bypasses password; others use modal
+        if (_getAppRole() === 'admin') _setOTUnlocked(true);
+        const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
+        const applyOverride = () => {
           td.dataset.override = 'true';
           delete td.dataset.imported;
           td.title = '';
-          span.textContent = (parsed>0?'+':'')+parsed;
-          span.className = 'ot-val ot-override'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
+          repaint(parsed, true, false);
           btn.textContent = '🔓'; btn.title = 'Reset to calculated';
+          td.dataset.savedVal = String(parsed);
+        };
+        if (pwd && td.dataset.override !== 'true' && !_otUnlocked) {
+          repaint(parseFloat(saved)||0, false, false);  // restore while modal is open
+          _askOTPwd(
+            applyOverride,
+            () => { repaint(parseFloat(saved)||0, false, false); }
+          );
+          return;
         }
+        applyOverride();
       });
 
       const btn = document.createElement('button');
@@ -613,6 +670,22 @@
       return td;
     }
 
+    // ── Extra OT cell builder ─────────────────────────────────────────────────
+    // Read-only — always derived from the OT cell via paintSplitOT. Shows the
+    // overflow beyond OT_SPLIT_THRESHOLD for split-eligible rows, or "—" for
+    // BC/On Call rows (which are never split).
+    function buildExtraOTCell(value=null) {
+      const td = document.createElement('td');
+      td.className = 'extraot-cell';
+      const span = document.createElement('span');
+      const n = value !== null ? (parseFloat(String(value).replace('+',''))||0) : null;
+      span.className = 'extraot-val' + (n>0 ? ' extraot-positive' : '');
+      span.textContent = n !== null ? ((n>0?'+':'')+n) : '—';
+      span.title = `Overtime beyond ${OT_SPLIT_THRESHOLD}h — paid from a separate source`;
+      td.appendChild(span);
+      return td;
+    }
+
     // ── Extension hours cell builder ──────────────────────────────────────────
     // Shows as "E{n}" — manually editable, saved separately, combined at pre-approval time.
     function buildExtCell(value=0) {
@@ -636,6 +709,7 @@
         // Reset to calculated — no password needed (user can always type "auto" too)
         delete otCell.dataset.override;
         delete otCell.dataset.imported;
+        delete otCell.dataset.trueVal;
         otCell.querySelector('.ot-lock-btn').textContent='🔒';
         otCell.querySelector('.ot-lock-btn').title='Override manually';
         calcOT(otCell.parentElement);
@@ -649,6 +723,7 @@
           otCell.querySelector('.ot-lock-btn').title = 'Reset to calculated';
           span.className = 'ot-val ot-override';
           // Select all text so user can type the new value immediately
+          // (focus triggers the listener above, which swaps in the true total)
           span.focus();
           const sel=window.getSelection(), rng=document.createRange();
           rng.selectNodeContents(span); sel.removeAllRanges(); sel.addRange(rng);
@@ -662,14 +737,13 @@
     function applyOTOverrideToRow(row, value, tooltip='') {
       const td = row.querySelector('.ot-cell');
       if (!td) return false;
-      const span = td.querySelector('.ot-val');
-      const btn  = td.querySelector('.ot-lock-btn');
+      const btn = td.querySelector('.ot-lock-btn');
+      const schedType = row.querySelector('.sched-cell select')?.value || '';
       const parsed = Number(value) || 0;
       td.dataset.override = 'true';
       td.dataset.imported = 'true';
-      span.textContent = (parsed>0?'+':'')+parsed;
-      span.className = 'ot-val ot-override ot-imported'+(parsed>0?' ot-positive':parsed<0?' ot-negative':'');
-      td.dataset.savedVal = span.textContent;
+      paintSplitOT(td, parsed, schedType, { override: true, imported: true });
+      td.dataset.savedVal = String(parsed);
       if (tooltip) td.title = tooltip;
       if (btn) { btn.textContent = '🔓'; btn.title = 'Reset to calculated'; }
       return true;
@@ -1433,6 +1507,7 @@
       const hTh  = document.createElement('th'); hTh.textContent  = 'Hours';       headerRow.appendChild(hTh);
       const sTh  = document.createElement('th'); sTh.className='sched-th'; sTh.textContent  = 'Sched. Type'; headerRow.appendChild(sTh);
       const otTh = document.createElement('th'); otTh.className='ot-th';   otTh.textContent = 'OT';          headerRow.appendChild(otTh);
+      const exOtTh = document.createElement('th'); exOtTh.className='extraot-th'; exOtTh.textContent = 'Extra OT'; headerRow.appendChild(exOtTh);
       const exTh   = document.createElement('th'); exTh.className='ext-th';   exTh.textContent = 'Ext.';  headerRow.appendChild(exTh);
       const noteTh = document.createElement('th'); noteTh.className='note-th'; noteTh.textContent = 'Note'; headerRow.appendChild(noteTh);
 
@@ -1441,6 +1516,7 @@
         const schedVal      = row.querySelector('.sched-cell select')?.value || '';
         const otIsOverride  = row.querySelector('.ot-cell')?.dataset?.override === 'true';
         const otOverrideVal = otIsOverride ? (row.querySelector('.ot-val')?.textContent || null) : null;
+        const otExtraVal    = otIsOverride ? (row.querySelector('.extraot-val')?.textContent || null) : null;
         const extVal        = Number(row.querySelector('.ext-cell input')?.value) || 0;
         const noteVal       = row.querySelector('.note-input')?.value || '';
         const hIdx = Array.from(row.cells).indexOf(row.querySelector('.hours-cell'));
@@ -1457,7 +1533,8 @@
         }
         const hc = document.createElement('td'); hc.className='hours-cell'; hc.textContent = '0'; row.appendChild(hc);
         row.appendChild(buildSchedCell(schedVal));
-        row.appendChild(buildOTCell(otOverrideVal, otIsOverride));
+        row.appendChild(buildOTCell(otOverrideVal, otIsOverride, otExtraVal));
+        row.appendChild(buildExtraOTCell(otExtraVal));
         row.appendChild(buildExtCell(extVal));
         row.appendChild(buildNoteCell(noteVal));
         if (noteVal) {
@@ -1792,6 +1869,7 @@
       const hc = document.createElement('td'); hc.className='hours-cell'; hc.textContent='0'; tr.appendChild(hc);
       tr.appendChild(buildSchedCell());
       tr.appendChild(buildOTCell());
+      tr.appendChild(buildExtraOTCell());
       tr.appendChild(buildExtCell());
       tr.appendChild(buildNoteCell());
       // Inherit comp type from area default
@@ -2483,10 +2561,11 @@
         const otOverride=otCell?.dataset?.override==='true' ? (otCell.querySelector('.ot-val')?.textContent||null) : null;
         const otImported=otCell?.dataset?.imported==='true';
         const otCalcRaw=parseFloat((otCell?.querySelector('.ot-val')?.textContent||'0').replace('+',''));
+        const otExtraRaw=parseFloat((row.querySelector('.extraot-val')?.textContent||'0').replace('+',''));
         const extension=Number(row.querySelector('.ext-cell input')?.value)||0;
         const compType=row.dataset.compType||'OT';
         const note=(row.querySelector('.note-input')?.value||'').trim().slice(0,50);
-        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otImported, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, extension, compType, note});
+        payload.records.push({staffName:name, hours:Number(row.querySelector('.hours-cell').textContent)||0, daysData:days, schedType, otOverride, otImported, otCalc:Number.isFinite(otCalcRaw)?otCalcRaw:null, otExtra:Number.isFinite(otExtraRaw)?otExtraRaw:0, extension, compType, note});
       }
       return payload;
     }
@@ -2606,11 +2685,18 @@
         if (rec.otOverride!=null) {
           const otCell=row.querySelector('.ot-cell');
           otCell.dataset.override='true';
-          const v=otCell.querySelector('.ot-val');
-          v.textContent=rec.otOverride; v.className='ot-val ot-override'+(rec.otImported?' ot-imported':'');
+          if (rec.otImported) otCell.dataset.imported='true';
+          // otOverride/otExtra are saved already split (capped + overflow) — add them
+          // back together so paintSplitOT re-derives the same split on load. This
+          // also gracefully re-splits records saved before Extra OT existed, where
+          // otOverride held the true uncapped total and otExtra is absent (=0).
+          const cappedVal = parseFloat(String(rec.otOverride).replace('+',''))||0;
+          const extraVal  = Number(rec.otExtra)||0;
+          paintSplitOT(otCell, cappedVal+extraVal, rec.schedType||'', { override:true, imported:!!rec.otImported });
+          otCell.dataset.savedVal = String(cappedVal+extraVal);
           otCell.querySelector('.ot-lock-btn').textContent='🔓';
           otCell.querySelector('.ot-lock-btn').title='Reset to calculated';
-          if (rec.otImported) { otCell.dataset.imported='true'; otCell.title='Imported from OT Adjustments'; }
+          if (rec.otImported) otCell.title='Imported from OT Adjustments';
         }
         // Restore per-row comp type
         if (rec.compType) {
