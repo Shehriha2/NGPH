@@ -3529,6 +3529,24 @@
       inp?.focus();
     }
 
+    // ── Print ──────────────────────────────────────────────────────────────────
+    // "Print only staff with hours" tags zero-hour rows with a print-only class
+    // (tr.print-hide-row, see index.html's @media print) instead of touching
+    // row.style.display, so it never fights with filterRota()'s own on-screen
+    // search filter. Wired to beforeprint/afterprint rather than a wrapper
+    // around the Print buttons' onclick, so it also applies to the browser's
+    // own Ctrl+P / File > Print, not just the two in-page buttons.
+    window.addEventListener('beforeprint', () => {
+      const onlyWorked = document.getElementById('printOnlyWorked')?.checked;
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const hours = Number(row.querySelector('.hours-cell')?.textContent) || 0;
+        row.classList.toggle('print-hide-row', !!onlyWorked && hours <= 0);
+      });
+    });
+    window.addEventListener('afterprint', () => {
+      document.querySelectorAll('#rotaTable tbody tr.print-hide-row').forEach(row => row.classList.remove('print-hide-row'));
+    });
+
     // ── Collaborative lock state (set by LockManager) ────────────────────────
     let _rotaLocked = false;
 
