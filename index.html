@@ -719,7 +719,7 @@
               <a href="Areas.html" class="ghost-link"><button type="button" class="btn-orange"><i class="bi bi-bank"></i> Cost Centers</button></a>
               <a href="BudgetReport.html"  class="ghost-link"><button type="button" class="btn-purple"><i class="bi bi-graph-up"></i> Budget Report</button></a>
               <button type="button" onclick="openOTPreApproval()" style="background:#1a4f8b;"><i class="bi bi-calendar-check"></i> OT Pre-Approval</button>
-              <a href="OvertimeJustification.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-file-earmark-text"></i> Overtime Justification</button></a>
+              <button type="button" onclick="OJ.open();" style="background:#1a4f8b;"><i class="bi bi-file-earmark-text"></i> Overtime Justification</button>
               <a href="AttendanceSheet.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-week"></i> Attendance Sheet</button></a>
               <a href="Extension.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-plus"></i> Extensions</button></a>
               <a href="MultiMonth.html"   class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-range"></i> Multi-Month View</button></a>
@@ -1095,7 +1095,7 @@
     window.FB = { db, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc, addDoc, updateDoc };
   </script>
 
-  <script src="js/index.js?v=28"></script>
+  <script src="js/index.js?v=29"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL
@@ -1711,6 +1711,312 @@
 
     </div><!-- /oa-shell -->
   </div><!-- /otAdjModal -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       OVERTIME JUSTIFICATION MODAL  (OJ namespace)
+       Ported from OvertimeJustification.html (kept in the repo, unused). No
+       admin gate — the original page didn't have one either. Every id/class
+       is scoped under #ojModal.
+  ══════════════════════════════════════════════════════════════════════ -->
+  <style>
+    #ojModal{ --oj-primary:#1a4f8b; --oj-secondary:#2e8b57; }
+    #ojModal, #ojModal *{ box-sizing:border-box; }
+    #ojModal .oj-shell{
+      background:#f5f5f5; border-radius:16px; width:90%; margin:0 auto;
+      padding:16px; font-family:Arial,sans-serif; font-size:12px; color:#000;
+    }
+
+    /* ── Controls bar ── */
+    #ojModal .oj-controls-bar{
+      background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.12);
+      padding:12px 16px; margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    #ojModal .oj-controls-bar label{ font-weight:700; color:#334155; white-space:nowrap; }
+    #ojModal input,#ojModal select,#ojModal button{ padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:12px; }
+    #ojModal button{ background:var(--oj-primary); color:#fff; border:none; cursor:pointer; font-weight:700; }
+    #ojModal button:hover{ background:var(--oj-secondary); }
+    #ojModal .btn-green{ background:#28a745; } #ojModal .btn-green:hover{ background:#218838; }
+    #ojModal .btn-orange{ background:#d97706; } #ojModal .btn-orange:hover{ background:#b45309; }
+    #ojModal .btn-gray{ background:#6b7280; } #ojModal .btn-gray:hover{ background:#4b5563; }
+
+    /* ── Form wrapper (printable preview — kept at print-accurate A4 proportions, not widened) ── */
+    #ojModal .oj-form-wrapper{
+      background:#fff; padding:16px 22px; border:1px solid #333; max-width:960px; margin:0 auto;
+      box-shadow:0 1px 6px rgba(0,0,0,.1);
+    }
+
+    /* ── Page section: one employee per page ── */
+    #ojModal .oj-print-page{ }
+    #ojModal .oj-print-page.page-break-after{
+      border-bottom:3px dashed #cbd5e1;
+      margin-bottom:32px;
+      padding-bottom:24px;
+    }
+
+    /* ── Official bilingual header (Kingdom / crest / Arabic) ── */
+    #ojModal .official-header{
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      padding-bottom:10px; margin-bottom:10px;
+    }
+    #ojModal .oh-en{ text-align:center; font-size:12.5px; line-height:1.6; flex:1; }
+    #ojModal .oh-ar{ text-align:center; font-size:12.5px; line-height:1.6; direction:rtl; flex:1; font-family:Arial,sans-serif; }
+    #ojModal .oh-logo{ width:70px; height:70px; flex-shrink:0; }
+    #ojModal .oh-logo img{ width:100%; height:100%; object-fit:contain; }
+
+    /* ── Title block ── */
+    #ojModal .oj-form-title{
+      text-align:center; margin:0 0 8px; background:#e5e5e5; border:1px solid #333; padding:6px 10px;
+    }
+    #ojModal .oj-form-title .main-title{ font-size:15px; font-weight:600; }
+
+    /* ── Part section header bars (Part I / II / III) ── */
+    #ojModal .part-header{
+      text-align:center; background:#dcdcdc; border:3px double #333;
+      padding:5px 10px; font-size:11px; margin:10px 0 8px;
+    }
+    #ojModal .part-header b{ font-weight:800; }
+
+    /* ── Meta fields ── */
+    #ojModal .meta-section{ margin-bottom:10px; }
+    #ojModal .meta-row{
+      display:grid; grid-template-columns:1fr 1fr; gap:0 20px;
+      margin-bottom:5px; align-items:baseline;
+    }
+    #ojModal .meta-row3{
+      display:grid; grid-template-columns:2fr 1fr 1fr; gap:0 14px;
+      margin-bottom:5px; align-items:baseline;
+    }
+    #ojModal .meta-cell{ display:flex; align-items:baseline; gap:0; font-size:11px; }
+    #ojModal .meta-cell b, #ojModal .meta-cell > span:first-child{ white-space:nowrap; font-weight:700; }
+    #ojModal .meta-cell .m-colon{ margin:0 4px; }
+    #ojModal .meta-cell .meta-val{
+      flex:1; border:none; border-bottom:1px dotted #333; border-radius:0;
+      padding:1px 4px; font-size:11px; font-family:Arial,sans-serif;
+      background:transparent; outline:none; min-width:50px;
+    }
+    #ojModal .meta-cell .meta-val:focus{ background:#fffde7; }
+
+    /* ── Day table ── */
+    #ojModal .day-table{ width:100%; border-collapse:collapse; border:1px solid #333; margin-top:6px; table-layout:fixed; }
+    #ojModal .day-table th{
+      background:#e5e5e5; color:#000; font-weight:700; font-size:9px;
+      border:1px solid #333; padding:3px 2px; text-align:center; line-height:1.25;
+    }
+    #ojModal .day-table td{
+      border:1px solid #333; padding:2px 3px; font-size:9.5px; vertical-align:middle; text-align:center;
+    }
+    #ojModal .day-table td.just{ text-align:left; font-size:9px; }
+    #ojModal .day-table td.just input,
+    #ojModal .day-table td input.cell-in{
+      width:100%; border:none; background:transparent; font-size:9.5px; text-align:center;
+      font-family:Arial,sans-serif; outline:none; padding:0;
+    }
+    #ojModal .day-table td.just input{ text-align:left; }
+    #ojModal .day-table td input:focus{ background:#fffde7; }
+    #ojModal .total-row td{ font-weight:700; font-size:9.5px; background:#e5e5e5; }
+
+    /* ── Approvals — 4 columns: Director | Badge No. | Executive Director | CEO/CMO/COO ── */
+    #ojModal .sig-wrapper{ margin-top:14px; break-inside:avoid; page-break-inside:avoid; }
+    #ojModal .approvals-label{ font-weight:700; font-size:11px; margin-bottom:4px; }
+    #ojModal .sig-row{ display:flex; }
+    #ojModal .sig-block{ padding:0 10px 4px 0; }
+    #ojModal .sig-line{
+      border-bottom:1px solid #333; height:20px; font-size:10px; text-align:center;
+      padding-top:2px; box-sizing:border-box; overflow:hidden; white-space:nowrap;
+    }
+    #ojModal .sig-role{ font-weight:700; font-size:9.5px; text-align:center; padding-top:3px; line-height:1.4; }
+    #ojModal .sig-role .sig-sub{ font-weight:400; display:block; }
+    #ojModal .sig-director{ flex:0 0 26%; }
+    #ojModal .sig-badge   { flex:0 0 14%; padding-right:12px; border-right:1px solid #333; }
+    #ojModal .sig-exdir   { flex:0 0 30%; padding-left:12px; padding-right:12px; border-right:1px solid #333; }
+    #ojModal .sig-ceo     { flex:1; padding-left:12px; padding-right:0; }
+    #ojModal .sig-footnote{
+      font-size:8.5px; background:#f0f0f0; border:1px solid #333; padding:5px 8px; margin-top:10px; line-height:1.4;
+    }
+
+    /* ── Part II / Part III sections ── */
+    #ojModal .part-section{ margin-top:4px; break-inside:avoid; page-break-inside:avoid; }
+    #ojModal .part-table{ width:100%; border-collapse:collapse; border:1px solid #333; }
+    #ojModal .part-table td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; vertical-align:top; height:22px; }
+    #ojModal .part-table td.lbl{ font-weight:700; font-size:9.5px; white-space:nowrap; vertical-align:middle; }
+
+    #ojModal .part2-wrap{ display:flex; gap:8px; align-items:flex-start; }
+    #ojModal .part2-left{ flex:0 0 58%; width:58%; border-collapse:collapse; border:1px solid #333; }
+    #ojModal .part2-left td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
+    #ojModal .part2-left td.lbl{ font-weight:700; white-space:nowrap; }
+    #ojModal .part2-left td.total-lbl{ font-weight:700; white-space:nowrap; width:16%; }
+    #ojModal .part2-right{ flex:1; width:42%; border-collapse:collapse; border:1px solid #333; }
+    #ojModal .part2-right td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
+    #ojModal .part2-right td.lbl{ font-weight:700; white-space:nowrap; width:38%; }
+
+    #ojModal .part3-table th{
+      background:#dcdcdc; border:1px solid #333; padding:4px 6px; font-size:9.5px; font-weight:700;
+    }
+    #ojModal .part3-table td{ border:1px solid #333; padding:4px 6px; font-size:9.5px; height:22px; }
+
+    /* ── Footer ── */
+    #ojModal .oj-form-footer{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-top:10px; font-size:8pt; color:#333;
+      border:1px solid #333; background:#e5e5e5; padding:5px 10px;
+    }
+
+    /* ── Approvers modal (nested) ── */
+    #ojModal .apr-modal{
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9300;
+      align-items:center; justify-content:center;
+    }
+    #ojModal .apr-modal-inner{
+      background:#fff; border-radius:12px; padding:20px 24px; width:min(480px,92vw);
+      max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,.25);
+    }
+    #ojModal .apr-modal-inner h3{ margin:0 0 14px; font-size:15px; color:var(--oj-primary); }
+    #ojModal .apr-section{ margin-bottom:10px; }
+    #ojModal .apr-section label{ display:block; font-size:11px; font-weight:700; color:#334155; margin-bottom:3px; }
+    #ojModal .apr-section select{ width:100%; box-sizing:border-box; }
+    #ojModal .apr-modal-inner hr{ border:none; border-top:1px solid #e5e7eb; margin:14px 0; }
+    #ojModal .apr-manage b{ font-size:12px; color:#334155; }
+    #ojModal .apr-list-row{
+      display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; border-bottom:1px solid #f1f5f9;
+    }
+    #ojModal .apr-list-row .apr-name{ flex:1; font-weight:700; }
+    #ojModal .apr-list-row .apr-badge{ color:#6b7280; font-size:11px; }
+    #ojModal .apr-list-row button{ background:#dc3545; padding:3px 8px; font-size:11px; }
+    #ojModal .apr-list-row button:hover{ background:#b91c1c; }
+    #ojModal .apr-add-row{ display:flex; gap:6px; margin-top:8px; }
+    #ojModal .apr-add-row input{ flex:1; min-width:0; }
+    #ojModal .apr-add-row button{ flex-shrink:0; }
+    #ojModal .apr-hint{ font-size:10.5px; color:#888; margin-top:4px; }
+    #ojModal .apr-modal-btns{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+    /* ── Status ── */
+    #ojModal .oj-status-message{
+      position:fixed; top:14px; right:14px; padding:10px 16px; border-radius:6px;
+      color:#fff; display:none; z-index:9200; font-size:12px; font-weight:700;
+    }
+    #ojModal .oj-status-ok{ background:#28a745; } #ojModal .oj-status-err{ background:#dc3545; }
+
+    /* ── PRINT — tuned so one employee's form fits exactly one A4 page ── */
+    @media print{
+      body.oj-open > *:not(#ojModal){ display:none !important; }
+      body.oj-open #ojModal{
+        position:static !important; inset:auto !important; background:#fff !important;
+        padding:0 !important; overflow:visible !important; display:block !important; z-index:auto !important;
+      }
+      body.oj-open #ojModal .oj-shell{
+        background:#fff !important; width:100% !important; margin:0 !important; padding:0 !important;
+      }
+      #ojModal .oj-controls-bar{ display:none !important; }
+      #ojModal .apr-modal{ display:none !important; }
+
+      @page{ size:A4 portrait; margin:9mm 9mm 8mm 9mm; }
+      #ojModal .oj-form-wrapper{ box-shadow:none; padding:0; max-width:100%; }
+
+      #ojModal .oj-print-page.page-break-after{
+        page-break-after:always;
+        border-bottom:none;
+        margin-bottom:0;
+        padding-bottom:0;
+      }
+
+      #ojModal .official-header{ padding-bottom:6px; margin-bottom:6px; font-size:9.5pt; }
+      #ojModal .oj-form-title{ margin:0 0 5px; padding:4px 8px; }
+      #ojModal .oj-form-title .main-title{ font-size:12.5pt; }
+      #ojModal .part-header{ margin:6px 0 5px; padding:3px 8px; }
+      #ojModal .meta-section{ margin-bottom:6px; }
+      #ojModal .meta-row, #ojModal .meta-row3{ margin-bottom:3px; }
+      #ojModal .meta-cell{ font-size:8.5pt; }
+      #ojModal .meta-cell .meta-val{ border-bottom:1px dotted #333 !important; }
+      #ojModal .day-table{ margin-top:3px; }
+      #ojModal .day-table th{ padding:2px; }
+      #ojModal .day-table td{ padding:0.5px 2px; }
+      #ojModal .day-table th, #ojModal .day-table td{ font-size:7pt; }
+      #ojModal .sig-wrapper{ margin-top:8px; }
+      #ojModal .approvals-label{ margin-bottom:3px; }
+      #ojModal .sig-role{ font-size:8.5pt; }
+      #ojModal .sig-footnote{ margin-top:6px; padding:3px 6px; }
+      #ojModal .part-section{ margin-top:3px; }
+      #ojModal .part-table td, #ojModal .part2-left td, #ojModal .part2-right td{ padding:2px 6px; height:16px; }
+      #ojModal .oj-form-footer{ margin-top:6px; padding:3px 8px; }
+      body.oj-open *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    }
+  </style>
+
+  <div id="ojModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:8000;overflow-y:auto;padding:16px;">
+    <div class="oj-shell">
+
+      <!-- Controls bar -->
+      <div class="oj-controls-bar">
+        <label>Month</label>
+        <select id="oj-monthSel">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+        <label>Year</label>
+        <input type="number" id="oj-yearSel" value="2026" style="width:76px"/>
+        <label>Rota Area</label>
+        <select id="oj-areaSel" style="min-width:120px">
+          <option value="ALL">All Areas</option>
+        </select>
+        <button class="btn-green" onclick="OJ.loadAndBuild()">Load &amp; Build Forms</button>
+        <button onclick="OJ.openApproversModal()">👤 Approvers</button>
+        <button class="btn-orange" onclick="window.print()">🖨 Print</button>
+        <button type="button" onclick="OJ.close()" style="margin-left:auto;background:#6b7280;">✕ Close</button>
+      </div>
+
+      <!-- Approvers modal: pick who signs this batch + manage the saved list -->
+      <div id="oj-approversModal" class="apr-modal">
+        <div class="apr-modal-inner">
+          <h3>👤 Approvers for this batch</h3>
+          <div class="apr-section">
+            <label>Director (or equivalent)</label>
+            <select id="oj-aprDirectorSel"><option value="">— None —</option></select>
+          </div>
+          <div class="apr-section">
+            <label>Executive Director (or equivalent)</label>
+            <select id="oj-aprExDirSel"><option value="">— None —</option></select>
+          </div>
+          <div class="apr-section">
+            <label>CEO/CMO/COO</label>
+            <select id="oj-aprCeoSel"><option value="">— None —</option></select>
+          </div>
+          <hr/>
+          <div class="apr-manage">
+            <b>Saved Approvers</b>
+            <div id="oj-aprList"></div>
+            <div class="apr-add-row">
+              <input type="text" id="oj-aprNewName" placeholder="Name"/>
+              <input type="text" id="oj-aprNewBadge" placeholder="Badge No. (optional)"/>
+              <button id="oj-aprAddBtn" onclick="OJ.addApprover()">+ Add</button>
+            </div>
+            <div class="apr-hint" id="oj-aprHint">Only Director uses Badge No. — leave it blank for the others.</div>
+          </div>
+          <div class="apr-modal-btns">
+            <button class="btn-gray" onclick="OJ.closeApproversModal()">Cancel</button>
+            <button class="btn-green" onclick="OJ.applyApprovers()">Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form wrapper — rebuilt by OJ.loadAndBuild() -->
+      <div class="oj-form-wrapper" id="oj-formWrapper">
+        <div class="official-header">
+          <div class="oh-en">Kingdom of Saudi Arabia<br>Ministry of National Guard Health Affairs</div>
+          <div class="oh-logo"><img src="MNGHA-Crest.png" alt="Ministry of National Guard Health Affairs Crest" onerror="this.style.visibility='hidden'"></div>
+          <div class="oh-ar">المملكة العربية السعودية<br>الشؤون الصحية بوزارة الحرس الوطني</div>
+        </div>
+        <div class="oj-form-title"><div class="main-title">Overtime Justification (Non-Physicians)</div></div>
+        <div style="text-align:center;color:#888;padding:30px;">
+          Click "Load &amp; Build Forms" to generate one Overtime Justification sheet per staff member with overtime this month.
+        </div>
+      </div>
+
+      <div class="oj-status-message" id="oj-statusBox"></div>
+
+    </div><!-- /oj-shell -->
+  </div><!-- /ojModal -->
 
 <script>
 /* ── Role-based UI enforcement ─────────────────────────────────────────────
