@@ -5892,6 +5892,7 @@
       let _foundStaff     = null;
       let _allAdjustments = [];
       let _logLoaded      = false;
+      let _wired          = false;
 
       function _key() { return (window.BCOT_APP_KEY || '').trim(); }
       function adjDocRef(id) { return window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key(), ADJ_COLL, id); }
@@ -6322,6 +6323,26 @@
         document.getElementById('otAdjModal').style.display = 'block';
         document.body.classList.add('oa-open');
 
+        // Attached lazily on first open, not at script-load time — this
+        // modal's markup sits *after* <script src="js/index.js"> in the
+        // document, so it doesn't exist yet while the script is still
+        // parsing/executing. Guarded so repeat opens don't stack duplicates.
+        if (!_wired) {
+          _wired = true;
+          document.getElementById('oa-monthSel').addEventListener('change', () => {
+            if (_logLoaded) renderLog();
+            if (_foundStaff) renderStaffCard(_foundStaff);
+          });
+          document.getElementById('oa-yearSel').addEventListener('change', () => {
+            if (_logLoaded) renderLog();
+            if (_foundStaff) renderStaffCard(_foundStaff);
+          });
+          // Close edit modal on backdrop click
+          document.getElementById('oa-editModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('oa-editModal')) closeEditModal();
+          });
+        }
+
         const role = _roleInfo();
         const gate = document.getElementById('oa-authGate');
         const work = document.getElementById('oa-workView');
@@ -6355,20 +6376,6 @@
         document.getElementById('otAdjModal').style.display = 'none';
         document.body.classList.remove('oa-open');
       }
-
-      document.getElementById('oa-monthSel').addEventListener('change', () => {
-        if (_logLoaded) renderLog();
-        if (_foundStaff) renderStaffCard(_foundStaff);
-      });
-      document.getElementById('oa-yearSel').addEventListener('change', () => {
-        if (_logLoaded) renderLog();
-        if (_foundStaff) renderStaffCard(_foundStaff);
-      });
-
-      // Close edit modal on backdrop click
-      document.getElementById('oa-editModal').addEventListener('click', e => {
-        if (e.target === document.getElementById('oa-editModal')) closeEditModal();
-      });
 
       return {
         open, close, searchStaff, submitAdjustment, refreshLog, printSummary,
