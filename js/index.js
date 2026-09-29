@@ -5876,6 +5876,506 @@
       return { open, close, pick, render, init };
     })();
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // OT ADJUSTMENT MODAL  (OA namespace)
+    // Ported from OTAdjustment.html (kept in the repo, unused) so this works
+    // even where IT blocks direct navigation to that file. Reuses the shared
+    // window.FB Firestore handle set up earlier in index.html instead of a
+    // second initializeApp() call. Same Firestore collection as before
+    // (bcot_overtime_secure/{key}/ot_adjustments), so history and the
+    // "Import OT Adjustments" button above keep working unchanged.
+    // ══════════════════════════════════════════════════════════════════════════
+    const OA = (() => {
+      const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
+      const ADJ_COLL  = 'ot_adjustments';
+
+      let _foundStaff     = null;
+      let _allAdjustments = [];
+      let _logLoaded      = false;
+
+      function _key() { return (window.BCOT_APP_KEY || '').trim(); }
+      function adjDocRef(id) { return window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key(), ADJ_COLL, id); }
+
+      function showStatus(msg, ok = true) {
+        const el = document.getElementById('oa-statusBox');
+        el.textContent = msg;
+        el.className   = 'oa-status-message ' + (ok ? 'oa-status-ok' : 'oa-status-err');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => { el.className = 'oa-status-message'; }, ok ? 3500 : 5000);
+      }
+
+      function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      function fmtDate(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (isNaN(d)) return iso;
+        return d.toLocaleDateString('en-GB',{ day:'2-digit', month:'short', year:'numeric' })
+          + ' ' + d.toLocaleTimeString('en-GB',{ hour:'2-digit', minute:'2-digit' });
+      }
+
+      function currentMonth() { return Number(document.getElementById('oa-monthSel').value); }
+      function currentYear()  { return Number(document.getElementById('oa-yearSel').value) || new Date().getFullYear(); }
+
+      function getSubmitter() {
+        try {
+          const sess = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
+          return [sess.nameTitle, sess.name].filter(Boolean).join(' ') || 'Staff';
+        } catch { return 'Staff'; }
+      }
+
+      function getStaffRecords() {
+        try { return JSON.parse(localStorage.getItem(STAFF_KEY) || '[]') || []; }
+        catch { return []; }
+      }
+
+      // ── Staff Lookup ──────────────────────────────────────────────────────
+      function searchStaff() {
+        const query = (document.getElementById('oa-staffSearch').value || '').trim();
+        if (!query) { showStatus('Enter a badge number or staff name to search.', false); return; }
+
+        const records = getStaffRecords();
+        let found = records.find(s => String(s.badge || '').trim() === query);
+        if (!found) {
+          const q = query.toLowerCase();
+          found = records.find(s => (s.name || '').toLowerCase().includes(q));
+        }
+
+        const card = document.getElementById('oa-staffCard');
+        const form = document.getElementById('oa-adjFormCard');
+
+        if (!found) {
+          card.style.display = 'block';
+          card.innerHTML = `<div style="color:#dc2626;font-size:13px;padding:8px 0;">
+            No staff found matching "<strong>${esc(query)}</strong>".
+            Check the badge number or name and try again.
+          </div>`;
+          form.style.display = 'none';
+          _foundStaff = null;
+          return;
+        }
+
+        _foundStaff = found;
+        renderStaffCard(found);
+        form.style.display = 'block';
+        resetForm();
+      }
+
+      function resetForm() {
+        document.getElementById('oa-addHours').value   = '';
+        document.getElementById('oa-adjNotes').value   = '';
+        document.getElementById('oa-adjOtType').value  = 'Regular';
+        document.getElementById('oa-adjRemarks').value = '';
+        document.getElementById('oa-adjFormTitle').textContent = '✏️ Log Adjustment';
+        document.getElementById('oa-submitBtn').textContent    = '✅ Submit Adjustment';
+      }
+
+      function renderStaffCard(s) {
+        const month = currentMonth();
+        const year  = currentYear();
+        const existingHours = _allAdjustments
+          .filter(a => String(a.badge) === String(s.badge) && a.month === month && a.year === year)
+          .reduce((sum, a) => sum + (Number(a.additionalHours) || 0), 0);
+
+        const areas = (s.area || '').split(',').map(x => x.trim()).filter(Boolean);
+        const areaChips = areas.length
+          ? areas.map(a => `<span class="oa-area-chip">${esc(a)}</span>`).join(' ')
+          : '<span style="color:#94a3b8;font-size:12px;">No area assigned</span>';
+
+        const pillClass = existingHours > 0 ? 'oa-ot-pill' : 'oa-ot-pill none';
+        const pillLabel = existingHours > 0
+          ? `+${existingHours} hrs adjustment logged this month`
+          : 'No adjustments logged this month';
+
+        document.getElementById('oa-staffCard').style.display = 'block';
+        document.getElementById('oa-staffCard').innerHTML = `
+          <div class="oa-sc-name">${esc(s.name)}</div>
+          <div class="oa-sc-row"><span class="oa-sc-label">Badge</span><span>${esc(s.badge || '—')}</span></div>
+          <div class="oa-sc-row"><span class="oa-sc-label">Role</span><span>${esc(s.role || '—')}</span></div>
+          <div class="oa-sc-row"><span class="oa-sc-label">Areas</span><span>${areaChips}</span></div>
+          <div><span class="${pillClass}">${pillLabel}</span></div>`;
+      }
+
+      // ── Submit Adjustment ─────────────────────────────────────────────────
+      async function submitAdjustment() {
+        if (!_foundStaff) { showStatus('Search for a staff member first.', false); return; }
+        const k = _key();
+        if (!k) { showStatus('config.js not found — BCOT_APP_KEY missing.', false); return; }
+
+        const hours   = parseFloat(document.getElementById('oa-addHours').value);
+        const notes   = document.getElementById('oa-adjNotes').value.trim();
+        const otType  = document.getElementById('oa-adjOtType').value;
+        const remarks = document.getElementById('oa-adjRemarks').value.trim();
+
+        if (!hours || hours <= 0) { showStatus('Enter a valid number of hours (> 0).', false); return; }
+        if (!notes)               { showStatus('Notes / justification is required.', false); return; }
+
+        const entry = {
+          badge:           String(_foundStaff.badge || ''),
+          staffName:       _foundStaff.name || '',
+          role:            _foundStaff.role || '',
+          area:            _foundStaff.area || '',
+          month:           currentMonth(),
+          year:            currentYear(),
+          additionalHours: hours,
+          notes,
+          otType,
+          remarks,
+          submittedBy:     getSubmitter(),
+          submittedAt:     new Date().toISOString(),
+        };
+
+        try {
+          const colRef = window.FB.collection(window.FB.db, 'bcot_overtime_secure', k, ADJ_COLL);
+          const docRef = await window.FB.addDoc(colRef, entry);
+          entry._id = docRef.id;
+          _allAdjustments.unshift(entry);
+          renderLog();
+          renderStaffCard(_foundStaff);
+          resetForm();
+          showStatus(`Adjustment of +${hours} hrs logged for ${_foundStaff.name} ✅`);
+        } catch (e) {
+          console.error(e);
+          showStatus('Save failed: ' + (e?.message || e), false);
+        }
+      }
+
+      // ── Edit ──────────────────────────────────────────────────────────────
+      function openEditModal(id) {
+        const a = _allAdjustments.find(x => x._id === id);
+        if (!a) return;
+        document.getElementById('oa-editDocId').value      = id;
+        document.getElementById('oa-editStaffName').value  = `${a.staffName || ''}  (${a.badge || ''})`;
+        document.getElementById('oa-editHours').value      = a.additionalHours || '';
+        document.getElementById('oa-editNotes').value      = a.notes   || '';
+        document.getElementById('oa-editOtType').value     = a.otType  || 'Regular';
+        document.getElementById('oa-editRemarks').value    = a.remarks || '';
+        document.getElementById('oa-editModal').classList.add('show');
+      }
+
+      function closeEditModal() {
+        document.getElementById('oa-editModal').classList.remove('show');
+      }
+
+      async function saveEdit() {
+        const id      = document.getElementById('oa-editDocId').value;
+        const hours   = parseFloat(document.getElementById('oa-editHours').value);
+        const notes   = document.getElementById('oa-editNotes').value.trim();
+        const otType  = document.getElementById('oa-editOtType').value;
+        const remarks = document.getElementById('oa-editRemarks').value.trim();
+
+        if (!id)                  { showStatus('No record selected.', false); return; }
+        if (!hours || hours <= 0) { showStatus('Enter a valid number of hours (> 0).', false); return; }
+        if (!notes)               { showStatus('Notes / justification is required.', false); return; }
+
+        try {
+          await window.FB.updateDoc(adjDocRef(id), {
+            additionalHours: hours,
+            notes,
+            otType,
+            remarks,
+            lastEditedBy: getSubmitter(),
+            lastEditedAt: new Date().toISOString(),
+          });
+          const idx = _allAdjustments.findIndex(x => x._id === id);
+          if (idx >= 0) {
+            _allAdjustments[idx] = { ..._allAdjustments[idx], additionalHours: hours, notes, otType, remarks };
+          }
+          closeEditModal();
+          renderLog();
+          if (_foundStaff) renderStaffCard(_foundStaff);
+          showStatus('Adjustment updated ✅');
+        } catch (e) {
+          console.error(e);
+          showStatus('Update failed: ' + (e?.message || e), false);
+        }
+      }
+
+      // ── Delete ────────────────────────────────────────────────────────────
+      async function deleteAdjustment(id) {
+        const a = _allAdjustments.find(x => x._id === id);
+        if (!a) return;
+        const confirmed = await window.BCOT_AUTH.confirm(
+          `Delete the adjustment of +${a.additionalHours} hrs for ${a.staffName}?\nThis cannot be undone.`,
+          { title: '🗑 Delete Adjustment', confirmLabel: 'Delete', confirmClass: 'btn-red' }
+        );
+        if (!confirmed) return;
+
+        try {
+          await window.FB.deleteDoc(adjDocRef(id));
+          _allAdjustments = _allAdjustments.filter(x => x._id !== id);
+          renderLog();
+          if (_foundStaff) renderStaffCard(_foundStaff);
+          showStatus('Adjustment deleted.');
+        } catch (e) {
+          console.error(e);
+          showStatus('Delete failed: ' + (e?.message || e), false);
+        }
+      }
+
+      // ── Mark as Done ────────────────────────────────────────────────────
+      async function toggleDone(id) {
+        const a = _allAdjustments.find(x => x._id === id);
+        if (!a) return;
+        const nowDone = !a.done;
+        try {
+          await window.FB.updateDoc(adjDocRef(id), {
+            done:   nowDone,
+            doneAt: nowDone ? new Date().toISOString() : null,
+            doneBy: nowDone ? getSubmitter() : null,
+          });
+          a.done   = nowDone;
+          a.doneAt = nowDone ? new Date().toISOString() : null;
+          a.doneBy = nowDone ? getSubmitter() : null;
+          renderLog();
+          showStatus(nowDone ? 'Marked as done ✅' : 'Marked as pending.');
+        } catch (e) {
+          console.error(e);
+          showStatus('Update failed: ' + (e?.message || e), false);
+        }
+      }
+
+      async function undoAllDone() {
+        const month     = currentMonth();
+        const year      = currentYear();
+        const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+        const doneRows  = _allAdjustments.filter(a => a.month === month && a.year === year && a.done);
+
+        if (!doneRows.length) { showStatus(`Nothing to undo for ${monthName} ${year}.`, false); return; }
+
+        const confirmed = await window.BCOT_AUTH.confirm(
+          `Un-mark ${doneRows.length} adjustment${doneRows.length === 1 ? '' : 's'} as Done for ${monthName} ${year}?\nThey'll return to pending status.`,
+          '↩ Undo All',
+          { confirmLabel: 'Undo All' }
+        );
+        if (!confirmed) return;
+
+        try {
+          await Promise.all(doneRows.map(a => window.FB.updateDoc(adjDocRef(a._id), {
+            done: false, doneAt: null, doneBy: null,
+          })));
+          doneRows.forEach(a => { a.done = false; a.doneAt = null; a.doneBy = null; });
+          renderLog();
+          showStatus(`${doneRows.length} adjustment${doneRows.length === 1 ? '' : 's'} un-marked as Done.`);
+        } catch (e) {
+          console.error(e);
+          showStatus('Undo All failed: ' + (e?.message || e), false);
+        }
+      }
+
+      // ── Log ───────────────────────────────────────────────────────────────
+      async function refreshLog() {
+        const k = _key();
+        if (!k) { showStatus('config.js not found.', false); return; }
+
+        document.getElementById('oa-logTitle').textContent = 'Adjustment Log — Loading…';
+        document.getElementById('oa-logBody').innerHTML =
+          '<tr><td colspan="10" class="oa-empty-log">Loading…</td></tr>';
+
+        try {
+          const colRef = window.FB.collection(window.FB.db, 'bcot_overtime_secure', k, ADJ_COLL);
+          const snap   = await window.FB.getDocs(colRef);
+          _allAdjustments = [];
+          snap.forEach(d => { _allAdjustments.push({ _id: d.id, ...d.data() }); });
+          _allAdjustments.sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+          _logLoaded = true;
+          renderLog();
+          if (_foundStaff) renderStaffCard(_foundStaff);
+        } catch (e) {
+          console.error(e);
+          showStatus('Failed to load adjustments: ' + (e?.message || e), false);
+          document.getElementById('oa-logTitle').textContent = 'Adjustment Log — Load Failed';
+        }
+      }
+
+      function renderLog() {
+        const month = currentMonth();
+        const year  = currentYear();
+        const rows  = _allAdjustments.filter(a => a.month === month && a.year === year);
+
+        const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+        document.getElementById('oa-logTitle').textContent = `Adjustment Log — ${monthName} ${year}`;
+
+        const totalHrs = rows.reduce((s, a) => s + (Number(a.additionalHours) || 0), 0);
+        document.getElementById('oa-logSummary').textContent = rows.length
+          ? `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} · +${totalHrs} hrs total`
+          : '';
+
+        const tbody = document.getElementById('oa-logBody');
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="10" class="oa-empty-log">
+            No adjustments recorded for ${monthName} ${year}.
+          </td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = rows.map(a => `
+          <tr class="${a.done ? 'oa-done-row' : ''}">
+            <td class="oa-ts-cell">${fmtDate(a.submittedAt)}</td>
+            <td style="white-space:nowrap;font-weight:700;">${esc(a.badge)}</td>
+            <td style="white-space:nowrap;">${esc(a.staffName)}${a.done ? '<span class="oa-done-chip">&#10003; Done</span>' : ''}</td>
+            <td style="font-size:11px;color:#475569;">${esc(a.role)}</td>
+            <td class="oa-hours-cell">+${Number(a.additionalHours) || 0} hrs</td>
+            <td class="oa-notes-cell" title="${esc(a.notes)}">${esc(a.notes)}</td>
+            <td style="white-space:nowrap;font-size:11px;font-weight:700;color:${a.otType === 'Regular' ? '#475569' : '#1a4f8b'};">${esc(a.otType) || '<span style="color:#cbd5e1;">—</span>'}</td>
+            <td class="oa-remarks-cell" title="${esc(a.remarks)}">${esc(a.remarks) || '<span style="color:#cbd5e1;">—</span>'}</td>
+            <td class="oa-by-cell">${esc(a.submittedBy)}</td>
+            <td class="oa-no-print">
+              <div class="oa-action-btns">
+                <button onclick="OA.toggleDone('${esc(a._id)}')" class="${a.done ? 'btn-ghost' : 'btn-teal'}">${a.done ? '↩ Undo' : '✓ Done'}</button>
+                <button onclick="OA.openEditModal('${esc(a._id)}')" style="background:#1a4f8b;">✏️ Edit</button>
+                <button onclick="OA.deleteAdjustment('${esc(a._id)}')" class="btn-red">🗑</button>
+              </div>
+            </td>
+          </tr>`).join('');
+      }
+
+      // ── Print Summary (one row per entry, sorted by staff name) ───────────
+      function printSummary() {
+        const month = currentMonth();
+        const year  = currentYear();
+        const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+
+        const rows = _allAdjustments
+          .filter(a => a.month === month && a.year === year)
+          .slice()
+          .sort((x, y) => {
+            const byName = (x.staffName || '').localeCompare(y.staffName || '', undefined, { sensitivity: 'base' });
+            return byName !== 0 ? byName : (x.submittedAt || '').localeCompare(y.submittedAt || '');
+          });
+
+        if (!rows.length) {
+          showStatus(`No adjustments recorded for ${monthName} ${year}.`, false);
+          return;
+        }
+
+        const hrs = n => String(Math.round((Number(n) || 0) * 100) / 100);
+        const fmtDay = iso => {
+          if (!iso) return '—';
+          const d = new Date(iso);
+          return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+
+        let totalReg = 0, totalBus = 0;
+        const body = rows.map(a => {
+          const h = Number(a.additionalHours) || 0;
+          const isBus = a.otType === 'Business OT';
+          if (isBus) totalBus += h; else totalReg += h;
+          return `
+          <tr>
+            <td>${fmtDay(a.submittedAt)}</td>
+            <td>${esc(a.badge) || '—'}</td>
+            <td>${esc(a.staffName)}</td>
+            <td class="num">${isBus ? '' : hrs(h)}</td>
+            <td class="num">${isBus ? hrs(h) : ''}</td>
+          </tr>`;
+        }).join('');
+
+        const totalRow = `
+          <tr class="ps-total">
+            <td></td><td></td><td>TOTAL</td>
+            <td class="num">${hrs(totalReg)}</td>
+            <td class="num">${hrs(totalBus)}</td>
+          </tr>`;
+
+        document.getElementById('oa-printSummary').innerHTML = `
+          <div class="ps-header">
+            <div class="ps-org">
+              King Abdulaziz Medical City &ndash; Western Region<br>
+              National Guard Health Affairs<br>
+              Pharmaceutical Care Department
+            </div>
+            <div class="ps-title">Overtime Adjustment Summary</div>
+            <div class="ps-period">${monthName} ${year}</div>
+          </div>
+          <table class="ps-table">
+            <thead>
+              <tr>
+                <th>Date</th><th>Badge No</th><th>Name</th>
+                <th>Regular OT (hrs)</th><th>Business OT (hrs)</th>
+              </tr>
+            </thead>
+            <tbody>${body}${totalRow}</tbody>
+          </table>
+          <div class="ps-foot">${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} &middot; generated ${fmtDate(new Date().toISOString())}</div>`;
+
+        document.body.classList.add('oa-print-summary-mode');
+        window.print();
+        setTimeout(() => document.body.classList.remove('oa-print-summary-mode'), 1000);
+      }
+
+      window.addEventListener('afterprint', () =>
+        document.body.classList.remove('oa-print-summary-mode'));
+
+      // ── Open / Close (modal lifecycle — replaces the standalone page's role gate + init()) ──
+      function _roleInfo() {
+        try {
+          const s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || '{}');
+          if (!s.ts || Date.now() - s.ts > 43200000) return null;
+          return s.app_role || 'user';
+        } catch { return null; }
+      }
+
+      function open() {
+        document.getElementById('otAdjModal').style.display = 'block';
+        document.body.classList.add('oa-open');
+
+        const role = _roleInfo();
+        const gate = document.getElementById('oa-authGate');
+        const work = document.getElementById('oa-workView');
+
+        if (role !== 'admin') {
+          document.getElementById('oa-authGateIcon').textContent  = role ? '🚫' : '🔑';
+          document.getElementById('oa-authGateTitle').textContent = role ? 'Admin Access Required' : 'Sign In Required';
+          document.getElementById('oa-authGateMsg').textContent   =
+            role ? 'This page is restricted to administrators.' : 'Please sign in to continue.';
+          gate.style.display = 'flex';
+          work.style.display = 'none';
+          return;
+        }
+
+        gate.style.display = 'none';
+        work.style.display = 'block';
+
+        // Fresh state every time, matching a fresh page load of the old standalone page
+        _foundStaff = null;
+        _logLoaded  = false;
+        document.getElementById('oa-staffSearch').value = '';
+        document.getElementById('oa-staffCard').style.display = 'none';
+        document.getElementById('oa-adjFormCard').style.display = 'none';
+        document.getElementById('oa-monthSel').value = String(new Date().getMonth() + 1);
+        document.getElementById('oa-yearSel').value  = String(new Date().getFullYear());
+
+        refreshLog();
+      }
+
+      function close() {
+        document.getElementById('otAdjModal').style.display = 'none';
+        document.body.classList.remove('oa-open');
+      }
+
+      document.getElementById('oa-monthSel').addEventListener('change', () => {
+        if (_logLoaded) renderLog();
+        if (_foundStaff) renderStaffCard(_foundStaff);
+      });
+      document.getElementById('oa-yearSel').addEventListener('change', () => {
+        if (_logLoaded) renderLog();
+        if (_foundStaff) renderStaffCard(_foundStaff);
+      });
+
+      // Close edit modal on backdrop click
+      document.getElementById('oa-editModal').addEventListener('click', e => {
+        if (e.target === document.getElementById('oa-editModal')) closeEditModal();
+      });
+
+      return {
+        open, close, searchStaff, submitAdjustment, refreshLog, printSummary,
+        openEditModal, closeEditModal, saveEdit, deleteAdjustment, toggleDone, undoAllDone,
+      };
+    })();
+
     // ── Init ──────────────────────────────────────────────────────────────────
     (function init() {
       setKeyFieldFromStorage();
