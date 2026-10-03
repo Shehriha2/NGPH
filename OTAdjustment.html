@@ -97,8 +97,10 @@
     .action-btns{ display:flex; gap:5px; white-space:nowrap; }
     .action-btns button{ padding:3px 9px; font-size:11px; font-weight:700; border-radius:5px; }
     .btn-teal{ background:#0f766e; } .btn-teal:hover{ background:#0b5c56; }
-    .adj-table tbody tr.done-row td{ background:#fff7ed; }
-    .done-chip{ display:inline-block; background:#d97706; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; }
+    /* Done records: dark orange row; text forced dark so it stays readable (some cells set their colour inline, hence !important) */
+    .adj-table tbody tr.done-row td{ background:#ff8c00; color:#111827 !important; }
+    .adj-table tbody tr.done-row td span:not(.done-chip){ color:#111827 !important; }
+    .done-chip{ display:inline-block; background:#7c2d12; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; }
 
     /* ── Edit modal ── */
     #editModal{

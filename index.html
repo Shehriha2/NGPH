@@ -724,7 +724,7 @@
               <a href="AttendanceSheet.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-week"></i> Attendance Sheet</button></a>
               <a href="Extension.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-plus"></i> Extensions</button></a>
               <a href="MultiMonth.html"   class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar-range"></i> Multi-Month View</button></a>
-              <button type="button" onclick="OA.open();" style="background:#1a4f8b;"><i class="bi bi-pencil-square"></i> OT Adjustments</button>
+              <a href="OTAdjustment.html" class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-pencil-square"></i> OT Adjustments</button></a>
               <a href="Training.html"     class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-mortarboard"></i> Training</button></a>
               <a href="LieuDays.html"     class="ghost-link"><button type="button" style="background:#1a4f8b;"><i class="bi bi-calendar2-check"></i> Lieu Days</button></a>
               <span id="nav-restricted-pages">
@@ -1350,7 +1350,10 @@
 
   <!-- ══════════════════════════════════════════════════════════════════════
        OT ADJUSTMENT MODAL  (OA namespace)
-       Ported from OTAdjustment.html (kept in the repo, unused) so this works
+       DORMANT since 2026-10-03: the "OT Adjustments" button links to the
+       regular OTAdjustment.html page again. Kept so the button can be switched
+       back to <button onclick="OA.open();"> if IT ever blocks that page again.
+       Ported from OTAdjustment.html so this works
        even where IT blocks direct navigation to that file. Every id/class
        below is scoped under #otAdjModal so nothing here can collide with,
        or be overridden by, the rest of the app's styles/scripts.
@@ -1455,8 +1458,10 @@
     #otAdjModal .oa-empty-log{ padding:40px; text-align:center; color:#94a3b8; font-size:13px; }
     #otAdjModal .oa-action-btns{ display:flex; gap:5px; white-space:nowrap; }
     #otAdjModal .oa-action-btns button{ padding:3px 9px; font-size:11px; font-weight:700; border-radius:5px; }
-    #otAdjModal .oa-adj-table tbody tr.oa-done-row td{ background:#fff7ed; }
-    #otAdjModal .oa-done-chip{ display:inline-block; background:#d97706; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; }
+    /* Done records: dark orange row; text forced dark so it stays readable (some cells set their colour inline, hence !important) */
+    #otAdjModal .oa-adj-table tbody tr.oa-done-row td{ background:#ff8c00; color:#111827 !important; }
+    #otAdjModal .oa-adj-table tbody tr.oa-done-row td span:not(.oa-done-chip){ color:#111827 !important; }
+    #otAdjModal .oa-done-chip{ display:inline-block; background:#7c2d12; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; }
 
     /* ── Edit modal (nested) ── */
     #otAdjModal #oa-editModal{
