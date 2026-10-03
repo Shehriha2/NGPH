@@ -3536,13 +3536,18 @@
     // search filter. Wired to beforeprint/afterprint rather than a wrapper
     // around the Print buttons' onclick, so it also applies to the browser's
     // own Ctrl+P / File > Print, not just the two in-page buttons.
-    window.addEventListener('beforeprint', () => {
+    // The checkbox is ticked by default (see index.html), so zero-hour staff are
+    // left out of every printout in every area view unless it's unticked.
+    // Also called from applyRotaPrintPageBreaks() below, so the page count
+    // there never depends on which beforeprint listener happens to run first.
+    function tagZeroHourRowsForPrint() {
       const onlyWorked = document.getElementById('printOnlyWorked')?.checked;
       document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const hours = Number(row.querySelector('.hours-cell')?.textContent) || 0;
         row.classList.toggle('print-hide-row', !!onlyWorked && hours <= 0);
       });
-    });
+    }
+    window.addEventListener('beforeprint', tagZeroHourRowsForPrint);
     window.addEventListener('afterprint', () => {
       document.querySelectorAll('#rotaTable tbody tr.print-hide-row').forEach(row => row.classList.remove('print-hide-row'));
     });
@@ -7030,8 +7035,15 @@
     function applyRotaPrintPageBreaks() {
       document.querySelectorAll('#rotaTable tbody tr.print-page-num-row').forEach(r => r.remove());
 
+      // Re-tag zero-hour rows first (idempotent) — see tagZeroHourRowsForPrint().
+      tagZeroHourRowsForPrint();
+
+      // Count only rows that will really print: not hidden by the on-screen
+      // search filter, and not dropped by "Print only staff with hours".
+      // Counting the dropped ones threw off the 18-per-page breaks and the
+      // "Page X / Y" labels (a page break on a hidden row does nothing).
       const rows = Array.from(document.querySelectorAll('#rotaTable tbody tr'))
-        .filter(r => r.style.display !== 'none');
+        .filter(r => r.style.display !== 'none' && !r.classList.contains('print-hide-row'));
       const totalPages = Math.max(1, Math.ceil(rows.length / ROTA_PRINT_ROWS_PER_PAGE));
 
       rows.forEach((r, i) => {

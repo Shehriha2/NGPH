@@ -555,8 +555,8 @@
           <button id="btn-duties" onclick="DM.open()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard-check"></i> Duties</button>
           <button id="btn-areas" onclick="AM.open()" style="background:#1a4f8b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-map"></i> Areas</button>
           <button onclick="clearAllTable()" style="background:#991b1b;border:none;color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-trash-fill"></i> Clear All</button>
-          <label title="When checked, staff with 0 total hours this month are left out of the printed rota" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:11px;padding:8px 12px;border-radius:10px;font-weight:700;cursor:pointer;white-space:nowrap;">
-            <input type="checkbox" id="printOnlyWorked" style="margin:0;"/> Print only staff with hours
+          <label title="Ticked by default: staff with 0 total hours this month are left out of the printed rota. Untick to print everyone." style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:11px;padding:8px 12px;border-radius:10px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="printOnlyWorked" checked autocomplete="off" style="margin:0;"/> Print only staff with hours
           </label>
           <button onclick="window.print()" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-printer-fill"></i> Print</button>
           <button onclick="window.location.href='ChargeRequests.html'" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.45);color:#fff;font-size:12px;padding:9px 16px;border-radius:10px;font-weight:700;"><i class="bi bi-clipboard2-check-fill"></i> Staff Requests</button>
@@ -1095,7 +1095,7 @@
     window.FB = { db, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc, addDoc, updateDoc };
   </script>
 
-  <script src="js/index.js?v=29"></script>
+  <script src="js/index.js?v=30"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL
