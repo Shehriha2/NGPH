@@ -17,7 +17,7 @@
   'use strict';
 
   const JSPDF_SRC     = 'js/vendor/jspdf.umd.min.js?v=4.2.1';
-  const LOGO_SRC      = 'MNGHA-Logo.png';
+  const LOGO_SRC      = 'MNGHA-Crest.png';
   const ROWS_PER_PAGE = 18;                       // same as the printed rota
   const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const WEEKDAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
