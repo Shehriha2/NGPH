@@ -21,6 +21,7 @@
   let _users       = [];
   let _ips         = [];          // access log — every IP/device ever seen
   let _myIP        = null;
+  let _ipLogPromise = null;       // in-flight background _logIP(); never rejects
   let _pendingUser = null;
 
   /* ── Session helpers ───────────────────────────────────────────────────── */
@@ -499,9 +500,16 @@
    * users rather than a single owner — never overwritten, only appended to.
    * Best-effort and non-blocking, same as _logIP(); called fire-and-forget
    * from _finishLogin so a slow/failed write never delays showing the app.
+   *
+   * _logIP() now runs in the background from init(), so a quick login can
+   * arrive before the IP lookup has finished. Wait for it here (this function
+   * is already fire-and-forget, so the wait is invisible) — otherwise _myIP
+   * would still be null and the link would be silently lost, and the two
+   * read-modify-write cycles on the shared _ips list could overlap.
    */
   async function _linkUserToIP(user) {
     try {
+      if (_ipLogPromise) await _ipLogPromise;
       if (!_myIP || !user || !user.badge) return;
       if (!_ips.length) await loadIPs();
 
@@ -1514,7 +1522,17 @@
       return;
     }
 
-    // 5. Load user list
+    // 5. Log this device's IP for the admin's records — in the BACKGROUND.
+    // Deliberately not awaited: the lookup (api4.ipify.org, an external
+    // IPv4-only service) can take ~5s or fail outright on restrictive or
+    // IPv6-only networks, and it's an audit trail, not a gate, so the login
+    // form must never wait on it. It runs concurrently with the user-list
+    // load below; _linkUserToIP() awaits this promise so a login that
+    // happens before it finishes still gets linked to the IP. The 15s cap
+    // just guarantees the promise settles; it is always safe to swallow.
+    _ipLogPromise = _withTimeout(_logIP(), 15000, 'IP log').catch(() => {});
+
+    // 6. Load user list
     try {
       await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) {
@@ -1523,13 +1541,13 @@
       return;
     }
 
-    // 6. No users yet → first-time setup
+    // 7. No users yet → first-time setup
     if (!_users.length) {
       showScreen('setup');
       return;
     }
 
-    // 7. Show login form
+    // 8. Show login form
     buildUserDropdown();
     showScreen('login');
    } catch (e) {
