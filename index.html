@@ -745,12 +745,11 @@
             <h3>🔒 Security</h3>
             <div class="btn-row">
               <button type="button" onclick="openAuthAdmin();" style="background:#1a4f8b;"><i class="bi bi-shield-lock"></i> Manage Login Users</button>
-              <button type="button" onclick="openIPAdmin();" style="background:#1a4f8b;"><i class="bi bi-globe"></i> Manage IP Access</button>
               <button type="button" onclick="AM.open();" style="background:#1a4f8b;"><i class="bi bi-folder2-open"></i> Manage Areas</button>
               <button type="button" onclick="bumpAppVersion();" style="background:#7c3aed;"><i class="bi bi-arrow-clockwise"></i> Publish Version</button>
               <button type="button" onclick="importOTAdjustments();" style="background:#0f766e;" title="Imports Regular OT Adjustments for this month (Business OT instead if the current area is BCOT). Staff not on this rota are skipped, except in BCOT where a new row is added for them."><i class="bi bi-cloud-download"></i> Import OT Adjustments</button>
             </div>
-            <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">Manage login users, device access, areas (including per-area user permissions), and OT Adjustment imports. All require the OT override password.</p>
+            <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">Manage login users, areas (including per-area user permissions), and OT Adjustment imports. All require the OT override password.</p>
           </div>
         </div>
 
@@ -1079,7 +1078,7 @@
 
   <script src="config.js"></script>
   <script src="js/version-check.js"></script>
-  <script src="js/auth.js?v=14"></script>
+  <script src="js/auth.js?v=15"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
@@ -1096,7 +1095,7 @@
     window.FB = { db, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc, addDoc, updateDoc };
   </script>
 
-  <script src="js/index.js?v=30"></script>
+  <script src="js/index.js?v=31"></script>
   <script src="js/rota-pdf.js?v=2"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════

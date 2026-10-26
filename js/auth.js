@@ -2,10 +2,9 @@
    BCOT Rota — App Authentication Guard  (js/auth.js)
    ───────────────────────────────────────────────────────────────────────────
    • Fullscreen overlay on every page — nothing visible until authenticated
-   • IP/device logging — every visit is recorded, but never blocks access;
-     username + password is the only access gate
+   • Access is gated by username + password only — the app never looks up,
+     logs, or filters by the visitor's IP address or device
    • Users stored in Firebase: bcot_overtime_secure/[KEY]/app_auth/USERS
-   • IPs stored in Firebase:   bcot_overtime_secure/[KEY]/app_ips/LIST (log only)
    • Session in localStorage, 12-hour expiry, shared across all tabs
    • First login forces password change (default: 12345)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -19,9 +18,6 @@
   /* ── State ─────────────────────────────────────────────────────────────── */
   let _key         = '';
   let _users       = [];
-  let _ips         = [];          // access log — every IP/device ever seen
-  let _myIP        = null;
-  let _ipLogPromise = null;       // in-flight background _logIP(); never rejects
   let _pendingUser = null;
 
   /* ── Session helpers ───────────────────────────────────────────────────── */
@@ -88,19 +84,6 @@
   }
   async function saveUsers() {
     await window.FB.setDoc(authDoc(), { users: _users });
-  }
-
-  /* ── Firebase helpers — IP list ────────────────────────────────────────── */
-  function ipDoc() {
-    return window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'app_ips', 'LIST');
-  }
-  async function loadIPs() {
-    const snap = await window.FB.getDoc(ipDoc());
-    _ips = snap.exists() ? (snap.data().ips || []) : [];
-  }
-  async function saveIPs() {
-    if (typeof window.FB.setDoc !== 'function') return;
-    await window.FB.setDoc(ipDoc(), { ips: _ips });
   }
 
   /* ── DOM helpers ───────────────────────────────────────────────────────── */
@@ -373,7 +356,6 @@
     // later page load, including one that finished logging in elsewhere.
     window.__bcotFreshLogin = true;
     window.dispatchEvent(new CustomEvent('bcotAuth', { detail: getSession() }));
-    _linkUserToIP(user);
   }
 
   function _removeOverlay() {
@@ -445,96 +427,6 @@
       document.addEventListener(ev, _reset, { passive: true })
     );
     _reset();
-  }
-
-  /* ══════════════════════════════════════════════════════════════════════════
-     IP / Device Logging (audit only — never blocks access)
-     ══════════════════════════════════════════════════════════════════════════ */
-
-  /** Fetch this device's public IP from ipify.org (5 s timeout). */
-  async function _getMyIP() {
-    try {
-      const ctrl = new AbortController();
-      const tid  = setTimeout(() => ctrl.abort(), 5000);
-      const resp = await fetch('https://api4.ipify.org?format=json', { signal: ctrl.signal });
-      clearTimeout(tid);
-      const data = await resp.json();
-      return data.ip || null;
-    } catch { return null; }
-  }
-
-  /**
-   * Record this device's IP in the access log. Best-effort and non-blocking:
-   * any failure (IP detection, Firestore) is swallowed — logging is an audit
-   * trail, not a gate, so it must never stop a user from reaching login.
-   */
-  async function _logIP() {
-    try {
-      _myIP = await _getMyIP();
-      if (!_myIP) return;
-
-      await loadIPs();
-      const now   = new Date().toISOString();
-      const entry = _ips.find(e => e.ip === _myIP);
-      if (entry) {
-        entry.lastSeen = now;
-        entry.visits   = (entry.visits || 0) + 1;
-      } else {
-        _ips.push({
-          ip:        _myIP,
-          label:     '',
-          firstSeen: now,
-          lastSeen:  now,
-          visits:    1,
-          ua:        (navigator.userAgent || '').slice(0, 120)
-        });
-      }
-      await saveIPs();
-    } catch {}
-  }
-
-  /**
-   * Associate the just-logged-in user with this device's IP entry, so the
-   * admin can see who has used each IP. An IP can be shared by more than one
-   * person (an office PC across shifts), so each entry keeps a *list* of
-   * users rather than a single owner — never overwritten, only appended to.
-   * Best-effort and non-blocking, same as _logIP(); called fire-and-forget
-   * from _finishLogin so a slow/failed write never delays showing the app.
-   *
-   * _logIP() now runs in the background from init(), so a quick login can
-   * arrive before the IP lookup has finished. Wait for it here (this function
-   * is already fire-and-forget, so the wait is invisible) — otherwise _myIP
-   * would still be null and the link would be silently lost, and the two
-   * read-modify-write cycles on the shared _ips list could overlap.
-   */
-  async function _linkUserToIP(user) {
-    try {
-      if (_ipLogPromise) await _ipLogPromise;
-      if (!_myIP || !user || !user.badge) return;
-      if (!_ips.length) await loadIPs();
-
-      const now = new Date().toISOString();
-      let entry = _ips.find(e => e.ip === _myIP);
-      if (!entry) {
-        entry = { ip: _myIP, label: '', firstSeen: now, lastSeen: now, visits: 1,
-                   ua: (navigator.userAgent || '').slice(0, 120) };
-        _ips.push(entry);
-      }
-      if (!Array.isArray(entry.users)) entry.users = [];
-      const link = entry.users.find(u => u.badge === user.badge);
-      if (link) {
-        link.name      = user.name;
-        link.nameTitle = user.nameTitle || '';
-        link.lastLogin = now;
-        link.logins    = (link.logins || 0) + 1;
-      } else {
-        entry.users.push({
-          badge: user.badge, name: user.name, nameTitle: user.nameTitle || '',
-          firstLogin: now, lastLogin: now, logins: 1
-        });
-      }
-      await saveIPs();
-    } catch {}
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -902,203 +794,6 @@
       areas:           u.ext_areas      || [],
       linkedManagerId: u.ext_manager_id || ''
     }));
-  }
-
-  /* ══════════════════════════════════════════════════════════════════════════
-     IP Manager
-     ══════════════════════════════════════════════════════════════════════════ */
-  async function openIPManager() {
-    if (!_key) { await _bcotAlert('Authentication module is not initialized.', 'Error'); return; }
-    try {
-      let t = 0;
-      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await _withTimeout(loadIPs(), 10000, 'Load IPs');
-      if (!_myIP) _myIP = await _getMyIP();
-    } catch (e) {
-      await _bcotAlert('Could not load IP list — check your connection.', 'Connection Error');
-      return;
-    }
-    _renderIPManagerModal();
-  }
-
-  function _renderIPManagerModal() {
-    const existing = $id('bcot-ip-modal');
-    if (existing) existing.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'bcot-ip-modal';
-    modal.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;' +
-      'display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
-
-    modal.innerHTML = `
-<div style="background:#fff;border-radius:14px;padding:28px 28px 22px;width:600px;
-            max-width:94vw;max-height:86vh;overflow-y:auto;
-            box-shadow:0 8px 32px rgba(0,0,0,.2);">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-    <h3 style="margin:0;font-size:16px;color:#1a4f8b;">🌐 Device / IP Access Log</h3>
-    <button onclick="document.getElementById('bcot-ip-modal').remove();"
-      style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;
-             line-height:1;padding:0 4px;">&times;</button>
-  </div>
-
-  <!-- Total count -->
-  <div id="bcot-ip-counter"
-    style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;
-           padding:10px 14px;margin-bottom:10px;font-size:13px;color:#0369a1;"></div>
-
-  <p style="margin:0 0 14px;font-size:11px;color:#9ca3af;">
-    Access is controlled by username + password only. Every device below was let in
-    automatically and is listed here for reference — nothing needs approval.
-  </p>
-
-  <!-- Device log -->
-  <div id="bcot-ip-list" style="margin-bottom:4px;"></div>
-</div>`;
-
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    _renderIPCounter();
-    _renderIPList();
-  }
-
-  function _renderIPCounter() {
-    const counter = $id('bcot-ip-counter');
-    if (!counter) return;
-    const total = _ips.length;
-    counter.innerHTML =
-      `<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">` +
-      `<div><strong>${total} device${total !== 1 ? 's' : ''} recorded</strong>` +
-      `<span style="font-size:11px;color:#6b7280;margin-left:10px;">Unlimited — access is not restricted by IP</span></div>` +
-      (total ? `<button onclick="BCOT_AUTH.ipClearAll();" ` +
-        `style="padding:5px 12px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;` +
-        `border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">` +
-        `🗑️ Clear All</button>` : ``) +
-      `</div>`;
-  }
-
-  async function ipClearAll() {
-    if (!_ips.length) return;
-    const ok = await _bcotConfirm(
-      `Permanently clear the entire access log?<br>` +
-      `This deletes all <strong>${_ips.length}</strong> recorded device${_ips.length !== 1 ? 's' : ''} ` +
-      `(IPs, labels, linked usernames, visit history). It does not affect who can log in — only the log itself.`,
-      'Clear Access Log', { confirmLabel: 'Clear All', danger: true }
-    );
-    if (!ok) return;
-    _ips = [];
-    try {
-      await saveIPs();
-      _renderIPCounter();
-      _renderIPList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
-  }
-
-  function _renderIPList() {
-    const list = $id('bcot-ip-list');
-    if (!list) return;
-
-    const fmtDate = iso => {
-      if (!iso) return '—';
-      try {
-        return new Date(iso).toLocaleDateString('en-GB',
-          { day: '2-digit', month: 'short', year: 'numeric' });
-      } catch { return iso.slice(0, 10); }
-    };
-
-    if (!_ips.length) {
-      list.innerHTML =
-        `<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">📋 RECORDED DEVICES</div>` +
-        `<p style="color:#9ca3af;font-size:13px;margin:0;">No visits recorded yet.</p>`;
-      return;
-    }
-
-    const sorted = [..._ips].sort((a, b) => (b.lastSeen || '').localeCompare(a.lastSeen || ''));
-
-    list.innerHTML =
-      `<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">📋 RECORDED DEVICES (${_ips.length})</div>` +
-      sorted.map(e => {
-        const i = _ips.indexOf(e);
-        const isMe = (e.ip === _myIP);
-        return `
-<div style="border:1px solid ${isMe ? '#93c5fd' : '#e5e7eb'};border-radius:9px;
-            padding:10px 12px;margin-bottom:8px;
-            background:${isMe ? '#eff6ff' : '#f9fafb'};">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-    <div style="flex:1;min-width:0;">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
-        <span style="font-size:13px;font-weight:700;color:#1f2937;
-                     font-family:monospace;">${e.ip}</span>
-        ${isMe
-          ? '<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:10px;">This device</span>'
-          : ''}
-        <span style="font-size:11px;color:#6b7280;font-style:italic;">
-          ${e.label ? e.label : '<span style="color:#d1d5db;">No label</span>'}
-        </span>
-        <button onclick="BCOT_AUTH.ipEditLabel(${i});"
-          style="font-size:10px;padding:2px 7px;background:#e5e7eb;color:#374151;
-                 border:none;border-radius:5px;cursor:pointer;line-height:1.5;">✏️ Label</button>
-      </div>
-      <div style="font-size:12px;color:#1a4f8b;margin-bottom:4px;">
-        👤 ${
-          (e.users && e.users.length)
-            ? [...e.users].sort((a, b) => (b.lastLogin||'').localeCompare(a.lastLogin||''))
-                .map(u => [u.nameTitle, u.name].filter(Boolean).join(' ') +
-                          `<span style="color:#9ca3af;"> (${u.badge})</span>` +
-                          (u.logins > 1 ? ` ×${u.logins}` : ''))
-                .join(', ')
-            : '<span style="color:#d1d5db;">No login recorded from this IP yet</span>'
-        }
-      </div>
-      <div style="font-size:11px;color:#9ca3af;">
-        First seen: ${fmtDate(e.firstSeen)}
-        &nbsp;·&nbsp; Last visit: ${fmtDate(e.lastSeen)}
-        &nbsp;·&nbsp; Visits: ${e.visits || 1}
-      </div>
-      ${e.ua ? `<div style="font-size:10px;color:#d1d5db;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.ua}</div>` : ''}
-    </div>
-    <button onclick="BCOT_AUTH.ipRemove(${i});"
-      style="padding:5px 12px;background:#dc2626;color:#fff;border:none;
-             border-radius:6px;font-size:11px;cursor:pointer;
-             white-space:nowrap;flex-shrink:0;">
-      Remove
-    </button>
-  </div>
-</div>`;
-      }).join('');
-  }
-
-  async function ipEditLabel(idx) {
-    const entry = _ips[idx];
-    if (!entry) return;
-    const newLabel = await _bcotPrompt(
-      `Set a label for <strong>${entry.ip}</strong>:`,
-      { title: '✏️ Edit Label',
-        placeholder: 'e.g. Office PC, Dr. Ahmed Phone',
-        confirmLabel: 'Save' }
-    );
-    if (newLabel === null) return;
-    entry.label = newLabel.trim();
-    try {
-      await saveIPs();
-      _renderIPList();
-    } catch (e) { await _bcotAlert('Save failed — check connection.', 'Error'); }
-  }
-
-  async function ipRemove(idx) {
-    const entry = _ips[idx];
-    if (!entry) return;
-    const ok = await _bcotConfirm(
-      `Remove <strong>${entry.label || entry.ip}</strong> from the log?<br>` +
-      `It will reappear automatically the next time that device visits.`,
-      'Remove Log Entry', { confirmLabel: 'Remove', danger: true });
-    if (!ok) return;
-    _ips.splice(idx, 1);
-    try {
-      await saveIPs();
-      _renderIPCounter();
-      _renderIPList();
-    } catch (e) { await _bcotAlert('Save failed — check connection.', 'Error'); }
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -1503,7 +1198,7 @@
       return;
     }
 
-    // 3. Fast path: valid session — skip IP check (device already authenticated)
+    // 3. Fast path: valid session — already authenticated on this device
     const session = getSession();
     if (session) {
       window.BCOT_AUTH_ALLOWED_AREAS = session.areas || 'ALL';
@@ -1522,17 +1217,7 @@
       return;
     }
 
-    // 5. Log this device's IP for the admin's records — in the BACKGROUND.
-    // Deliberately not awaited: the lookup (api4.ipify.org, an external
-    // IPv4-only service) can take ~5s or fail outright on restrictive or
-    // IPv6-only networks, and it's an audit trail, not a gate, so the login
-    // form must never wait on it. It runs concurrently with the user-list
-    // load below; _linkUserToIP() awaits this promise so a login that
-    // happens before it finishes still gets linked to the IP. The 15s cap
-    // just guarantees the promise settles; it is always safe to swallow.
-    _ipLogPromise = _withTimeout(_logIP(), 15000, 'IP log').catch(() => {});
-
-    // 6. Load user list
+    // 5. Load user list
     try {
       await _withTimeout(loadUsers(), 10000, 'Load users');
     } catch (e) {
@@ -1541,13 +1226,13 @@
       return;
     }
 
-    // 7. No users yet → first-time setup
+    // 6. No users yet → first-time setup
     if (!_users.length) {
       showScreen('setup');
       return;
     }
 
-    // 8. Show login form
+    // 7. Show login form
     buildUserDropdown();
     showScreen('login');
    } catch (e) {
@@ -1588,11 +1273,6 @@
     umSaveRole,
     umSaveAll,
     fetchExtUsers,
-    // IP / device log
-    openIPManager,
-    ipEditLabel,
-    ipRemove,
-    ipClearAll,
     // Area manager
     openAreaManager,
     areaAdd,

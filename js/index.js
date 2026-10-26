@@ -32,7 +32,6 @@
 
     function openAuthAdmin() { _openAdminGated(() => BCOT_AUTH.openUserManager()); }
     function openAreaAdmin() { _openAdminGated(() => BCOT_AUTH.openAreaManager()); }
-    function openIPAdmin()   { _openAdminGated(() => BCOT_AUTH.openIPManager());  }
 
     // ── Storage keys ──────────────────────────────────────────────────────────
     const AREA_KEY           = "BCOT_CURRENT_AREA_V1";
