@@ -472,6 +472,18 @@
              line-height:1;padding:0 6px;">&times;</button>
   </div>
 
+  <!-- Search (badge number or name) — outside the list so it survives re-renders -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0;">
+    <input id="bcot-um-search" type="text" inputmode="search" autocomplete="off"
+      placeholder="🔍 Search by badge number or name…"
+      style="flex:1;min-width:0;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;" />
+    <button id="bcot-um-clear" type="button" title="Clear search"
+      style="padding:8px 11px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;
+             border-radius:8px;font-size:12px;cursor:pointer;">✕</button>
+    <span id="bcot-um-count"
+      style="font-size:11px;color:#6b7280;white-space:nowrap;min-width:64px;text-align:right;"></span>
+  </div>
+
   <!-- Scrollable user list -->
   <div id="bcot-um-list" style="flex:1;overflow-y:auto;margin-bottom:20px;min-height:0;"></div>
 
@@ -531,18 +543,45 @@
 
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+    const search = $id('bcot-um-search');
+    search.addEventListener('input', _renderUserList);
+    $id('bcot-um-clear').addEventListener('click', () => { search.value = ''; _renderUserList(); search.focus(); });
+    // Desktop only: jump straight to the search box. On touch devices that
+    // would pop the on-screen keyboard open before the user asked for it.
+    if (window.matchMedia && matchMedia('(pointer: fine)').matches) setTimeout(() => search.focus(), 50);
+
     _renderUserList();
   }
 
   function _renderUserList() {
     const list = $id('bcot-um-list');
     if (!list) return;
+    const countEl = $id('bcot-um-count');
     if (!_users.length) {
       list.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">No users yet.</p>';
+      if (countEl) countEl.textContent = '';
       return;
     }
+
+    // Filter by badge number or name. The search box sits outside the list,
+    // so it survives the full re-render that follows every edit — after
+    // changing a role/badge/password the list stays on the user being
+    // worked on instead of snapping back to everyone.
+    const q = ($id('bcot-um-search')?.value || '').trim().toLowerCase();
+    const shown = !q ? _users : _users.filter(u =>
+      String(u.badge || '').toLowerCase().includes(q) ||
+      [u.nameTitle, u.name].filter(Boolean).join(' ').toLowerCase().includes(q));
+    if (countEl) countEl.textContent = q
+      ? `${shown.length} of ${_users.length}`
+      : `${_users.length} user${_users.length !== 1 ? 's' : ''}`;
+    if (!shown.length) {
+      list.innerHTML = '<p style="color:#9ca3af;font-size:13px;margin:0;">No user matches your search.</p>';
+      return;
+    }
+
     const extRoleLabel = { staff:'Staff member', supervisor:'Supervisor', manager:'Manager / AD', director:'Director' };
-    list.innerHTML = _users.map(u => {
+    list.innerHTML = shown.map(u => {
       const pos        = u.position || u.title || '';
       const dispName   = [u.nameTitle, u.name].filter(Boolean).join(' ');
       const extRole    = u.ext_role  || '';
@@ -602,6 +641,7 @@
       await saveUsers();
       if ($id('bcot-um-newbadge')) $id('bcot-um-newbadge').value = '';
       if ($id('bcot-um-newname'))  $id('bcot-um-newname').value  = '';
+      if ($id('bcot-um-search'))   $id('bcot-um-search').value   = '';   // so the new user isn't hidden by an old search
       _renderUserList();
     } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
   }
@@ -671,6 +711,7 @@
     _users = _users.concat(toAdd);
     try {
       await saveUsers();
+      if ($id('bcot-um-search')) $id('bcot-um-search').value = '';   // show the newly added users
       _renderUserList();
       await _bcotAlert(`Added ${toAdd.length} user${toAdd.length !== 1 ? 's' : ''}.`, 'Import Complete');
     } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
