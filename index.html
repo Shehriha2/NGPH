@@ -963,6 +963,12 @@
     </button>
     <input type="file" id="rotaXlsxInput" accept=".xlsx,.xls" style="display:none;"
       onchange="importRotaFromExcel(this)"/>
+    <button type="button" onclick="openRotaImportMatches()"
+      title="Review or change the duty matches remembered for Excel imports in this area"
+      style="background:#475569;color:#fff;border:none;border-radius:8px;padding:6px 13px;
+             font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+      🔗 Saved matches
+    </button>
 
     <!-- Staff search filter -->
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
@@ -1095,7 +1101,7 @@
     window.FB = { db, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc, addDoc, updateDoc };
   </script>
 
-  <script src="js/index.js?v=31"></script>
+  <script src="js/index.js?v=32"></script>
   <script src="js/rota-pdf.js?v=2"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════

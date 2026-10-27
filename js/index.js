@@ -1711,11 +1711,93 @@
       if (!silent) showStatusMessage('Staff sorted A → Z', 'info');
     }
 
+    // ROTA-IMPORT-MAP:BEGIN
     // ── Import Rota from Excel ────────────────────────────────────────────────
+    // Excel duty codes that aren't in the current area's duty list have to be
+    // matched to one. Those choices are REMEMBERED per area — in this browser's
+    // localStorage and in a shared Firestore doc — so re-importing the same file
+    // doesn't ask again: saved codes are resolved automatically and the dialog
+    // only opens for codes it hasn't seen. In a saved map, "" means "always skip".
+    const ROTA_IMPORT_MAP_KEY = 'BCOT_ROTA_IMPORT_MAP_V1';
+    const ROTA_IMPORT_SKIP    = '__SKIP__';          // <option> value for "always skip"
+
+    function _escHtml(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function _raceTimeout(promise, ms) {
+      return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))]);
+    }
+
+    function _importMapAll() {
+      try { return JSON.parse(localStorage.getItem(ROTA_IMPORT_MAP_KEY) || '{}') || {}; } catch { return {}; }
+    }
+    function _importMapLocal(area) { return _importMapAll()[area] || {}; }
+    function _importMapSetLocal(area, map) {
+      const all = _importMapAll();
+      if (map && Object.keys(map).length) all[area] = map; else delete all[area];
+      try { localStorage.setItem(ROTA_IMPORT_MAP_KEY, JSON.stringify(all)); } catch {}
+    }
+    function _importMapRef(area) {
+      const key = (window.BCOT_APP_KEY || '').trim();
+      return window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'rota_import_maps', String(area).replace(/[\/\s]+/g, '_'));
+    }
+
+    // The cloud copy wins (so every PC agrees); falls back to this computer's
+    // copy if the cloud is slow or unreachable. Never throws.
+    async function _importMapFetch(area) {
+      const local = _importMapLocal(area);
+      if (!(window.BCOT_APP_KEY || '').trim() || !window.FB) return local;
+      try {
+        const snap = await _raceTimeout(window.FB.getDoc(_importMapRef(area)), 4000);
+        const m = snap.exists() ? snap.data()?.map : null;
+        if (m && typeof m === 'object') { _importMapSetLocal(area, m); return m; }
+      } catch (e) { console.warn("[rota-import] couldn't read saved duty matches from the cloud, using this computer's copy:", e); }
+      return local;
+    }
+
+    // Saves on this computer first (instant, works offline), then to the cloud.
+    // Resolves false if the cloud write failed, so callers can say "local only".
+    async function _importMapSave(area, map) {
+      _importMapSetLocal(area, map);
+      try {
+        if (!(window.BCOT_APP_KEY || '').trim()) return false;
+        let t = 0; while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+        if (!window.FB) return false;
+        await _raceTimeout(window.FB.setDoc(_importMapRef(area), { map, savedAt: new Date().toISOString() }), 8000);
+        return true;
+      } catch (e) { console.error('[rota-import] could not save duty matches to the cloud:', e); return false; }
+    }
+
+    // Splits the file's unknown codes into: matched from saved matches (mapping),
+    // saved as "always skip" (skipped), and needing a decision (fresh) — which
+    // includes codes whose saved duty no longer exists in this area (stale).
+    function _resolveImportCodes(codes, saved) {
+      const mapping = {}, skipped = [], fresh = [], stale = {};
+      codes.forEach(c => {
+        if (Object.prototype.hasOwnProperty.call(saved, c)) {
+          const v = saved[c];
+          if (v === '') { skipped.push(c); return; }
+          if (v && DUTIES[v]) { mapping[c] = v; return; }
+          if (v) stale[c] = v;
+        }
+        fresh.push(c);
+      });
+      return { mapping, skipped, fresh, stale };
+    }
+
+    function _importMapNote(mapping, skipped, newlySaved) {
+      const parts = [];
+      const n = Object.keys(mapping).length;
+      if (n) parts.push(`${n} code${n !== 1 ? 's' : ''} matched from saved matches`);
+      if (skipped.length) parts.push(`skipped (saved): ${skipped.slice(0, 6).join(', ')}${skipped.length > 6 ? '…' : ''}`);
+      if (newlySaved) parts.push(`${newlySaved} new match${newlySaved !== 1 ? 'es' : ''} saved`);
+      return parts.length ? `(${parts.join('; ')})` : '';
+    }
+
     function importRotaFromExcel(input) {
       const file = input.files[0]; if (!file) return; input.value = '';
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(e) {
         try {
           const wb   = XLSX.read(e.target.result, { type: 'array' });
           const ws   = wb.Sheets[wb.SheetNames[0]];
@@ -1744,10 +1826,17 @@
             if (base && !DUTIES[base]) unknown.add(base);
           }));
 
-          if (unknown.size === 0) {
-            _applyExcelImport(parsed, {});
+          if (unknown.size === 0) { _applyExcelImport(parsed, {}); return; }
+
+          // Saved matches are only looked up now, so a file whose codes are all
+          // known duties never touches the network.
+          const area  = getCurrentArea();
+          const saved = await _importMapFetch(area);
+          const r     = _resolveImportCodes(Array.from(unknown).sort(), saved);
+          if (!r.fresh.length) {
+            _applyExcelImport(parsed, r.mapping, _importMapNote(r.mapping, r.skipped, 0));   // nothing to ask
           } else {
-            _showDutyMappingDialog(Array.from(unknown).sort(), parsed);
+            _showDutyMappingDialog(r.fresh, parsed, { area, saved, mapping: r.mapping, skipped: r.skipped, stale: r.stale });
           }
         } catch(err) {
           console.error(err);
@@ -1757,27 +1846,43 @@
       reader.readAsArrayBuffer(file);
     }
 
-    function _showDutyMappingDialog(unknownCodes, parsedRows) {
+    function _showDutyMappingDialog(freshCodes, parsedRows, ctx) {
+      ctx = ctx || { area: getCurrentArea(), saved: {}, mapping: {}, skipped: [], stale: {} };
       const existing = Object.entries(DUTIES).sort(([a],[b]) => a.localeCompare(b));
-      const opts = `<option value="">— Skip (leave empty) —</option>` +
+      const opts = `<option value="">— Decide later (leave empty this time) —</option>` +
+        `<option value="${ROTA_IMPORT_SKIP}">✕ Always skip this code</option>` +
         existing.map(([c, m]) => {
           const bg  = m.color || '#1a4f8b';
           const fg  = contrastColor(bg);
-          return `<option value="${c}" style="background:${bg};color:${fg};">${c}${m.label ? ' — ' + m.label : ''}</option>`;
+          return `<option value="${_escHtml(c)}" style="background:${bg};color:${fg};">${_escHtml(c)}${m.label ? ' — ' + _escHtml(m.label) : ''}</option>`;
         }).join('');
 
-      const tableRows = unknownCodes.map(code => `
+      const tableRows = freshCodes.map(code => `
         <tr style="border-bottom:1px solid #e5e7eb;">
-          <td style="padding:7px 10px;font-weight:700;font-family:monospace;font-size:13px;
-                     background:#fef3c7;color:#92400e;border-radius:4px;">${code}</td>
+          <td style="padding:7px 10px;vertical-align:top;">
+            <div style="display:inline-block;font-weight:700;font-family:monospace;font-size:13px;
+                        background:#fef3c7;color:#92400e;border-radius:4px;padding:3px 8px;">${_escHtml(code)}</div>
+            ${ctx.stale[code] ? `<div style="font-size:10px;color:#b45309;margin-top:3px;">was “${_escHtml(ctx.stale[code])}” — no longer in this area</div>` : ''}
+          </td>
           <td style="padding:7px 10px;">
-            <select data-code="${code}"
+            <select data-code="${_escHtml(code)}"
               style="font-size:12px;padding:5px 8px;border:1px solid #d1d5db;
                      border-radius:6px;min-width:220px;width:100%;">
               ${opts}
             </select>
           </td>
         </tr>`).join('');
+
+      const usedN = Object.keys(ctx.mapping).length + ctx.skipped.length;
+      const usedHtml = usedN ? `
+          <details style="font-size:12px;color:#374151;">
+            <summary style="cursor:pointer;color:#15803d;font-weight:700;">✓ ${usedN} other code${usedN !== 1 ? 's' : ''} matched from your saved matches</summary>
+            <div style="margin-top:6px;line-height:1.7;">
+              ${Object.entries(ctx.mapping).map(([c, d]) => `<span style="font-family:monospace;font-weight:700;">${_escHtml(c)}</span> → ${_escHtml(d)}`)
+                  .concat(ctx.skipped.map(c => `<span style="font-family:monospace;font-weight:700;">${_escHtml(c)}</span> → <i>always skip</i>`)).join('<br>')}
+              <div style="color:#6b7280;margin-top:4px;">Change these with the 🔗 Saved matches button.</div>
+            </div>
+          </details>` : '';
 
       const modal = document.createElement('div');
       modal.id = 'rotaXlsxMapModal';
@@ -1788,9 +1893,11 @@
                     box-shadow:0 24px 64px rgba(0,0,0,.28);">
           <div style="font-size:16px;font-weight:800;color:#1f2937;">🔗 Map Unknown Duty Codes</div>
           <div style="font-size:12px;color:#6b7280;line-height:1.5;">
-            The Excel file contains <b>${unknownCodes.length}</b> duty code(s) not in your duties list.<br>
-            Map each one to an existing duty, or leave it as <i>Skip</i> to leave those cells empty.
+            The Excel file contains <b>${freshCodes.length}</b> duty code(s) that aren't in your duties list and aren't saved yet.<br>
+            Pick the duty each one means. <i>Always skip</i> leaves its cells empty from now on;
+            <i>Decide later</i> leaves them empty this time and asks again next import.
           </div>
+          ${usedHtml}
           <div style="overflow-y:auto;flex:1;">
             <table style="width:100%;border-collapse:collapse;">
               <thead>
@@ -1802,6 +1909,11 @@
               <tbody>${tableRows}</tbody>
             </table>
           </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;cursor:pointer;">
+            <input type="checkbox" id="_xlsxMapRemember" checked>
+            <span>Remember these matches for next time
+              <span style="color:#9ca3af;">(shared with everyone using ${_escHtml(ctx.area)})</span></span>
+          </label>
           <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;border-top:1px solid #e5e7eb;">
             <button id="_xlsxMapCancel" style="background:#6b7280;color:#fff;border:none;
               border-radius:8px;padding:8px 20px;font-size:12px;cursor:pointer;">Cancel</button>
@@ -1815,16 +1927,110 @@
 
       document.getElementById('_xlsxMapCancel').onclick = () => modal.remove();
       document.getElementById('_xlsxMapApply').onclick = () => {
-        const mapping = {};
+        // fresh code -> duty, or '' = always skip. "Decide later" is left out on purpose.
+        const choices = {};
         modal.querySelectorAll('select[data-code]').forEach(sel => {
-          if (sel.value) mapping[sel.dataset.code] = sel.value;
+          if (sel.value === ROTA_IMPORT_SKIP) choices[sel.dataset.code] = '';
+          else if (sel.value) choices[sel.dataset.code] = sel.value;
         });
+        const remember = !!document.getElementById('_xlsxMapRemember')?.checked;
         modal.remove();
-        _applyExcelImport(parsedRows, mapping);
+
+        const mapping = { ...ctx.mapping };
+        Object.entries(choices).forEach(([c, v]) => { if (v) mapping[c] = v; });
+
+        const toSave = Object.keys(choices).length;
+        if (remember && toSave) {
+          _importMapSave(ctx.area, { ...ctx.saved, ...choices }).then(ok => {
+            if (!ok) showStatusMessage('Duty matches were saved on this computer only — could not reach the cloud.', 'info');
+          });
+        }
+        _applyExcelImport(parsedRows, mapping, _importMapNote(ctx.mapping, ctx.skipped, remember ? toSave : 0));
       };
     }
 
-    function _applyExcelImport(parsedRows, mapping) {
+    // ── Saved matches manager (🔗 button next to Import Excel) ────────────────
+    async function openRotaImportMatches() {
+      const area = getCurrentArea();
+      document.getElementById('rotaImportMapModal')?.remove();
+      _renderImportMapManager(area, await _importMapFetch(area));
+    }
+
+    function _renderImportMapManager(area, saved) {
+      const work   = { ...saved };                      // edits are staged until "Save changes"
+      const duties = Object.entries(DUTIES).sort(([a], [b]) => a.localeCompare(b));
+      const dutyOptions = sel => {
+        const stale = sel && !DUTIES[sel]
+          ? `<option value="${_escHtml(sel)}" selected>${_escHtml(sel)} (no longer in this area)</option>` : '';
+        return stale +
+          `<option value="${ROTA_IMPORT_SKIP}"${sel === '' ? ' selected' : ''}>✕ Always skip (leave empty)</option>` +
+          duties.map(([c, m]) => `<option value="${_escHtml(c)}"${sel === c ? ' selected' : ''}>${_escHtml(c)}${m.label ? ' — ' + _escHtml(m.label) : ''}</option>`).join('');
+      };
+
+      const modal = document.createElement('div');
+      modal.id = 'rotaImportMapModal';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      modal.innerHTML = `
+        <div style="background:#fff;border-radius:14px;padding:28px 28px 20px;max-width:600px;
+                    width:94%;max-height:85vh;display:flex;flex-direction:column;gap:14px;
+                    box-shadow:0 24px 64px rgba(0,0,0,.28);">
+          <div style="font-size:16px;font-weight:800;color:#1f2937;">🔗 Saved Excel duty matches — ${_escHtml(area)}</div>
+          <div style="font-size:12px;color:#6b7280;line-height:1.5;">
+            Used automatically whenever an Excel import contains these codes in <b>${_escHtml(area)}</b>,
+            and shared with everyone using this area. Change a match, or delete it to be asked again next time.
+          </div>
+          <div id="_rimBody" style="overflow-y:auto;flex:1;"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;border-top:1px solid #e5e7eb;">
+            <button id="_rimClose" style="background:#6b7280;color:#fff;border:none;
+              border-radius:8px;padding:8px 20px;font-size:12px;cursor:pointer;">Close</button>
+            <button id="_rimSave" style="background:#15803d;color:#fff;border:none;
+              border-radius:8px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer;">💾 Save changes</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      const body = modal.querySelector('#_rimBody');
+
+      const draw = () => {
+        const codes = Object.keys(work).sort();
+        if (!codes.length) {
+          body.innerHTML = `<p style="font-size:13px;color:#9ca3af;margin:6px 0;">No saved matches for <b>${_escHtml(area)}</b> yet.
+            They are saved when you import an Excel file and leave “Remember these matches” ticked.</p>`;
+          return;
+        }
+        body.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#f3f6fb;font-size:12px;">
+            <th style="padding:7px 10px;text-align:left;white-space:nowrap;">Excel Code</th>
+            <th style="padding:7px 10px;text-align:left;">Matched duty</th><th></th></tr></thead>
+          <tbody>${codes.map(c => `
+            <tr style="border-bottom:1px solid #e5e7eb;">
+              <td style="padding:7px 10px;">
+                <span style="font-weight:700;font-family:monospace;font-size:13px;background:#fef3c7;
+                             color:#92400e;border-radius:4px;padding:3px 8px;">${_escHtml(c)}</span></td>
+              <td style="padding:7px 10px;">
+                <select data-code="${_escHtml(c)}" style="font-size:12px;padding:5px 8px;border:1px solid #d1d5db;
+                        border-radius:6px;min-width:220px;width:100%;">${dutyOptions(work[c])}</select></td>
+              <td style="padding:7px 4px;">
+                <button type="button" data-del="${_escHtml(c)}" title="Delete this match"
+                  style="background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;">🗑</button></td>
+            </tr>`).join('')}</tbody></table>`;
+        body.querySelectorAll('select[data-code]').forEach(sel => sel.onchange = () => {
+          work[sel.dataset.code] = sel.value === ROTA_IMPORT_SKIP ? '' : sel.value;
+        });
+        body.querySelectorAll('button[data-del]').forEach(btn => btn.onclick = () => { delete work[btn.dataset.del]; draw(); });
+      };
+      draw();
+
+      modal.querySelector('#_rimClose').onclick = () => modal.remove();
+      modal.querySelector('#_rimSave').onclick = async () => {
+        const btn = modal.querySelector('#_rimSave'); btn.disabled = true; btn.textContent = 'Saving…';
+        const ok = await _importMapSave(area, work);
+        modal.remove();
+        showStatusMessage(ok ? `Saved duty matches updated for ${area}.` : 'Saved on this computer only — could not reach the cloud.', ok ? 'success' : 'info');
+      };
+    }
+    // ROTA-IMPORT-MAP:END
+
+    function _applyExcelImport(parsedRows, mapping, note) {
       const tbody = document.querySelector('#rotaTable tbody');
       const month = parseInt(document.getElementById('monthSelect').value, 10);
       const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
@@ -1871,7 +2077,8 @@
 
       sortStaffAlpha(true);
       updateDashboard();
-      const msg = `Excel import done — ${updated} updated, ${added} added` + (skipped ? `, ${skipped} skipped.` : '.');
+      const msg = `Excel import done — ${updated} updated, ${added} added` + (skipped ? `, ${skipped} skipped.` : '.')
+                + (note ? ' ' + note : '');
       showStatusMessage(msg, 'success');
     }
 
