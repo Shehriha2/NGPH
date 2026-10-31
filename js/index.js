@@ -141,7 +141,7 @@
       const key = (window.BCOT_APP_KEY || '').trim();
       if (!key) return;
       let t = 0;
-      while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
       if (!window.FB) return;
       await window.FB.setDoc(
         window.FB.doc(window.FB.db, 'bcot_overtime_secure', key, 'area_consumption', 'RECORDS'),
@@ -153,7 +153,7 @@
       const key = (window.BCOT_APP_KEY || '').trim();
       if (!key) return null;
       let t = 0;
-      while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
       if (!window.FB) return null;
       try {
         const snap = await window.FB.getDoc(
@@ -173,7 +173,7 @@
       if (!key) return;
       // Wait for Firebase bridge
       let t = 0;
-      while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
       if (!window.FB?.onSnapshot) return;
 
       // Clean up any existing listener first
@@ -1761,7 +1761,7 @@
       _importMapSetLocal(area, map);
       try {
         if (!(window.BCOT_APP_KEY || '').trim()) return false;
-        let t = 0; while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+        let t = 0; while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
         if (!window.FB) return false;
         await _raceTimeout(window.FB.setDoc(_importMapRef(area), { map, savedAt: new Date().toISOString() }), 8000);
         return true;
@@ -1792,6 +1792,20 @@
       if (skipped.length) parts.push(`skipped (saved): ${skipped.slice(0, 6).join(', ')}${skipped.length > 6 ? '…' : ''}`);
       if (newlySaved) parts.push(`${newlySaved} new match${newlySaved !== 1 ? 'es' : ''} saved`);
       return parts.length ? `(${parts.join('; ')})` : '';
+    }
+
+    // Excel library is large, so it's only fetched the first time a file is imported
+    let _xlsxLoading = null;
+    function ensureXLSX() {
+      if (window.XLSX) return Promise.resolve();
+      if (!_xlsxLoading) _xlsxLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'js/vendor/xlsx.full.min.js';
+        s.onload = resolve;
+        s.onerror = () => { _xlsxLoading = null; reject(new Error('Could not load the Excel library — check your connection and try again.')); };
+        document.head.appendChild(s);
+      });
+      return _xlsxLoading;
     }
 
     function importRotaFromExcel(input) {
@@ -1843,7 +1857,7 @@
           showStatusMessage('Failed to read Excel: ' + (err?.message || err), 'error');
         }
       };
-      reader.readAsArrayBuffer(file);
+      ensureXLSX().then(() => reader.readAsArrayBuffer(file)).catch(e => showStatusMessage(e.message, "error"));
     }
 
     function _showDutyMappingDialog(freshCodes, parsedRows, ctx) {
@@ -5419,7 +5433,7 @@
             showStatusMessage(`Import: ${added} added, ${skipped} dup(s) skipped${invalid?", "+invalid+" invalid":""}`);}
           catch(err){console.error(err);showStatusMessage("Import failed: "+(err?.message||err),"error");}
         };
-        reader.readAsArrayBuffer(file);
+        ensureXLSX().then(() => reader.readAsArrayBuffer(file)).catch(e => showStatusMessage(e.message, "error"));
       }
 
       // Imports external collaborators from a sheet with Badge/Name/Rate/Department
@@ -5511,7 +5525,7 @@
             await BCOT_AUTH.alert("Import failed: "+esc(err?.message||err), "📂 Import External Staff — Error");
           }
         };
-        reader.readAsArrayBuffer(file);
+        ensureXLSX().then(() => reader.readAsArrayBuffer(file)).catch(e => showStatusMessage(e.message, "error"));
       }
 
       function importHRR(input) {
@@ -5531,7 +5545,7 @@
             let msg=`HRR updated: ${upd} staff`;if(kept)msg+=` · ${kept} kept (existing rate higher)`;if(notF.length)msg+=` · ${notF.length} not found`;showStatusMessage(msg+(upd||kept?"":" — nothing updated"),"error");}
           catch(err){console.error(err);showStatusMessage("HRR import failed: "+(err?.message||err),"error");}
         };
-        reader.readAsArrayBuffer(file);
+        ensureXLSX().then(() => reader.readAsArrayBuffer(file)).catch(e => showStatusMessage(e.message, "error"));
       }
 
       // Manpower Report import — matches existing staff by Employee #/Badge No.,
@@ -5607,7 +5621,7 @@
             showStatusMessage(`Manpower import: ${plan.length} staff updated (${roleUpdates} role+date, ${dateOnlyUpdates} date-only)`);
           }catch(err){console.error(err);showStatusMessage("Manpower import failed: "+(err?.message||err),"error");}
         };
-        reader.readAsArrayBuffer(file);
+        ensureXLSX().then(() => reader.readAsArrayBuffer(file)).catch(e => showStatusMessage(e.message, "error"));
       }
 
       function doCopyToArea(sourceRecs, targetArea) {
@@ -6647,7 +6661,7 @@
       // ── Approvers: storage + cloud sync ─────────────────────────────────────
       async function waitForFB() {
         let t = 0;
-        while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+        while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
         return !!window.FB;
       }
 
@@ -7169,14 +7183,14 @@
       if (!staffList.length && window.BCOT_APP_KEY) {
         (async () => {
           let t = 0;
-          while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+          while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
           if (window.FB) populateStaff();  // populateStaff also syncs areas
         })();
       } else if (!getAreasList().length && window.BCOT_APP_KEY) {
         // Staff is cached but areas list is missing — sync areas from cloud only
         (async () => {
           let t = 0;
-          while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+          while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
           if (!window.FB) return;
           try {
             const key = (window.BCOT_APP_KEY || '').trim(); if (!key) return;

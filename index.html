@@ -504,7 +504,7 @@
     #_lkOv{ position:absolute; inset:0; z-index:50; cursor:not-allowed; background:rgba(220,38,38,.03); border-radius:12px; }
   </style>
   <!-- ▼ BOOTSTRAP ICONS — to revert: delete the line below ▼ -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="js/vendor/bootstrap-icons/bootstrap-icons.min.css" media="print" onload="this.media='all'">
   <!-- ▲ BOOTSTRAP ICONS ▲ -->
 </head>
 <body>
@@ -1084,9 +1084,8 @@
 
   <script src="config.js"></script>
   <script src="js/version-check.js"></script>
-  <script src="js/auth.js?v=16"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module">
+  <script src="js/auth.js?v=17"></script>
+  <script type="module" async>
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import { getFirestore, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
     const firebaseConfig = {
@@ -1100,9 +1099,6 @@
     const db  = getFirestore(app);
     window.FB = { db, doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc, addDoc, updateDoc };
   </script>
-
-  <script src="js/index.js?v=32"></script>
-  <script src="js/rota-pdf.js?v=2"></script>
 
   <!-- ══════════════════════════════════════════════════════════════════════
        DUTIES MODAL
@@ -2077,7 +2073,7 @@ function _applyRoleUI(detail) {
     if (!badge) return;
     (async () => {
       let t = 0;
-      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
       if (!window.FB) return;
       try {
         const key = (window.BCOT_APP_KEY || '').trim();
@@ -2138,7 +2134,41 @@ function _applyRoleUI(detail) {
   }
 }
 
-window.addEventListener('bcotAuth', function (e) { _applyRoleUI(e.detail); });
+/* ── App scripts load only after login ─────────────────────────────────────
+   The login screen doesn't need them, and 'user' accounts never use this page
+   (they go straight to UserHome.html), so they don't download them at all. */
+var _appStarted = false;
+function _startApp(detail) {
+  if (_appStarted) return;
+  _appStarted = true;
+
+  if (((detail && detail.app_role) || 'user') === 'user') { _applyRoleUI(detail); return; }
+
+  var cover = document.createElement('div');
+  cover.textContent = 'Loading…';
+  cover.style.cssText = 'position:fixed;inset:0;z-index:9997;background:#fff;display:flex;' +
+    'align-items:center;justify-content:center;font:15px Arial,sans-serif;color:#1a4f8b;';
+  document.body.appendChild(cover);
+
+  var srcs = ['js/index.js?v=33', 'js/rota-pdf.js?v=2', 'js/version-admin.js'];
+  var left = srcs.length;
+  srcs.forEach(function (src) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.async = false;   // run in this order, as plain script tags would
+    s.onload = function () {
+      if (--left) return;
+      _applyRoleUI(detail);
+      cover.remove();
+    };
+    s.onerror = function () {
+      cover.textContent = 'Could not load the app — check your connection and reload the page.';
+    };
+    document.body.appendChild(s);
+  });
+}
+
+window.addEventListener('bcotAuth', function (e) { _startApp(e.detail); });
 
 // Compensate for the returning-session race described above: if a session
 // is already in localStorage by the time this script runs, the 'bcotAuth'
@@ -2146,11 +2176,10 @@ window.addEventListener('bcotAuth', function (e) { _applyRoleUI(e.detail); });
 (function () {
   try {
     var s = JSON.parse(localStorage.getItem('BCOT_AUTH_SESSION_V1') || 'null');
-    if (s && s.ts) _applyRoleUI(s);
+    if (s && s.ts) _startApp(s);
   } catch (e) {}
 })();
 
 </script>
-<script src="js/version-admin.js"></script>
 </body>
 </html>

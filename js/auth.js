@@ -78,8 +78,8 @@
     if (!_key) return;
     try {
       let t = 0;
-      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await _withTimeout(loadUsers(), 10000, 'Load users');
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
+      await _withTimeout(loadUsers(), 20000, 'Load users');
     } catch (e) { console.warn('[BCOT_AUTH] _ensureUsers:', e); }
   }
   async function saveUsers() {
@@ -436,8 +436,8 @@
     if (!_key) { await _bcotAlert('Authentication module is not initialized.', 'Error'); return; }
     try {
       let t = 0;
-      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await _withTimeout(loadUsers(), 10000, 'Load users');
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
+      await _withTimeout(loadUsers(), 20000, 'Load users');
     } catch (e) {
       await _bcotAlert('Could not load users — check your connection.', 'Connection Error');
       return;
@@ -822,8 +822,8 @@
   async function fetchExtUsers() {
     if (!_users.length) {
       let t = 0;
-      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      try { await _withTimeout(loadUsers(), 10000, 'Load users'); } catch (e) { console.warn('[BCOT_AUTH] fetchExtUsers:', e); }
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
+      try { await _withTimeout(loadUsers(), 20000, 'Load users'); } catch (e) { console.warn('[BCOT_AUTH] fetchExtUsers:', e); }
     }
     return _users.map(u => ({
       id:              u.id,
@@ -877,8 +877,8 @@
     if (!_key) { await _bcotAlert('Authentication module is not initialized.', 'Error'); return; }
     try {
       let t = 0;
-      while (!window.FB && t++ < 40) await new Promise(r => setTimeout(r, 50));
-      await _withTimeout(loadUsers(), 10000, 'Load users');
+      while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
+      await _withTimeout(loadUsers(), 20000, 'Load users');
     } catch (e) {
       await _bcotAlert('Could not load users — check your connection.', 'Connection Error');
       return;
@@ -1251,7 +1251,7 @@
 
     // 4. Wait for Firebase module (deferred script may not have run yet)
     let t = 0;
-    while (!window.FB && t++ < 100) await new Promise(r => setTimeout(r, 50));
+    while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
     if (!window.FB) {
       $id('bcot-error-msg').textContent = 'Firebase failed to initialize. Check your connection.';
       showScreen('error');
@@ -1260,7 +1260,7 @@
 
     // 5. Load user list
     try {
-      await _withTimeout(loadUsers(), 10000, 'Load users');
+      await _withTimeout(loadUsers(), 20000, 'Load users');
     } catch (e) {
       $id('bcot-error-msg').textContent = 'Could not load user list — check connection.';
       showScreen('error');
