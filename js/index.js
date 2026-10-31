@@ -1532,7 +1532,7 @@
       const exTh   = document.createElement('th'); exTh.className='ext-th';   exTh.textContent = 'Ext.';  headerRow.appendChild(exTh);
       const noteTh = document.createElement('th'); noteTh.className='note-th'; noteTh.textContent = 'Note'; headerRow.appendChild(noteTh);
 
-      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+      batchRowUpdates(() => document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
         const name          = row.cells[0]?.querySelector('input')?.value || '';
         const schedVal      = row.querySelector('.sched-cell select')?.value || '';
         const otIsOverride  = row.querySelector('.ot-cell')?.dataset?.override === 'true';
@@ -1563,9 +1563,7 @@
           if (dot) { dot.classList.add('visible'); dot.title = noteVal; }
         }
         updateHours(row);
-      });
-      applyColumnWidths();
-      updateDashboard();
+      }));
       updateNotesBtn();
     }
 
@@ -2096,6 +2094,15 @@
       showStatusMessage(msg, 'success');
     }
 
+    // Adding many rows: refresh the dashboard, column widths and filter once at
+    // the end rather than once per row (each refresh rescans the whole table).
+    let _rowBatch = false;
+    function batchRowUpdates(fn) {
+      _rowBatch = true;
+      try { fn(); } finally { _rowBatch = false; }
+      applyColumnWidths(); updateDashboard(); filterRota();
+    }
+
     function addNewRow() {
       const tbody = document.querySelector('#rotaTable tbody');
       const tr    = document.createElement('tr');
@@ -2125,7 +2132,7 @@
           : '💰 OT Pay — click to switch to COMP Day';
       }
       tbody.appendChild(tr);
-      applyColumnWidths(); updateDashboard(); filterRota();
+      if (!_rowBatch) { applyColumnWidths(); updateDashboard(); filterRota(); }
     }
 
     function openOTPreApproval() {
@@ -2172,13 +2179,13 @@
           }).filter(Boolean)
         );
         let addedCount = 0;
-        staffList.forEach(name => {
+        batchRowUpdates(() => staffList.forEach(name => {
           if (!existingNames.has(name)) {
             addNewRow();
             tbody.lastElementChild.cells[0].querySelector('input').value = name;
             addedCount++;
           }
-        });
+        }));
         updateDashboard();
         sortStaffAlpha(true);
         if (addedCount === 0) {
@@ -2908,7 +2915,7 @@
       if (Array.isArray(payload?.holidays)) { holidays=payload.holidays.map(h=>({...h})); renderHolidayList(); }
       document.querySelector('#rotaTable tbody').innerHTML='';
       updateTable();
-      for (const rec of records) {
+      batchRowUpdates(() => { for (const rec of records) {
         addNewRow();
         const row=document.querySelector('#rotaTable tbody').lastElementChild;
         row.cells[0].querySelector('input').value=rec.staffName||'';
@@ -2951,7 +2958,7 @@
               : '💰 OT Pay — click to switch to COMP Day';
           }
         }
-      }
+      } });
       if (!records.length) addNewRow();
       persistMonthlyTarget(); updateDashboard();
       sortStaffAlpha(true);
@@ -3326,6 +3333,7 @@
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
     function updateDashboard() {
+      if (_rowBatch) return;
       const rows=Array.from(document.querySelectorAll('#rotaTable tbody tr'));
       const target=getMonthlyTarget();
       const days=getDaysInMonth(Number(document.getElementById('monthSelect').value));
