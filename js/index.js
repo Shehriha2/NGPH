@@ -707,6 +707,61 @@
       return td;
     }
 
+    // ── Proposed OT / Business (read-only, from OT Adjustments) ───────────────
+    // Each staff member's submitted hours for the month and year on screen, totalled
+    // per OT type. Always read live, so they are never saved with the rota. Entries
+    // stay counted after they've been imported, since they're still what was proposed.
+    function buildProposedCell(otType) {
+      const td = document.createElement('td');
+      td.className = 'proposed-cell';
+      td.dataset.otType = otType;
+      return td;
+    }
+
+    let _proposedMonth = null;   // "year-month" the cached entries belong to
+    let _proposedEntries = [];
+    let _proposedTimer = null;
+
+    function scheduleProposedRefresh() {
+      clearTimeout(_proposedTimer);
+      _proposedTimer = setTimeout(refreshProposedColumns, 150);
+    }
+
+    async function refreshProposedColumns() {
+      const month = Number(document.getElementById('monthSelect').value);
+      const year  = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
+      const wanted = `${year}-${month}`;
+      if (_proposedMonth !== wanted) {
+        const key = (window.BCOT_APP_KEY || '').trim();
+        if (!key) return;
+        let t = 0;
+        while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
+        if (!window.FB) return;
+        try {
+          const snap = await window.FB.getDocs(window.FB.collection(window.FB.db, 'bcot_overtime_secure', key, 'ot_adjustments'));
+          const entries = [];
+          snap.forEach(d => { const a = d.data(); if (a.month === month && a.year === year) entries.push(a); });
+          _proposedEntries = entries;
+          _proposedMonth = wanted;
+        } catch (e) { console.warn('[Proposed OT] load failed:', e); return; }
+        // The month may have changed again while this was loading
+        if (Number(document.getElementById('monthSelect').value) !== month) { scheduleProposedRefresh(); return; }
+      }
+      const totals = new Map();
+      _proposedEntries.forEach(a => {
+        const id = `${(a.staffName || '').trim().toLowerCase()}|${a.otType}`;
+        totals.set(id, (totals.get(id) || 0) + (Number(a.additionalHours) || 0));
+      });
+      document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
+        const nameKey = (row.cells[0]?.querySelector('input')?.value || '').trim().toLowerCase();
+        row.querySelectorAll('.proposed-cell').forEach(td => {
+          const hours = totals.get(`${nameKey}|${td.dataset.otType}`) || 0;
+          const text = hours ? String(hours) : '';
+          if (td.textContent !== text) td.textContent = text;
+        });
+      });
+    }
+
     // ── Extension hours cell builder ──────────────────────────────────────────
     // Shows as "E{n}" — manually editable, saved separately, combined at pre-approval time.
     function buildExtCell(value=0) {
@@ -1530,6 +1585,8 @@
       const otTh = document.createElement('th'); otTh.className='ot-th';   otTh.textContent = 'OT';          headerRow.appendChild(otTh);
       const exOtTh = document.createElement('th'); exOtTh.className='extraot-th'; exOtTh.textContent = 'Extra OT'; headerRow.appendChild(exOtTh);
       const exTh   = document.createElement('th'); exTh.className='ext-th';   exTh.textContent = 'Ext.';  headerRow.appendChild(exTh);
+      const propOtTh = document.createElement('th'); propOtTh.className='proposed-th'; propOtTh.textContent = 'Proposed OT'; headerRow.appendChild(propOtTh);
+      const propBizTh = document.createElement('th'); propBizTh.className='proposed-th'; propBizTh.textContent = 'Proposed Business'; headerRow.appendChild(propBizTh);
       const noteTh = document.createElement('th'); noteTh.className='note-th'; noteTh.textContent = 'Note'; headerRow.appendChild(noteTh);
 
       batchRowUpdates(() => document.querySelectorAll('#rotaTable tbody tr').forEach(row => {
@@ -1557,6 +1614,8 @@
         row.appendChild(buildOTCell(otOverrideVal, otIsOverride, otExtraVal));
         row.appendChild(buildExtraOTCell(otExtraVal));
         row.appendChild(buildExtCell(extVal));
+        row.appendChild(buildProposedCell('Regular'));
+        row.appendChild(buildProposedCell('Business OT'));
         row.appendChild(buildNoteCell(noteVal));
         if (noteVal) {
           const dot = row.querySelector('.note-dot');
@@ -2120,6 +2179,8 @@
       tr.appendChild(buildOTCell());
       tr.appendChild(buildExtraOTCell());
       tr.appendChild(buildExtCell());
+      tr.appendChild(buildProposedCell('Regular'));
+      tr.appendChild(buildProposedCell('Business OT'));
       tr.appendChild(buildNoteCell());
       // Inherit comp type from area default
       const areaDefault = getAreaCompType(getCurrentArea());
@@ -2679,7 +2740,7 @@
           const hIdx=Array.from(bRows[r].cells).indexOf(bRows[r].querySelector('.hours-cell'));
           for(let c=1;c<bRows[r].cells.length;c++){
             const cell=bRows[r].cells[c];
-            if(cell.classList.contains('sched-cell')||cell.classList.contains('ot-cell')){
+            if(cell.classList.contains('sched-cell')||cell.classList.contains('ot-cell')||cell.classList.contains('proposed-cell')){
               // skip schedule/OT cells from export
               continue;
             }
@@ -3366,6 +3427,7 @@
       updateCallCenterCards();
       updateConsumptionBar();
       scheduleDraftSave();
+      scheduleProposedRefresh();
     }
 
     // ── Draft auto-save (localStorage) ───────────────────────────────────────
@@ -4309,6 +4371,8 @@
       const _m=String(document.getElementById('monthSelect').value).padStart(2,'0');
       LockManager.onRotaChange(getCurrentArea(),`${_y}-${_m}`);
     });
+    document.getElementById('yearInput')?.addEventListener('change', scheduleProposedRefresh);
+    document.querySelector('#rotaTable tbody').addEventListener('change', scheduleProposedRefresh);
     document.getElementById('monthlyTarget').addEventListener('input',persistMonthlyTarget);
     document.getElementById('rotaTitleInput').addEventListener('input',updateDashboard);
     document.getElementById('newAreaInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addNewArea(); });

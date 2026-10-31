@@ -162,6 +162,8 @@
     .ext-cell{ white-space:nowrap; text-align:center; }
     .ext-cell .ext-prefix{ font-weight:800; font-size:10px; color:#7c3aed; }
     .ext-cell input{ width:38px; border:1px solid #d1d5db; border-radius:4px; font-size:11px; padding:1px 3px; text-align:center; background:#faf5ff; }
+    .proposed-cell{ white-space:nowrap; text-align:center; font-size:11px; font-weight:700; color:#0369a1; }
+    th.proposed-th{ white-space:normal; line-height:1.1; font-size:10px; min-width:58px; }
     .ot-positive{ color:var(--hours-over); }
     .ot-negative{ color:var(--hours-warn); }
     .ot-override{ color:var(--accent-color); }
@@ -478,6 +480,7 @@
       .ot-cell,    th.ot-th  { display:none !important; }
       .extraot-cell, th.extraot-th { display:none !important; }
       .ext-cell,   th.ext-th { display:none !important; }
+      .proposed-cell, th.proposed-th { display:none !important; }
       /* "Print only staff with hours" checkbox — rows tagged on beforeprint (js/index.js) */
       tr.print-hide-row{ display:none !important; }
       table{ font-size:7pt; }
@@ -2150,7 +2153,7 @@ function _startApp(detail) {
     'align-items:center;justify-content:center;font:15px Arial,sans-serif;color:#1a4f8b;';
   document.body.appendChild(cover);
 
-  var srcs = ['js/index.js?v=34', 'js/rota-pdf.js?v=2', 'js/version-admin.js'];
+  var srcs = ['js/index.js?v=35', 'js/rota-pdf.js?v=2', 'js/version-admin.js'];
   var left = srcs.length;
   srcs.forEach(function (src) {
     var s = document.createElement('script');
