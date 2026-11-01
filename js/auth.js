@@ -833,6 +833,7 @@
       role:            u.ext_role       || '',
       phone:           u.ext_phone      || '',
       areas:           u.ext_areas      || [],
+      accessAreas:     u.areas          || 'ALL',
       linkedManagerId: u.ext_manager_id || ''
     }));
   }

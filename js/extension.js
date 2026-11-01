@@ -72,6 +72,26 @@ function localStaff(area) {
 }
 function localAreas() { try { return JSON.parse(localStorage.getItem(AREAS_KEY)||'[]')||[]; } catch { return []; } }
 
+// A charge person can request extensions for an area assigned to them in the
+// Area Manager, or one whose rule names them. Every request also needs that
+// area's rule, because the rule says who approves it.
+function chargeAreas(userId, accessAreas) {
+  const assigned = Array.isArray(accessAreas) ? accessAreas : Object.keys(rules);
+  const named = Object.keys(rules).filter(area => rules[area].chargePersonId === userId);
+  const all = [...new Set([...assigned, ...named])].sort();
+  return { usable: all.filter(area => rules[area]), noRule: all.filter(area => !rules[area]) };
+}
+
+// The staff list is otherwise only on devices that have opened the main rota.
+async function loadStaffIfMissing() {
+  if (localStaff().length) return;
+  try {
+    const snap = await window.FB.getDoc(window.FB.doc(window.FB.db,'bcot_overtime_secure',KEY,'staff_named','STAFF_POOL'));
+    const records = snap.exists() ? (snap.data().records || []) : [];
+    if (records.length) localStorage.setItem(STAFF_KEY, JSON.stringify(records));
+  } catch (e) { console.warn('[Extension] staff load failed:', e); }
+}
+
 // ── App init ──────────────────────────────────────────────────────────────────
 async function startExtension() {
   KEY = (window.BCOT_APP_KEY || '').trim();
@@ -82,9 +102,22 @@ async function startExtension() {
   const session = window.BCOT_AUTH?.getSession();
   if (!session) return;
 
-  const appRole = session.app_role || 'user';
   show('appShell');
   se('userNameBadge').textContent = session.name;
+
+  try {
+    users = await window.BCOT_AUTH.fetchExtUsers();
+    await loadRules();
+    await loadAll();
+  } catch (e) {
+    se('appBody').innerHTML = '<div style="padding:40px;color:red;">Failed to load data. Check connection.</div>';
+    return;
+  }
+
+  // Use the saved account rather than the login's copy, so a role or area given
+  // after this person logged in applies straight away.
+  const me = users.find(u => u.id === session.id);
+  const appRole = me?.app_role || session.app_role || 'user';
 
   if (appRole === 'user') {
     se('roleBadge').textContent = '⛔ No Access';
@@ -97,20 +130,10 @@ async function startExtension() {
     return;
   }
 
-  try {
-    users = await window.BCOT_AUTH.fetchExtUsers();
-    await loadRules();
-    await loadAll();
-  } catch (e) {
-    se('appBody').innerHTML = '<div style="padding:40px;color:red;">Failed to load data. Check connection.</div>';
-    return;
-  }
+  const access = chargeAreas(session.id, me?.accessAreas ?? session.areas);
+  await loadStaffIfMissing();
 
-  const myAreas = appRole === 'charge'
-    ? Object.entries(rules).filter(([,rule]) => rule.chargePersonId === session.id).map(([area]) => area)
-    : [];
-
-  currentUser = { id: session.id, name: session.name, role: appRole, areas: myAreas };
+  currentUser = { id: session.id, name: session.name, role: appRole, areas: access.usable, areasWithoutRule: access.noRule };
   launchApp();
 }
 
@@ -196,14 +219,20 @@ function reqCard(r) {
 // ── Charge: New Request ───────────────────────────────────────────────────────
 function renderNewReq() {
   const myAreas = currentUser.areas || [];
+  const noRule = currentUser.areasWithoutRule || [];
+  const noRuleNote = noRule.length
+    ? `<div style="margin-bottom:12px;font-size:12px;color:#92400e;">No approval rule yet for: <b>${noRule.map(esc).join(', ')}</b>. Ask an administrator to add one in the Rules tab.</div>`
+    : '';
   if (!myAreas.length) return `
     <div class="section-title">New Extension Request</div>
+    ${noRuleNote}
     <div class="empty-state">
       <i class="bi bi-gear" style="font-size:30px;color:#9ca3af;margin-bottom:12px;display:block;"></i>
-      No areas assigned to you yet.<br>Ask an administrator to configure the Extension Rules.
+      ${noRule.length ? 'None of your areas can take requests until they have an approval rule.' : 'No areas assigned to you yet.<br>Ask an administrator to assign you an area.'}
     </div>`;
   const aOpts = myAreas.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
   return `<div class="section-title">New Extension Request</div>
+  ${noRuleNote}
   <div class="panel" style="max-width:620px;">
     <div class="fg"><label>Area</label><select id="reqArea" onchange="refreshStaffList()">${aOpts}</select></div>
     <div class="fg"><label>Staff Members <span style="font-weight:400;color:#6b7280;">(select one or more)</span></label>
