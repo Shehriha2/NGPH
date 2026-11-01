@@ -63,13 +63,14 @@ function waBtn(phone, msg, label='<i class="bi bi-whatsapp"></i> WhatsApp') {
   const n = (phone || '').replace(/\D/g,''); if (!n) return '';
   return `<a class="wa-btn" href="https://wa.me/${n}?text=${encodeURIComponent(msg)}" target="_blank">${label}</a>`;
 }
-function localStaff(area) {
+function localStaffRecords(area) {
   try {
-    const all = JSON.parse(localStorage.getItem(STAFF_KEY) || '[]') || [];
-    if (!area || area === 'ALL') return all.map(s => s.name).filter(Boolean);
-    return all.filter(s => (s.area||'').toUpperCase().split(',').map(x=>x.trim()).includes(area.toUpperCase())).map(s=>s.name).filter(Boolean);
+    const all = (JSON.parse(localStorage.getItem(STAFF_KEY) || '[]') || []).filter(s => s.name);
+    if (!area || area === 'ALL') return all;
+    return all.filter(s => (s.area||'').toUpperCase().split(',').map(x=>x.trim()).includes(area.toUpperCase()));
   } catch { return []; }
 }
+function localStaff(area) { return localStaffRecords(area).map(s => s.name); }
 function localAreas() { try { return JSON.parse(localStorage.getItem(AREAS_KEY)||'[]')||[]; } catch { return []; } }
 
 // A charge person can request extensions for an area assigned to them in the
@@ -235,7 +236,8 @@ function renderNewReq() {
   ${noRuleNote}
   <div class="panel" style="max-width:620px;">
     <div class="fg"><label>Area</label><select id="reqArea" onchange="refreshStaffList()">${aOpts}</select></div>
-    <div class="fg"><label>Staff Members <span style="font-weight:400;color:#6b7280;">(select one or more)</span></label>
+    <div class="fg"><label>Staff Members <span style="font-weight:400;color:#6b7280;">(select one or more)</span> <span id="staffCount" style="font-weight:700;color:var(--primary);"></span></label>
+      <input type="search" id="staffSearch" placeholder="Search by name or badge number…" autocomplete="off" oninput="filterStaffList()" style="margin-bottom:6px;"/>
       <div class="staff-grid" id="staffGrid"><span style="color:#9ca3af;font-size:12px;">Loading…</span></div>
     </div>
     <div class="fg"><label>Date</label><input type="date" id="reqDate" value="${new Date().toISOString().slice(0,10)}"/></div>
@@ -253,9 +255,33 @@ function renderNewReq() {
 
 function refreshStaffList() {
   const area = se('reqArea')?.value, grid = se('staffGrid'); if (!grid) return;
-  const staff = localStaff(area);
-  if (!staff.length) { grid.innerHTML = '<span style="color:#9ca3af;font-size:12px;">No staff for this area.</span>'; return; }
-  grid.innerHTML = staff.map(n => `<label class="staff-item"><input type="checkbox" class="sc" value="${esc(n)}"/> ${esc(n)}</label>`).join('');
+  const staff = localStaffRecords(area);
+  if (se('staffSearch')) se('staffSearch').value = '';
+  if (!staff.length) { grid.innerHTML = '<span style="color:#9ca3af;font-size:12px;">No staff for this area.</span>'; updateStaffCount(); return; }
+  grid.innerHTML = staff.map(s => {
+    const search = `${s.name} ${s.badge || ''}`.toLowerCase();
+    return `<label class="staff-item" data-search="${esc(search).replace(/"/g,'&quot;')}"><input type="checkbox" class="sc" value="${esc(s.name)}" onchange="updateStaffCount()"/> ${esc(s.name)}</label>`;
+  }).join('') + '<span id="staffNoMatch" style="display:none;color:#9ca3af;font-size:12px;">No staff match your search.</span>';
+  updateStaffCount();
+}
+
+// Hides rather than rebuilds, so anyone already ticked stays selected.
+function filterStaffList() {
+  const q = (se('staffSearch')?.value || '').trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#staffGrid .staff-item').forEach(item => {
+    const match = item.dataset.search.includes(q);
+    item.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  const none = se('staffNoMatch');
+  if (none) none.style.display = shown ? 'none' : '';
+}
+
+function updateStaffCount() {
+  const el = se('staffCount'); if (!el) return;
+  const n = document.querySelectorAll('.sc:checked').length;
+  el.textContent = n ? `— ${n} selected` : '';
 }
 
 function calcHrsDisplay() {
@@ -298,6 +324,9 @@ async function submitReq() {
     requests.unshift({ id: ref.id, ...req });
     if (se('reqJust')) se('reqJust').value = '';
     document.querySelectorAll('.sc:checked').forEach(c => c.checked = false);
+    if (se('staffSearch')) se('staffSearch').value = '';
+    filterStaffList();
+    updateStaffCount();
     if (se('hrsDisplay')) se('hrsDisplay').textContent = '0 h';
     const ok = se('reqOk'); ok.textContent = '✅ Request submitted — awaiting approval'; ok.style.display = 'block';
     setTimeout(() => ok.style.display = 'none', 4500);
