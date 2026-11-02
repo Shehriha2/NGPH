@@ -494,6 +494,7 @@
     const duties    = (() => { try{ return JSON.parse(localStorage.getItem(DUTIES_KEY)||"{}"); }catch{ return {}; } })();
 
     const entries = [];
+    let skippedNoHours = 0;
     allRecords.forEach(rec => {
       const isBCOT   = isBCOTArea(rec._srcArea);
       const qualifies = isBCOT ? hasAnyDutyDay(rec.daysData, duties) : hasOvertimeDay(rec.daysData);
@@ -509,17 +510,21 @@
       const totalHours = days.reduce((s,r) => s + (Number(r.hrsWorked)||0), 0);
       const totalHome  = days.reduce((s,r) => s + (Number(r.otHome)||0), 0);
       const totalOther = days.reduce((s,r) => s + (Number(r.otherHours)||0), 0);
+      // Only staff with actual overtime hours get a printed form — an _O code
+      // whose duty has no hours would otherwise produce a blank sheet.
+      if (totalHours <= 0) { skippedNoHours++; return; }
 
       entries.push({ name: stripBadge(name), badge, position, days, totalHours, totalHome, totalOther, isBCOT });
     });
 
     if (!entries.length) {
-      showStatus("No staff with overtime days (duty codes ending _O) found for this period.", false);
+      showStatus("No staff with overtime hours found for this period.", false);
       return;
     }
 
     buildForm(entries, meta);
-    showStatus(`Built ${entries.length} Overtime Justification form(s) ✅`);
+    showStatus(`Built ${entries.length} Overtime Justification form(s) ✅` +
+      (skippedNoHours ? ` — skipped ${skippedNoHours} with no hours` : ''));
   }
 
   // Init
