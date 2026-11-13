@@ -69,6 +69,15 @@ async function dryRun() {
     getTemporaryPassword: withLogin.length - keep.length,
     skippedNoUsableBadge: users.length - withLogin.length, roles
   });
+  // Why people get a temporary password, and who gets no login at all.
+  const temp = withLogin.filter(u => !keepsPassword(u));
+  console.log('Temporary password because:', {
+    neverLoggedIn: temp.filter(u => u.firstLogin).length,
+    ownPasswordShorterThan6: temp.filter(u => !u.firstLogin).length
+  });
+  console.log('No login (badge missing or has unusual characters):');
+  users.filter(u => !canLogIn(u)).forEach(u =>
+    console.log(`  ${u.name || '(no name)'} | badge: "${u.badge || ''}" | role: ${u.app_role || 'user'}`));
   if (!roles.admin) console.log('WARNING: no administrator would have a login. Do not continue.');
 }
 
