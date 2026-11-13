@@ -1,21 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // A role is only ever set by server code, so an account someone registers
-    // for themselves through the public API key gets no access.
-    function signedIn() { return request.auth != null && request.auth.token.role is string; }
-    function isAdmin()  { return signedIn() && request.auth.token.role == 'admin'; }
-
     match /bcot_overtime_secure/{appKey} {
-      // Logged-in users read the user list; only admins and server functions change it.
+      // Roles live in the USERS document as a map of login id -> role. Only an
+      // admin can change that map, so an account someone registers for
+      // themselves through the public API key has no role and gets no access.
+      function authData() { return get(/databases/$(database)/documents/bcot_overtime_secure/$(appKey)/app_auth/USERS).data; }
+      function signedIn() { return request.auth != null && request.auth.uid in authData().roles; }
+      function isAdmin()  { return signedIn() && authData().roles[request.auth.uid] == 'admin'; }
+
+      // The one change a non-admin may make to USERS: clearing their own
+      // "must choose a new password" flag after choosing one.
+      function clearsOwnPendingFlag() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pending'])
+          && request.resource.data.pending.diff(resource.data.pending).affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.pending[request.auth.uid] == false;
+      }
+
+      match /app_auth/USERS {
+        allow read: if signedIn();
+        allow create, delete: if isAdmin();
+        allow update: if isAdmin() || (signedIn() && clearsOwnPendingFlag());
+      }
       match /app_auth/{doc} {
         allow read: if signedIn();
         allow write: if isAdmin();
       }
 
-      // Server functions only (they bypass these rules).
-      match /private/{doc} {
-        allow read, write: if false;
+      // Which login address a badge uses when it is not the default one (after
+      // a password reset or a badge change). Looked up by badge before login.
+      match /login_alias/{badge} {
+        allow get: if true;
+        allow list: if isAdmin();
+        allow write: if isAdmin();
       }
 
       // version-check.js reads this before login.
@@ -41,7 +58,7 @@ service cloud.firestore {
       // Everything else in the app needs a login.
       match /{collection}/{document=**} {
         allow read, write: if signedIn()
-          && !(collection in ['app_auth', 'private', 'app_config', 'medcheck_mappings', 'medcheck_scans']);
+          && !(collection in ['app_auth', 'login_alias', 'app_config', 'medcheck_mappings', 'medcheck_scans']);
       }
     }
   }

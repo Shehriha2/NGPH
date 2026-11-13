@@ -1,0 +1,8 @@
+{
+  "name": "ngph-migration",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

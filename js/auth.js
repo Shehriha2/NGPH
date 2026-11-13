@@ -36,6 +36,7 @@
   function setSession(user) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       id:             user.id,
+      uid:            user.uid            || user.id,
       badge:          user.badge          || '',
       name:           user.name,
       nameTitle:      user.nameTitle || '',
@@ -70,9 +71,20 @@
   function authDoc() {
     return window.FB.doc(window.FB.db, 'bcot_overtime_secure', _key, 'app_auth', 'USERS');
   }
+  /* A user's Firebase login id. It starts out equal to their record id and
+     only differs after a password reset, which gives them a fresh login. */
+  function _uid(u) { return u.uid || u.id; }
+  function _readUsers(data) {
+    const users = data.users || [];
+    // "Must choose a new password" flags are kept in their own map so a user
+    // can clear their own without being allowed to edit the user list.
+    const pending = data.pending;
+    users.forEach(u => { u.firstLogin = pending ? pending[_uid(u)] === true : !!u.firstLogin; });
+    return users;
+  }
   async function loadUsers() {
     const snap = await window.FB.getDoc(authDoc());
-    _users = snap.exists() ? (snap.data().users || []) : [];
+    _users = snap.exists() ? _readUsers(snap.data()) : [];
   }
   async function _ensureUsers() {
     if (_users.length) return;
@@ -83,8 +95,48 @@
       await _withTimeout(loadUsers(), 20000, 'Load users');
     } catch (e) { console.warn('[BCOT_AUTH] _ensureUsers:', e); }
   }
+  /* Saves the user list together with the two maps the database rules and the
+     login screen read: who has which role, and who must choose a password. */
   async function saveUsers() {
-    await window.FB.setDoc(authDoc(), { users: _users });
+    const snap = await window.FB.getDoc(authDoc());
+    const livePending = snap.exists() ? snap.data().pending : null;
+    const roles = {}, pending = {};
+    _users.forEach(u => {
+      const id = _uid(u);
+      roles[id] = u.app_role || 'user';
+      // Take the flag from the database, not from this screen, so a user who
+      // chose their password while the list was open isn't asked again.
+      pending[id] = id in _pendingSet ? _pendingSet[id]
+        : livePending ? livePending[id] === true : !!u.firstLogin;
+    });
+    if (!Object.values(roles).includes('admin')) {
+      throw new Error('At least one administrator is required.');
+    }
+    const users = _users.map(u => { const copy = Object.assign({}, u); delete copy.firstLogin; return copy; });
+    await window.FB.setDoc(authDoc(), { users, roles, pending });
+    _users.forEach(u => { u.firstLogin = pending[_uid(u)]; });
+    _pendingSet = {};
+  }
+  let _pendingSet = {};   // flags changed on this screen and not saved yet
+
+  function _aliasPath(badge) {
+    return ['bcot_overtime_secure', _key, 'login_alias', String(badge).trim().toLowerCase()];
+  }
+  /* Looks up the login address of a badge that isn't on its default one. */
+  async function _findAlias(badge) {
+    const found = await (await window.FBAuth.store()).get(_aliasPath(badge));
+    return found?.email || null;
+  }
+  /* Records a non-default login address so the login screen can find it. */
+  async function _saveAlias(badge, email) {
+    if (email === window.FBAuth.emailFor(badge)) return;
+    await (await window.FBAuth.store()).set(_aliasPath(badge), { email });
+  }
+  function _validBadge(badge) { return /^[A-Za-z0-9._-]+$/.test(badge); }
+  function _tempPassword() {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    const picks = crypto.getRandomValues(new Uint32Array(12));
+    return Array.from(picks, n => alphabet[n % alphabet.length]).join('');
   }
 
   /* ── DOM helpers ───────────────────────────────────────────────────────── */
@@ -203,12 +255,16 @@
     try {
       await _waitForFirebase();
       await _staleCleanup;
-      const cred = await _withTimeout(window.FBAuth.signIn(badge, pwd || ''), 20000, 'Login');
+      const cred = await _withTimeout(window.FBAuth.signIn(badge, pwd || '', _findAlias), 20000, 'Login');
       await _withTimeout(loadUsers(), 20000, 'Load users');
-      user = _users.find(u => u.id === cred.user.uid);
+      user = _users.find(u => _uid(u) === cred.user.uid
+        && String(u.badge || '').toLowerCase() === badge.toLowerCase());
     } catch (e) {
-      const badLogin = ['auth/invalid-credential', 'auth/invalid-email', 'auth/wrong-password', 'auth/user-not-found']
-        .includes(e?.code);
+      // A retired login (replaced by a password reset) still signs in to
+      // Firebase but has no role, so the database refuses it.
+      const retired = e?.code === 'permission-denied';
+      if (retired) { try { await window.FBAuth.signOut(); } catch (e2) {} }
+      const badLogin = retired || window.FBAuth?.isBadLogin(e);
       _loggingIn = false;
       say(badLogin ? 'Invalid username or password.'
         : e?.code === 'auth/too-many-requests' ? 'Too many attempts — please wait a few minutes and try again.'
@@ -225,7 +281,6 @@
     _pendingUser = user;
     if ($id('bcot-login-pwd')) $id('bcot-login-pwd').value = '';
     if (user.firstLogin) {
-      window.FBAuth.warm('completeFirstLogin');   // start the server early, while they type
       showScreen('changepwd');
       return;
     }
@@ -245,13 +300,18 @@
       if (errEl) errEl.textContent = 'Could not save your password — check your connection and try again.';
       return;
     }
-    // Clearing the first-login flag is a server call that can be slow to
-    // start, so it runs in the background (retried once) instead of keeping
-    // the user waiting. If it never lands, they are simply asked to choose a
+    // Clear the "must choose a password" flag. This is one small database
+    // write; it gets a few seconds and is otherwise left to finish in the
+    // background. If it never lands, they are simply asked to choose a
     // password again at their next login.
-    const markDone = () => window.FBAuth.call('completeFirstLogin');
-    markDone().catch(() => new Promise(r => setTimeout(r, 4000)).then(markDone))
-      .catch(e => console.warn('[BCOT_AUTH] completeFirstLogin:', e));
+    const uid = window.FBAuth.user.uid;
+    const markDone = async () => (await window.FBAuth.store())
+      .merge(['bcot_overtime_secure', _key, 'app_auth', 'USERS'], { pending: { [uid]: false } });
+    try {
+      await _withTimeout(markDone(), 4000, 'Save flag');
+    } catch (e) {
+      markDone().catch(e2 => console.warn('[BCOT_AUTH] first-login flag:', e2));
+    }
     _pendingUser.firstLogin = false;
     if ($id('bcot-new-pwd'))     $id('bcot-new-pwd').value = '';
     if ($id('bcot-confirm-pwd')) $id('bcot-confirm-pwd').value = '';
@@ -268,7 +328,7 @@
   /* A saved session only counts if Firebase still has the same user logged in. */
   async function _verifyFirebaseLogin(session) {
     try { await _waitForFirebase(); } catch (e) { return; }
-    if (window.FBAuth.user?.uid === session.id) return;
+    if (window.FBAuth.user?.uid === (session.uid || session.id)) return;
     clearSession();
     location.reload();
   }
@@ -278,13 +338,13 @@
     try { await window.FBAuth?.signOut(); } catch (e) { console.warn('[BCOT_AUTH] signOut:', e); }
   }
 
-  /* Starts the server's override check early, while the user is still typing. */
-  function warmOverride() { try { window.FBAuth?.warm('checkOverride'); } catch (e) {} }
+  /* Gets the override check ready while the user is still typing. */
+  function warmOverride() { try { window.FBAuth?.prepare(); } catch (e) {} }
 
-  /* The override password is checked on the server, never stored in the page. */
+  /* The override password is checked by Firebase, never stored in the page. */
   async function checkOverride(password) {
     try {
-      return !!(await window.FBAuth.call('checkOverride', { password })).ok;
+      return await _withTimeout(window.FBAuth.checkSecret(password), 20000, 'Check password');
     } catch (e) {
       console.warn('[BCOT_AUTH] checkOverride:', e);
       return false;
@@ -659,6 +719,42 @@
     }).join('');
   }
 
+  /**
+   * Creates a Firebase login with a one-time temporary password for each
+   * entry and adds them to the user list. Returns [{ badge, name, password }]
+   * for the ones created. Firebase limits how many logins one network can
+   * create per hour; if that limit is hit the rest are left for later and
+   * the returned list has `stoppedEarly` set.
+   */
+  async function _createUsers(entries) {
+    await loadUsers();   // add to the latest list, not a stale copy
+    const taken = new Set(_users.map(u => String(u.badge || '').toLowerCase()));
+    const created = [];
+    let failure = null;
+    for (const entry of entries) {
+      if (taken.has(entry.badge.toLowerCase())) continue;
+      const password = _tempPassword();
+      let login;
+      try {
+        login = await window.FBAuth.createLogin(entry.badge, password);
+      } catch (e) { failure = e; break; }
+      taken.add(entry.badge.toLowerCase());
+      const user = Object.assign({}, entry, { id: login.uid });
+      if (login.email !== window.FBAuth.emailFor(entry.badge)) user.login = login.email;
+      _users.push(user);
+      _pendingSet[login.uid] = true;
+      created.push({ badge: entry.badge, name: entry.name, password, email: login.email });
+    }
+    if (!created.length) {
+      if (failure) throw failure;
+      return created;
+    }
+    await saveUsers();
+    for (const c of created) await _saveAlias(c.badge, c.email);
+    created.stoppedEarly = !!failure;
+    return created;
+  }
+
   async function umAddUser() {
     const badge     = ($id('bcot-um-newbadge')?.value   || '').trim();
     const nameTitle = ($id('bcot-um-nametitle')?.value  || '').trim();
@@ -671,9 +767,11 @@
     if (_users.find(u => u.badge === badge)) {
       if (errEl) errEl.textContent = 'A user with that badge number already exists.'; return;
     }
+    if (!_validBadge(badge)) {
+      if (errEl) errEl.textContent = 'Badge number can only contain letters, numbers, dots, dashes and underscores.'; return;
+    }
     try {
-      const { created } = await window.FBAuth.call('adminCreateUsers', { users: [{ badge, nameTitle, name }] });
-      await loadUsers();
+      const created = await _createUsers([{ badge, nameTitle, name, position: '', app_role: 'user' }]);
       if ($id('bcot-um-newbadge')) $id('bcot-um-newbadge').value = '';
       if ($id('bcot-um-newname'))  $id('bcot-um-newname').value  = '';
       if ($id('bcot-um-search'))   $id('bcot-um-search').value   = '';   // so the new user isn't hidden by an old search
@@ -713,6 +811,7 @@
       const name  = String(r?.name  || '').trim();
       if (r?.department) { external++; return; }
       if (!badge) { noBadge++; return; }
+      if (!_validBadge(badge)) { noBadge++; return; }
       if (!name || seenBadges.has(badge)) return;
       if (existingBadges.has(badge)) { alreadyHasLogin++; return; }
       seenBadges.add(badge);
@@ -742,8 +841,7 @@
     if (!ok) return;
 
     try {
-      const { created } = await window.FBAuth.call('adminCreateUsers', { users: toAdd });
-      await loadUsers();
+      const created = await _createUsers(toAdd);
       if ($id('bcot-um-search')) $id('bcot-um-search').value = '';   // show the newly added users
       _renderUserList();
       const csvCell = v => `"${String(v).replace(/"/g, '""')}"`;
@@ -755,7 +853,9 @@
       link.click();
       URL.revokeObjectURL(link.href);
       await _bcotAlert(`Added ${created.length} user${created.length !== 1 ? 's' : ''}. ` +
-        `Their temporary passwords were downloaded as a file — keep it private and delete it once handed out.`,
+        `Their temporary passwords were downloaded as a file — keep it private and delete it once handed out.` +
+        (created.stoppedEarly ? `<br><br><strong>${toAdd.length - created.length} could not be added yet.</strong> ` +
+          `Only a limited number of logins can be created per hour from one network — run the import again later for the rest.` : ''),
         'Import Complete');
     } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
@@ -792,12 +892,26 @@
     if (_users.find(u2 => u2.badge === b && u2.id !== id)) {
       await _bcotAlert('That badge number is already assigned to another user.', 'Duplicate'); return;
     }
+    if (!_validBadge(b)) {
+      await _bcotAlert('Badge number can only contain letters, numbers, dots, dashes and underscores.', 'Validation'); return;
+    }
+    // The login itself keeps its address; the new badge is pointed at it.
+    const email = u.login || window.FBAuth.emailFor(u.badge);
+    const before = { badge: u.badge, login: u.login };
     try {
-      await window.FBAuth.call('adminSetBadge', { id, badge: b });
       u.badge = b;
+      if (email === window.FBAuth.emailFor(b)) delete u.login; else u.login = email;
+      await _saveAlias(b, email);
+      await saveUsers();
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
+    } catch (e) {
+      u.badge = before.badge;
+      if (before.login) u.login = before.login; else delete u.login;
+      await _bcotAlert('Save failed — ' + e.message, 'Error');
+    }
   }
+
+  function _isSelf(u) { return _uid(u) === window.FBAuth?.user?.uid; }
 
   async function umResetPwd(id) {
     const u = _users.find(u => u.id === id);
@@ -806,12 +920,28 @@
       `Reset password for <strong>${u.name}</strong>?<br>You'll get a temporary password to give them, and they will be required to set a new one on their next login.`,
       'Reset Password', { confirmLabel: 'Reset' });
     if (!ok) return;
+    if (_isSelf(u)) {
+      await _bcotAlert('You cannot reset your own password here — ask another administrator.', 'Reset Password');
+      return;
+    }
+    // Nobody but the user can change the password of an existing login, so a
+    // reset gives them a fresh login and retires the old one.
+    const before = { uid: u.uid, login: u.login };
     try {
-      const { password } = await window.FBAuth.call('adminResetPassword', { id });
-      u.firstLogin = true;
+      const password = _tempPassword();
+      const login = await window.FBAuth.createLogin(u.badge, password);
+      u.uid = login.uid;
+      if (login.email === window.FBAuth.emailFor(u.badge)) delete u.login; else u.login = login.email;
+      _pendingSet[login.uid] = true;
+      await saveUsers();
+      await _saveAlias(u.badge, login.email);
       _renderUserList();
       await _showTempPassword(u.name, password);
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
+    } catch (e) {
+      if (before.uid) u.uid = before.uid; else delete u.uid;
+      if (before.login) u.login = before.login; else delete u.login;
+      await _bcotAlert('Save failed — ' + e.message, 'Error');
+    }
   }
 
   async function umRemoveUser(id) {
@@ -821,11 +951,16 @@
       `Remove <strong>${u.name}</strong> from the login users list?<br>They will no longer be able to access the app.`,
       'Remove User', { confirmLabel: 'Remove', danger: true });
     if (!ok) return;
+    if (_isSelf(u)) { await _bcotAlert('You cannot remove your own account.', 'Remove User'); return; }
+    const all = _users;
     try {
-      await window.FBAuth.call('adminRemoveUser', { id });
       _users = _users.filter(u => u.id !== id);
+      await saveUsers();   // dropping them from the role list is what ends their access
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
+    } catch (e) {
+      _users = all;
+      await _bcotAlert('Save failed — ' + e.message, 'Error');
+    }
   }
 
   async function umSaveExt(id) {
@@ -847,11 +982,16 @@
     if (!u) return;
     const allowed = ['user', 'charge', 'admin'];
     if (!allowed.includes(role)) return;
+    const previous = u.app_role;
     try {
-      await window.FBAuth.call('adminSetRole', { id, role });
       u.app_role = role;
+      await saveUsers();
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
+    } catch (e) {
+      u.app_role = previous;
+      _renderUserList();
+      await _bcotAlert('Save failed — ' + e.message, 'Error');
+    }
   }
 
   async function umSaveAll() {
