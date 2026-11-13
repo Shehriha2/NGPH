@@ -6,6 +6,13 @@
   // Location options for BC OT
   const BC_LOCATIONS = ["Oncology", "NSTC", "ACC"];
 
+  // Which Business Center area this form is for: BCOT, BCOT1 or BCOT2, passed
+  // by the rota page as ?area=. Anything else falls back to BCOT.
+  const BC_AREA = (() => {
+    const a = (new URLSearchParams(location.search).get('area') || '').trim().toUpperCase();
+    return /^BCOT[12]?$/.test(a) ? a : 'BCOT';
+  })();
+
   // Detect BC location(s) by scanning all assigned duty names.
   // Collects every matching location across all days, then joins with "/".
   // e.g. only Oncology duties → "Oncology"
@@ -44,7 +51,7 @@
     if (!key) { showStatus("config.js not found.", false); return; }
     const month = Number(document.getElementById("monthSel").value);
     const year  = Number(document.getElementById("yearSel").value) || new Date().getFullYear();
-    const area  = 'BCOT';
+    const area  = BC_AREA;
     const docId = `${year}-${String(month).padStart(2,'0')}`;
 
     showStatus("Fetching releases…");
@@ -64,14 +71,14 @@
     const monthName = new Date(year, month-1, 1).toLocaleString('default', {month:'long'});
     let bodyHtml = '';
     if (!releases.length) {
-      bodyHtml = `<div class="rel-empty">No releases saved for BCOT — ${monthName} ${year}.<br>Save a release from the Rota page first.</div>`;
+      bodyHtml = `<div class="rel-empty">No releases saved for ${BC_AREA} — ${monthName} ${year}.<br>Save a release from the Rota page first.</div>`;
     } else {
       [...releases].reverse().forEach(r => {
         const date = r.savedAt ? new Date(r.savedAt).toLocaleString() : '—';
         const note = r.note ? `<span style="color:#374151;"> — ${r.note}</span>` : '';
         bodyHtml += `<div class="rel-item" onclick="applyRelease('${r.id}')">
           <div>
-            <div class="rel-item-name">Release #${r.releaseNum} — BCOT-${monthName.slice(0,3)}</div>
+            <div class="rel-item-name">Release #${r.releaseNum} — ${BC_AREA}-${monthName.slice(0,3)}</div>
             <div class="rel-item-meta">${date}${note} &nbsp;·&nbsp; ${r.staffCount||'?'} staff</div>
           </div>
           <button class="rel-item-btn">Load</button>
@@ -81,7 +88,7 @@
 
     backdrop.innerHTML = `<div class="rel-modal">
       <div class="rel-modal-head">
-        <span>Pick Release — BCOT / ${monthName} ${year}</span>
+        <span>Pick Release — ${BC_AREA} / ${monthName} ${year}</span>
         <button class="rel-modal-close" onclick="document.getElementById('relPickerBackdrop').remove()">✕</button>
       </div>
       <div class="rel-modal-body">${bodyHtml}</div>
@@ -89,7 +96,7 @@
     document.body.appendChild(backdrop);
 
     if (releases.length) showStatus('');
-    else showStatus(`No releases found for BCOT ${monthName} ${year}.`, false);
+    else showStatus(`No releases found for ${BC_AREA} ${monthName} ${year}.`, false);
   }
 
   async function applyRelease(releaseId) {
@@ -377,7 +384,7 @@
       showStatus('Saving to cloud…');
       // merge:true — this save only covers the currently-loaded role group's badges;
       // a plain (non-merge) setDoc would wipe out the other group's saved picks.
-      await window.FB.setDoc(formDataRef(key, 'BCOT', docId), { rows: rowsData }, { merge:true });
+      await window.FB.setDoc(formDataRef(key, BC_AREA, docId), { rows: rowsData }, { merge:true });
       showStatus('Saved ✅ — other users will see this on next load.');
     } catch(e) { showStatus('Save failed: '+(e?.message||e), false); }
   }
@@ -427,8 +434,7 @@
     showStatus("Loading from cloud…");
     let payload;
     try {
-      // BC rota is always saved under area "BCOT"
-      const area = 'BCOT';
+      const area = BC_AREA;
       if (_selectedReleaseId) {
         const snap = await window.FB.getDoc(releaseDocRef(key, area, _selectedReleaseId));
         if (!snap.exists()) { showStatus('Release not found in cloud.', false); _selectedReleaseId=null; return; }
@@ -437,7 +443,7 @@
       } else {
         const docId = `${year}-${String(month).padStart(2,'0')}`;
         const snap  = await window.FB.getDoc(monthRef(key, area, docId));
-        if (!snap.exists()) { showStatus(`No monthly rota for BCOT ${year}/${String(month).padStart(2,'0')}.`, false); return; }
+        if (!snap.exists()) { showStatus(`No monthly rota for ${BC_AREA} ${year}/${String(month).padStart(2,'0')}.`, false); return; }
         payload = snap.data();
       }
     } catch(e) { console.error(e); showStatus("Load failed: "+(e?.message||e), false); return; }
@@ -451,7 +457,7 @@
     const duties    = (() => { try{ return JSON.parse(localStorage.getItem(DUTIES_KEY)||"{}"); }catch{ return {}; } })();
 
     // Fetch approved extensions (Firebase-approved takes priority over manual entry)
-    const extMap = await fetchGrantedExtensions(month, year, 'BCOT');
+    const extMap = await fetchGrantedExtensions(month, year, BC_AREA);
 
     // Filter to BC schedule rows only — for BC, all hours = overtime
     const records = Array.isArray(payload.records) ? payload.records : [];
@@ -489,7 +495,7 @@
       return;
     }
 
-    const _saved    = await _loadFormData(key, 'BCOT', month, year);
+    const _saved    = await _loadFormData(key, BC_AREA, month, year);
     const finalRows = _mergeFormData(rows, _saved);
 
     buildForm(finalRows, meta);

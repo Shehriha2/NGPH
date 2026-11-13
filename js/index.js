@@ -871,6 +871,9 @@
     }
 
     // ── Area helpers ──────────────────────────────────────────────────────────
+    // BCOT, BCOT1 and BCOT2 are all Business Center areas and share every BCOT rule.
+    function isBCOTArea(area) { return /^BCOT[12]?$/.test((area||'').trim().toUpperCase()); }
+
     function getCurrentArea() {
       // prefer live select, fall back to localStorage
       return (document.getElementById("areaFilter")?.value
@@ -2197,8 +2200,11 @@
     }
 
     function openOTPreApproval() {
-      // Route to BC-specific form when the active area is BCOT
-      window.location.href = getCurrentArea() === 'BCOT' ? 'BCOTPreApproval.html' : 'OTPreApproval.html';
+      // Route to BC-specific form when the active area is BCOT / BCOT1 / BCOT2
+      const area = getCurrentArea();
+      window.location.href = isBCOTArea(area)
+        ? 'BCOTPreApproval.html?area=' + encodeURIComponent(area)
+        : 'OTPreApproval.html';
     }
 
     async function populateStaff() {
@@ -2269,7 +2275,7 @@
       const area     = getCurrentArea();
       const month    = Number(document.getElementById('monthSelect').value);
       const year     = Number(document.getElementById('yearInput')?.value) || new Date().getFullYear();
-      const wantType = area === 'BCOT' ? 'Business OT' : 'Regular';
+      const wantType = isBCOTArea(area) ? 'Business OT' : 'Regular';
 
       showStatusMessage('Checking OT Adjustments…', 'info');
       let snap;
@@ -2319,7 +2325,7 @@
           let isNew = false;
 
           if (!row) {
-            if (area !== 'BCOT') { bypassed.push(displayName); continue; }
+            if (!isBCOTArea(area)) { bypassed.push(displayName); continue; }
             if (!areaStaffList.includes(displayName)) { notTagged.push(displayName); continue; }
             addNewRow();
             row = tbody.lastElementChild;
@@ -2348,7 +2354,7 @@
         if (updated.length)     lines.push(`✅ <strong>Updated (${updated.length}):</strong> ${updated.join(', ')}`);
         if (added.length)       lines.push(`➕ <strong>Added new row (${added.length}):</strong> ${added.join(', ')}`);
         if (bypassed.length)    lines.push(`⏭ <strong>Bypassed — not in this rota (${bypassed.length}):</strong> ${bypassed.join(', ')}`);
-        if (notTagged.length)   lines.push(`⚠️ <strong>Not tagged for area BCOT (${notTagged.length}):</strong> ${notTagged.join(', ')} — add "BCOT" to their area in Staff Management first.`);
+        if (notTagged.length)   lines.push(`⚠️ <strong>Not tagged for area ${area} (${notTagged.length}):</strong> ${notTagged.join(', ')} — add "${area}" to their area in Staff Management first.`);
         if (needsReview.length) lines.push(`🔎 <strong>Needs manual review — multiple entries (${needsReview.length}):</strong> ${needsReview.join(', ')}`);
         if (!lines.length) lines.push('Nothing to import.');
 
@@ -2557,7 +2563,7 @@
       const sel = row.querySelector('.sched-cell select');
       if (!sel) return;
 
-      if (getCurrentArea() === 'BCOT' && (Number(hCell.textContent) || 0) > 0) {
+      if (isBCOTArea(getCurrentArea()) && (Number(hCell.textContent) || 0) > 0) {
         if (sel.value !== 'BC') { sel.value = 'BC'; calcOT(row); }
         return;
       }
@@ -6914,7 +6920,7 @@
       }
 
       // ── BCOT-only rule: every assigned duty counts as overtime (no _O suffix needed) ──
-      function isBCOTArea(area) { return (area||'').trim().toUpperCase() === 'BCOT'; }
+      function isBCOTArea(area) { return /^BCOT[12]?$/.test((area||'').trim().toUpperCase()); }
 
       function hasAnyDutyDay(daysData, duties) {
         return Object.values(daysData||{}).some(v => {

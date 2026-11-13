@@ -34,7 +34,7 @@
   // placed on the staff member's real rota-assigned days (Sun-Thu only, in date
   // order) — so a staff member's Attendance Sheet lands on the exact same days
   // and times as their Overtime Justification sheet.
-  function isBCOTArea(area) { return (area||'').trim().toUpperCase() === 'BCOT'; }
+  function isBCOTArea(area) { return /^BCOT[12]?$/.test((area||'').trim().toUpperCase()); }
 
   function sumAnyDutyHours(daysData, duties) {
     let total = 0;

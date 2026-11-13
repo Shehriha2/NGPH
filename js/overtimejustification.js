@@ -227,7 +227,7 @@
   }
 
   // ── BCOT-only rule: every assigned duty counts as overtime (no _O suffix needed) ──
-  function isBCOTArea(area) { return (area||'').trim().toUpperCase() === 'BCOT'; }
+  function isBCOTArea(area) { return /^BCOT[12]?$/.test((area||'').trim().toUpperCase()); }
 
   function hasAnyDutyDay(daysData, duties) {
     return Object.values(daysData||{}).some(v => {
