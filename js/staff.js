@@ -1028,7 +1028,7 @@
         showStatusMessage("No local data — loading from cloud…");
         (async () => {
           let t = 0;
-          while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+          while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
           if (window.FB) {
             await loadStaffFromCloud();
           } else {

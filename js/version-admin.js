@@ -56,7 +56,7 @@ window.bumpAppVersion = async function () {
     var url = docUrl + '&updateMask.fieldPaths=v&updateMask.fieldPaths=c';
     var r = await fetch(url, {
       method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await window.FBAuth.user.getIdToken()) },
       body:    JSON.stringify({ fields: { v: { stringValue: v }, c: { integerValue: String(nextColorIdx) } } })
     });
     if (!r.ok) throw new Error('Firestore returned HTTP ' + r.status);

@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js">
+<link rel="modulepreload" href="js/fb-auth.js">
   <style>html{visibility:hidden}</style>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -255,7 +261,7 @@
 
   <script src="config.js"></script>
   <script src="js/version-check.js"></script>
-  <script src="js/auth.js?v=18"></script>
+  <script src="js/auth.js?v=19"></script>
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
@@ -268,6 +274,7 @@
       appId:"1:659421824894:web:f0546879df8808491ad52f"
     };
     const app = initializeApp(firebaseConfig);
+  await (await import('./js/fb-auth.js')).ready(app);
     const db  = getFirestore(app);
     window.FB = { db, doc, setDoc, getDoc };
   </script>

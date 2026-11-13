@@ -356,7 +356,7 @@
     (async function init() {
       drugs = readDrugsLocal();
       rebuildDrugsDatalist();
-      let t = 0; while (!window.FB && t++ < 60) await new Promise(r => setTimeout(r, 50));
+      let t = 0; while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
       if (!drugs.length) await loadDrugsFromCloud();
       loadPrintHistory();
     })();

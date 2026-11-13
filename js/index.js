@@ -4,30 +4,11 @@
     }
 
     // ── Auth Admin ────────────────────────────────────────────────────────────
-    async function _sha256(s) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-    // SHA-256 of the bootstrap password — original never appears in source
-    const _BOOTSTRAP_HASH = '0d14cdb9a9fbe665964f55a53aadb5d4142b2a71ff7550a8ac381a8ae32a3b6c';
 
     async function _openAdminGated(openFn) {
       if (typeof BCOT_AUTH === 'undefined') { showStatusMessage('Authentication module is not available.', 'error'); return; }
       if (_getAppRole() === 'admin') { closeSettingsModal(); openFn(); return; }
-      // Check whether any admin has been assigned yet
-      let users = [];
-      try { users = await BCOT_AUTH.fetchExtUsers(); } catch (e) {}
-      const hasAdmin = users.some(u => (u.app_role || 'user') === 'admin');
-      if (hasAdmin) { showStatusMessage('Access denied — Administrator role required.', 'error'); return; }
-      // No admin assigned yet — bootstrap mode
-      const entered = await BCOT_AUTH.prompt(
-        'No administrator has been assigned yet.\nEnter the setup password to manage users.',
-        { title: '🔑 First-Time Setup', placeholder: 'Setup password', type: 'password', confirmLabel: 'Open' });
-      if (entered === null) return;
-      const h = await _sha256(entered.trim());
-      if (h !== _BOOTSTRAP_HASH) { showStatusMessage('Incorrect password — access denied.', 'error'); return; }
-      closeSettingsModal();
-      openFn();
+      showStatusMessage('Access denied — Administrator role required.', 'error');
     }
 
     function openAuthAdmin() { _openAdminGated(() => BCOT_AUTH.openUserManager()); }
@@ -516,17 +497,17 @@
     function _askOTPwd(onOK, onFail) {
       // Already unlocked this session — skip the modal entirely
       if (_otUnlocked) { onOK?.(); return; }
+      BCOT_AUTH.warmOverride();   // start the server check while they type
       _otPwdCB = { onOK, onFail };
       document.getElementById('otPwdInput').value = '';
       document.getElementById('otPwdModal').classList.add('show');
       setTimeout(() => document.getElementById('otPwdInput').focus(), 80);
     }
 
-    function _submitOTPwd() {
+    async function _submitOTPwd() {
       const entered = document.getElementById('otPwdInput').value;
-      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
       document.getElementById('otPwdModal').classList.remove('show');
-      if (entered === pwd) {
+      if (await BCOT_AUTH.checkOverride(entered)) {
         _setOTUnlocked(true);   // unlock for the rest of the session
         showStatusMessage('OT override unlocked — click 🔒 Lock OT when done.', 'info');
         _otPwdCB?.onOK?.();
@@ -638,7 +619,6 @@
 
         // Set manual override — admin bypasses password; others use modal
         if (_getAppRole() === 'admin') _setOTUnlocked(true);
-        const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
         const applyOverride = () => {
           td.dataset.override = 'true';
           delete td.dataset.imported;
@@ -647,7 +627,7 @@
           btn.textContent = '🔓'; btn.title = 'Reset to calculated';
           td.dataset.savedVal = String(parsed);
         };
-        if (pwd && td.dataset.override !== 'true' && !_otUnlocked) {
+        if (td.dataset.override !== 'true' && !_otUnlocked) {
           repaint(parseFloat(saved)||0, false, false);  // restore while modal is open
           _askOTPwd(
             applyOverride,
@@ -779,8 +759,6 @@
     }
 
     function handleOTLock(otCell) {
-      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
-      if (!pwd) { showStatusMessage('OT password not set in config.js','error'); return; }
       if (otCell.dataset.override==='true') {
         // Reset to calculated — no password needed (user can always type "auto" too)
         delete otCell.dataset.override;
@@ -1552,13 +1530,12 @@
     function openSettingsWithAuth() {
       // Admins go straight in — no password prompt needed
       if (_getAppRole() === 'admin') { openSettingsModal(); return; }
-      const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-      if (!pwd) { openSettingsModal(); return; }
+      BCOT_AUTH.warmOverride();
       BCOT_AUTH.prompt('Enter the administrator password to access Settings & Tools.',
         { title: '🔑 Settings & Tools', placeholder: 'Admin password', type: 'password', confirmLabel: 'Unlock' })
-        .then(entered => {
+        .then(async entered => {
           if (entered === null) return;
-          if (entered.trim() !== pwd) { BCOT_AUTH.alert('Incorrect password.', 'Access Denied'); return; }
+          if (!(await BCOT_AUTH.checkOverride(entered.trim()))) { BCOT_AUTH.alert('Incorrect password.', 'Access Denied'); return; }
           openSettingsModal();
         });
     }
@@ -1708,15 +1685,14 @@
         const name = this.value.trim();
         if (!name) return;
         if (_getAppRole() === 'admin') { SM.openEditByName(name); return; }
-        const pwd = (window.BCOT_OT_OVERRIDE_PASSWORD || '').trim();
-        if (!pwd) { SM.openEditByName(name); return; }
+        BCOT_AUTH.warmOverride();
         BCOT_AUTH.prompt(
           'Enter the administrator password to edit staff properties.',
           { title: '🔑 Staff Properties', placeholder: 'Admin password',
             type: 'password', confirmLabel: 'Unlock' }
-        ).then(entered => {
+        ).then(async entered => {
           if (entered === null) return;
-          if (entered.trim() !== pwd) { BCOT_AUTH.alert('Incorrect password.', 'Access Denied'); return; }
+          if (!(await BCOT_AUTH.checkOverride(entered.trim()))) { BCOT_AUTH.alert('Incorrect password.', 'Access Denied'); return; }
           SM.openEditByName(name);
         });
       });
@@ -2652,12 +2628,11 @@
         if(e.ctrlKey){
           e.preventDefault();
           if(_getAppRole()==='admin'){DM.openEditByCode(base);return;}
-          const pwd=(window.BCOT_OT_OVERRIDE_PASSWORD||'').trim();
-          if(!pwd){DM.openEditByCode(base);return;}
+          BCOT_AUTH.warmOverride();
           BCOT_AUTH.prompt('Enter the administrator password to edit duty properties.',{title:'🔑 Duty Properties',placeholder:'Admin password',type:'password',confirmLabel:'Unlock'})
-            .then(entered=>{
+            .then(async entered=>{
               if(entered===null)return;
-              if(entered.trim()!==pwd){BCOT_AUTH.alert('Incorrect password.','Access Denied');return;}
+              if(!(await BCOT_AUTH.checkOverride(entered.trim()))){BCOT_AUTH.alert('Incorrect password.','Access Denied');return;}
               DM.openEditByCode(base);
             });
           return;
@@ -4187,7 +4162,7 @@
       const _lid  = () => `${_area}_${_ym}`;
       const _ref  = async () => {
         const k=_key(); if(!k) return null;
-        let t=0; while(!window.FB && t++<80) await new Promise(r=>setTimeout(r,50));
+        let t=0; while(!window.FB && t++<400) await new Promise(r=>setTimeout(r,50));
         return window.FB ? window.FB.doc(window.FB.db,'bcot_overtime_secure',k,COLL,_lid()) : null;
       };
       const _exp  = l => !l||!l.expiresAt||new Date(l.expiresAt)<=new Date();

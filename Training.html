@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js">
+<link rel="modulepreload" href="js/fb-auth.js">
   <style>html{visibility:hidden}</style>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -449,7 +455,6 @@
       </div>
       <div class="fg">
         <label class="fl">Portal Password <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;">(default: 12345)</span></label>
-        <input type="text" id="pmPwd" placeholder="Leave blank for default (12345)"/>
       </div>
     </div>
     <div class="mft">
@@ -539,7 +544,7 @@
 <div class="snot" id="snot"></div>
 <script src="config.js"></script>
 <script src="js/version-check.js"></script>
-<script src="js/auth.js?v=18"></script>
+<script src="js/auth.js?v=19"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc }
@@ -550,6 +555,7 @@
     projectId:"bcotrota", storageBucket:"bcotrota.firebasestorage.app",
     messagingSenderId:"659421824894", appId:"1:659421824894:web:f0546879df8808491ad52f"
   });
+  await (await import('./js/fb-auth.js')).ready(app);
   const db = getFirestore(app);
 
   const STAFF_KEY = 'BCOT_STAFF_RECORDS_V2';
@@ -911,7 +917,6 @@
           <button class="btn btn-teal btn-sm" onclick="openAvail('${p._id}')">Availability</button>
           <button class="btn btn-primary btn-sm" onclick="openCapModal('${p._id}')">Capacity</button>
           <button class="btn btn-ghost btn-sm" onclick="togPrec('${p._id}')">${p.active!==false?'Deactivate':'Activate'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="resetPrecPwd('${p._id}','${esc(p.name)}')">🔑 Reset Pwd</button>
           <button class="btn btn-danger btn-sm" onclick="delPrec('${p._id}')">Delete</button>
         </div></td>
       </tr>`;
@@ -921,7 +926,7 @@
   window.openPreceptorModal=function(){
     document.getElementById('psQuery').value='';
     document.getElementById('psResults').innerHTML='';
-    ['pmName','pmBadge','pmRole','pmArea','pmPwd'].forEach(id=>document.getElementById(id).value='');
+    ['pmName','pmBadge','pmRole','pmArea'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('mPreceptor').classList.add('show');
     setTimeout(()=>document.getElementById('psQuery').focus(),100);
   };
@@ -952,8 +957,7 @@
     const name=document.getElementById('pmName').value.trim();
     if(!name){ss('Name is required.',false);return;}
     if(_preceptors.find(p=>p.name===name)){ss(`${name} is already a preceptor.`,false);return;}
-    const pwd=document.getElementById('pmPwd').value.trim()||'12345';
-    const entry={name,badge:document.getElementById('pmBadge').value.trim(),role:document.getElementById('pmRole').value.trim(),area:document.getElementById('pmArea').value.trim(),active:true,password:pwd,addedAt:new Date().toISOString(),addedBy:sub()};
+    const entry={name,badge:document.getElementById('pmBadge').value.trim(),role:document.getElementById('pmRole').value.trim(),area:document.getElementById('pmArea').value.trim(),active:true,addedAt:new Date().toISOString(),addedBy:sub()};
     try{
       const ref=await addDoc(pColl(),entry);
       _preceptors.push({_id:ref.id,...entry});
@@ -976,20 +980,6 @@
     if(!ok)return;
     try{await deleteDoc(pDoc(id));_preceptors=_preceptors.filter(x=>x._id!==id);renderPrecList();ss('Preceptor deleted.');}
     catch(e){ss('Delete failed: '+(e?.message||e),false);}
-  };
-
-  window.resetPrecPwd=async function(id,name){
-    const ok=await window.BCOT_AUTH.confirm(
-      `Reset the portal password for "${name}" back to the default (12345)?`,
-      {title:'🔑 Reset Password',confirmLabel:'Reset'}
-    );
-    if(!ok)return;
-    try{
-      await updateDoc(pDoc(id),{password:'12345'});
-      const p=_preceptors.find(x=>x._id===id);
-      if(p)p.password='12345';
-      ss(`Password reset to 12345 for ${name} ✅`);
-    }catch(e){ss('Reset failed: '+(e?.message||e),false);}
   };
 
   // ── Capacity modal ────────────────────────────────────────────────────────

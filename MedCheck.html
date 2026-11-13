@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js">
+<link rel="modulepreload" href="js/fb-auth.js">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MedCheck - MNGHA</title>
@@ -842,6 +848,7 @@
           messagingSenderId:"659421824894",
           appId:"1:659421824894:web:f0546879df8808491ad52f"
         });
+  await (await import('./js/fb-auth.js')).ready(app);
         const db = getFirestore(app);
 
         const _key      = () => (window.BCOT_APP_KEY || '').trim();

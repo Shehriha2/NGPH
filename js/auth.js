@@ -4,9 +4,10 @@
    • Fullscreen overlay on every page — nothing visible until authenticated
    • Access is gated by username + password only — the app never looks up,
      logs, or filters by the visitor's IP address or device
-   • Users stored in Firebase: bcot_overtime_secure/[KEY]/app_auth/USERS
-   • Session in localStorage, 12-hour expiry, shared across all tabs
-   • First login forces password change (default: 12345)
+   • Logins live in Firebase Authentication; user details in app_auth/USERS
+   • Session in localStorage (12-hour expiry) is display info only; database
+     access is enforced by Firestore rules against the Firebase login
+   • First login forces a change of the temporary password
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -90,7 +91,7 @@
   function $id(id) { return document.getElementById(id); }
 
   function showScreen(name) {
-    ['loading', 'login', 'changepwd', 'setup', 'error'].forEach(s => {
+    ['loading', 'login', 'changepwd', 'error'].forEach(s => {
       const el = $id('bcot-scr-' + s);
       if (el) el.style.display = (s === name) ? '' : 'none';
     });
@@ -171,33 +172,6 @@
     </button>
   </div>
 
-  <!-- First-time setup -->
-  <div id="bcot-scr-setup" style="display:none;">
-    <h2 style="margin:0 0 4px;font-size:21px;color:#1a4f8b;font-weight:700;">First-Time Setup</h2>
-    <p style="margin:0 0 24px;font-size:12px;color:#6b7280;">
-      No users found. Create the first admin account.<br>
-      Default password will be <strong>12345</strong> — you will be asked to change it.
-    </p>
-    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
-                  color:#374151;margin-bottom:6px;">USERNAME</label>
-    <input id="bcot-setup-badge" type="text" placeholder="Username"
-      style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
-             font-size:13px;box-sizing:border-box;margin-bottom:14px;" />
-    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
-                  color:#374151;margin-bottom:6px;">YOUR NAME</label>
-    <input id="bcot-setup-name" type="text" placeholder="Full name"
-      style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;
-             font-size:13px;box-sizing:border-box;margin-bottom:6px;"
-      onkeydown="if(event.key==='Enter') BCOT_AUTH.doSetup();" />
-    <div id="bcot-setup-err"
-      style="color:#dc2626;font-size:12px;min-height:18px;margin-bottom:12px;"></div>
-    <button onclick="BCOT_AUTH.doSetup();"
-      style="width:100%;padding:12px;background:#1a4f8b;color:#fff;border:none;
-             border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
-      Create Account
-    </button>
-  </div>
-
   <!-- Error -->
   <div id="bcot-scr-error" style="display:none;text-align:center;padding:10px 0;">
     <div style="font-size:28px;margin-bottom:12px;">⚠️</div>
@@ -213,20 +187,48 @@
   function buildUserDropdown() { /* no-op: select replaced by text input */ }
 
   /* ── Login actions ─────────────────────────────────────────────────────── */
-  function doLogin() {
+  let _loggingIn = false;
+  let _staleCleanup = null;   // sign-out of a leftover Firebase login, started by init()
+  async function doLogin() {
     const badge = ($id('bcot-login-badge')?.value || '').trim();
     const pwd   = $id('bcot-login-pwd')?.value;
     const errEl = $id('bcot-login-err');
-    if (errEl) errEl.textContent = '';
-    if (!badge) { if (errEl) errEl.textContent = 'Please enter your username.'; return; }
-    const user = _users.find(u => u.badge === badge);
-    if (!user || user.password !== pwd) {
-      if (errEl) errEl.textContent = 'Invalid username or password.';
+    const say = (msg, color) => { if (errEl) { errEl.style.color = color || '#dc2626'; errEl.textContent = msg; } };
+    say('');
+    if (!badge) { say('Please enter your username.'); return; }
+    if (_loggingIn) return;
+    _loggingIn = true;
+    say('Signing in…', '#6b7280');
+    let user;
+    try {
+      await _waitForFirebase();
+      await _staleCleanup;
+      const cred = await _withTimeout(window.FBAuth.signIn(badge, pwd || ''), 20000, 'Login');
+      await _withTimeout(loadUsers(), 20000, 'Load users');
+      user = _users.find(u => u.id === cred.user.uid);
+    } catch (e) {
+      const badLogin = ['auth/invalid-credential', 'auth/invalid-email', 'auth/wrong-password', 'auth/user-not-found']
+        .includes(e?.code);
+      _loggingIn = false;
+      say(badLogin ? 'Invalid username or password.'
+        : e?.code === 'auth/too-many-requests' ? 'Too many attempts — please wait a few minutes and try again.'
+        : 'Could not log in — check your connection.');
       return;
     }
+    _loggingIn = false;
+    if (!user) {
+      await window.FBAuth.signOut();
+      say('This login is no longer active — contact an administrator.');
+      return;
+    }
+    say('');
     _pendingUser = user;
     if ($id('bcot-login-pwd')) $id('bcot-login-pwd').value = '';
-    if (user.firstLogin) { showScreen('changepwd'); return; }
+    if (user.firstLogin) {
+      window.FBAuth.warm('completeFirstLogin');   // start the server early, while they type
+      showScreen('changepwd');
+      return;
+    }
     _finishLogin(user);
   }
 
@@ -237,33 +239,70 @@
     if (errEl) errEl.textContent = '';
     if (!np || np.length < 6) { if (errEl) errEl.textContent = 'Minimum 6 characters.'; return; }
     if (np !== cp)             { if (errEl) errEl.textContent = 'Passwords do not match.'; return; }
-    _pendingUser.password   = np;
-    _pendingUser.firstLogin = false;
-    const idx = _users.findIndex(u => u.id === _pendingUser.id);
-    if (idx >= 0) _users[idx] = Object.assign({}, _pendingUser);
     try {
-      await _withTimeout(saveUsers(), 10000, 'Save password');
-    } catch (e) { console.error('Auth save error:', e); }
+      await _withTimeout(window.FBAuth.setPassword(np), 20000, 'Save password');
+    } catch (e) {
+      if (errEl) errEl.textContent = 'Could not save your password — check your connection and try again.';
+      return;
+    }
+    // Clearing the first-login flag is a server call that can be slow to
+    // start, so it runs in the background (retried once) instead of keeping
+    // the user waiting. If it never lands, they are simply asked to choose a
+    // password again at their next login.
+    const markDone = () => window.FBAuth.call('completeFirstLogin');
+    markDone().catch(() => new Promise(r => setTimeout(r, 4000)).then(markDone))
+      .catch(e => console.warn('[BCOT_AUTH] completeFirstLogin:', e));
+    _pendingUser.firstLogin = false;
     if ($id('bcot-new-pwd'))     $id('bcot-new-pwd').value = '';
     if ($id('bcot-confirm-pwd')) $id('bcot-confirm-pwd').value = '';
     _finishLogin(_pendingUser);
   }
 
-  async function doSetup() {
-    const badge = ($id('bcot-setup-badge')?.value || '').trim();
-    const name  = ($id('bcot-setup-name')?.value  || '').trim();
-    const errEl = $id('bcot-setup-err');
-    if (errEl) errEl.textContent = '';
-    if (!badge) { if (errEl) errEl.textContent = 'Username is required.'; return; }
-    if (!name)  { if (errEl) errEl.textContent = 'Name is required.'; return; }
-    const user = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-                   badge, name, password: '12345', firstLogin: true };
-    _users = [user];
+  /* Sign-in can be slower than the page's own scripts on a poor connection. */
+  async function _waitForFirebase() {
+    let t = 0;
+    while ((!window.FB || !window.FBAuth) && t++ < 400) await new Promise(r => setTimeout(r, 50));
+    if (!window.FB || !window.FBAuth) throw new Error('Firebase failed to initialize');
+  }
+
+  /* A saved session only counts if Firebase still has the same user logged in. */
+  async function _verifyFirebaseLogin(session) {
+    try { await _waitForFirebase(); } catch (e) { return; }
+    if (window.FBAuth.user?.uid === session.id) return;
+    clearSession();
+    location.reload();
+  }
+
+  async function _endSession() {
+    clearSession();
+    try { await window.FBAuth?.signOut(); } catch (e) { console.warn('[BCOT_AUTH] signOut:', e); }
+  }
+
+  /* Starts the server's override check early, while the user is still typing. */
+  function warmOverride() { try { window.FBAuth?.warm('checkOverride'); } catch (e) {} }
+
+  /* The override password is checked on the server, never stored in the page. */
+  async function checkOverride(password) {
     try {
-      await _withTimeout(saveUsers(), 10000, 'Save user');
-    } catch (e) { if (errEl) errEl.textContent = 'Could not save — check connection.'; return; }
-    _pendingUser = user;
-    showScreen('changepwd');
+      return !!(await window.FBAuth.call('checkOverride', { password })).ok;
+    } catch (e) {
+      console.warn('[BCOT_AUTH] checkOverride:', e);
+      return false;
+    }
+  }
+
+  /* Shows a one-time temporary password so an admin can pass it on. */
+  function _showTempPassword(name, password) {
+    return _bcotAlert(
+      `Temporary password for <strong>${_esc(name)}</strong>:<br><br>` +
+      `<code style="font-size:16px;user-select:all;">${_esc(password)}</code><br><br>` +
+      `Copy it now and give it to them privately — it won't be shown again. ` +
+      `They'll choose their own password when they first log in.`,
+      'Temporary Password');
+  }
+
+  function _esc(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   /* ── Custom dialogs ────────────────────────────────────────────────────── */
@@ -337,7 +376,7 @@
   function doLogout() {
     _bcotConfirm('You will need to log in again to access the app.', 'Log Out?',
       { confirmLabel: 'Log Out', danger: true })
-      .then(ok => { if (ok) { clearSession(); location.reload(); } });
+      .then(async ok => { if (ok) { await _endSession(); location.reload(); } });
   }
 
   /* ── After successful auth ─────────────────────────────────────────────── */
@@ -406,7 +445,7 @@
     }
     function _doIdleLogout() {
       _clearWarn();
-      clearSession();
+      _endSession();
       const overlay = document.createElement('div');
       overlay.textContent = 'Session expired due to inactivity. Logging out…';
       overlay.style.cssText =
@@ -443,10 +482,6 @@
       return;
     }
     _renderUserManagerModal();
-  }
-
-  function _uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
   function _renderUserManagerModal() {
@@ -521,7 +556,7 @@
     <div id="bcot-um-err"
       style="color:#dc2626;font-size:11px;min-height:16px;margin-top:4px;"></div>
     <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">
-      New users get default password <strong>12345</strong> and are asked to change it on first login.
+      New users get a one-time temporary password and are asked to change it on first login.
     </p>
   </div>
 
@@ -636,18 +671,19 @@
     if (_users.find(u => u.badge === badge)) {
       if (errEl) errEl.textContent = 'A user with that badge number already exists.'; return;
     }
-    _users.push({ id: _uid(), badge, nameTitle, name, position: '', password: '12345', firstLogin: true });
     try {
-      await saveUsers();
+      const { created } = await window.FBAuth.call('adminCreateUsers', { users: [{ badge, nameTitle, name }] });
+      await loadUsers();
       if ($id('bcot-um-newbadge')) $id('bcot-um-newbadge').value = '';
       if ($id('bcot-um-newname'))  $id('bcot-um-newname').value  = '';
       if ($id('bcot-um-search'))   $id('bcot-um-search').value   = '';   // so the new user isn't hidden by an old search
       _renderUserList();
+      if (created[0]) await _showTempPassword(name, created[0].password);
     } catch (e) { if (errEl) errEl.textContent = 'Save failed: ' + e.message; }
   }
 
   /**
-   * Bulk-create a login account (role User, default password 12345) for
+   * Bulk-create a login account (role User, one-time temporary password) for
    * every staff member in Staff Management who doesn't already have one.
    * Staff records repeat per area (same badge, multiple rows), so entries
    * are de-duplicated by badge; staff with no badge number are skipped
@@ -680,10 +716,7 @@
       if (!name || seenBadges.has(badge)) return;
       if (existingBadges.has(badge)) { alreadyHasLogin++; return; }
       seenBadges.add(badge);
-      toAdd.push({
-        id: _uid(), badge, nameTitle: '', name, position: '',
-        password: '12345', firstLogin: true, app_role: 'user'
-      });
+      toAdd.push({ badge, nameTitle: '', name, position: '', app_role: 'user' });
     });
 
     if (!toAdd.length) {
@@ -699,8 +732,8 @@
 
     const ok = await _bcotConfirm(
       `Create login accounts for <strong>${toAdd.length}</strong> staff member(s) not yet in this list?<br>` +
-      `Each gets role <strong>User</strong> and the default password <strong>12345</strong> ` +
-      `— they'll be asked to set a personal password on first login.` +
+      `Each gets role <strong>User</strong> and a temporary password, which you can download ` +
+      `straight afterwards — they'll be asked to set a personal password on first login.` +
       (alreadyHasLogin ? `<br><br>${alreadyHasLogin} already have a login and will be skipped.` : '') +
       (external ? `<br>${external} are external collaborators and will be skipped.` : '') +
       (noBadge ? `<br>${noBadge} have no badge number and will be skipped.` : ''),
@@ -708,12 +741,22 @@
     );
     if (!ok) return;
 
-    _users = _users.concat(toAdd);
     try {
-      await saveUsers();
+      const { created } = await window.FBAuth.call('adminCreateUsers', { users: toAdd });
+      await loadUsers();
       if ($id('bcot-um-search')) $id('bcot-um-search').value = '';   // show the newly added users
       _renderUserList();
-      await _bcotAlert(`Added ${toAdd.length} user${toAdd.length !== 1 ? 's' : ''}.`, 'Import Complete');
+      const csvCell = v => `"${String(v).replace(/"/g, '""')}"`;
+      const csv = ['badge,name,temporary_password']
+        .concat(created.map(c => [c.badge, c.name, c.password].map(csvCell).join(','))).join('\n');
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      link.download = 'temporary-passwords.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+      await _bcotAlert(`Added ${created.length} user${created.length !== 1 ? 's' : ''}. ` +
+        `Their temporary passwords were downloaded as a file — keep it private and delete it once handed out.`,
+        'Import Complete');
     } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
@@ -749,26 +792,26 @@
     if (_users.find(u2 => u2.badge === b && u2.id !== id)) {
       await _bcotAlert('That badge number is already assigned to another user.', 'Duplicate'); return;
     }
-    u.badge = b;
     try {
-      await saveUsers();
+      await window.FBAuth.call('adminSetBadge', { id, badge: b });
+      u.badge = b;
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   async function umResetPwd(id) {
     const u = _users.find(u => u.id === id);
     if (!u) return;
     const ok = await _bcotConfirm(
-      `Reset password for <strong>${u.name}</strong> to the default <strong>12345</strong>?<br>They will be required to set a new password on their next login.`,
+      `Reset password for <strong>${u.name}</strong>?<br>You'll get a temporary password to give them, and they will be required to set a new one on their next login.`,
       'Reset Password', { confirmLabel: 'Reset' });
     if (!ok) return;
-    u.password   = '12345';
-    u.firstLogin = true;
     try {
-      await saveUsers();
+      const { password } = await window.FBAuth.call('adminResetPassword', { id });
+      u.firstLogin = true;
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+      await _showTempPassword(u.name, password);
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   async function umRemoveUser(id) {
@@ -778,11 +821,11 @@
       `Remove <strong>${u.name}</strong> from the login users list?<br>They will no longer be able to access the app.`,
       'Remove User', { confirmLabel: 'Remove', danger: true });
     if (!ok) return;
-    _users = _users.filter(u => u.id !== id);
     try {
-      await saveUsers();
+      await window.FBAuth.call('adminRemoveUser', { id });
+      _users = _users.filter(u => u.id !== id);
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   async function umSaveExt(id) {
@@ -804,11 +847,11 @@
     if (!u) return;
     const allowed = ['user', 'charge', 'admin'];
     if (!allowed.includes(role)) return;
-    u.app_role = role;
     try {
-      await saveUsers();
+      await window.FBAuth.call('adminSetRole', { id, role });
+      u.app_role = role;
       _renderUserList();
-    } catch (e) { await _bcotAlert('Save failed — check your connection.', 'Error'); }
+    } catch (e) { await _bcotAlert('Save failed — ' + e.message, 'Error'); }
   }
 
   async function umSaveAll() {
@@ -1247,36 +1290,19 @@
       _removeOverlay();
       _addLogoutButton(session.name);
       window.dispatchEvent(new CustomEvent('bcotAuth', { detail: session }));
+      _verifyFirebaseLogin(session);
       return;
     }
 
-    // 4. Wait for Firebase module (deferred script may not have run yet)
-    let t = 0;
-    while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
-    if (!window.FB) {
-      $id('bcot-error-msg').textContent = 'Firebase failed to initialize. Check your connection.';
-      showScreen('error');
-      return;
-    }
-
-    // 5. Load user list
-    try {
-      await _withTimeout(loadUsers(), 20000, 'Load users');
-    } catch (e) {
-      $id('bcot-error-msg').textContent = 'Could not load user list — check connection.';
-      showScreen('error');
-      return;
-    }
-
-    // 6. No users yet → first-time setup
-    if (!_users.length) {
-      showScreen('setup');
-      return;
-    }
-
-    // 7. Show login form
+    // 4. Show the login form straight away. Firebase keeps loading while the
+    //    user types; doLogin() waits for it only if it still isn't ready.
     buildUserDropdown();
     showScreen('login');
+
+    // 5. The saved session has ended, so end the Firebase login with it
+    _staleCleanup = _waitForFirebase()
+      .then(() => { if (window.FBAuth.user) return window.FBAuth.signOut(); })
+      .catch(e => console.warn('[BCOT_AUTH] Firebase not ready yet:', e));
    } catch (e) {
     // Catch-all: any uncaught error above previously left the "Checking
     // access…" spinner frozen forever with zero feedback. Surface it
@@ -1300,9 +1326,10 @@
     // Login
     doLogin,
     doChangePwd,
-    doSetup,
     doLogout,
     getSession,
+    checkOverride,
+    warmOverride,
     // User manager
     openUserManager,
     umAddUser,

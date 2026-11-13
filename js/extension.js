@@ -97,7 +97,7 @@ async function loadStaffIfMissing() {
 async function startExtension() {
   KEY = (window.BCOT_APP_KEY || '').trim();
   if (!KEY) { document.body.innerHTML = '<div style="padding:40px;color:red;font-weight:700;text-align:center;">config.js not found.</div>'; return; }
-  let t = 0; while (!window.FB && t++ < 50) await new Promise(r => setTimeout(r,100));
+  let t = 0; while (!window.FB && t++ < 200) await new Promise(r => setTimeout(r,100));
   if (!window.FB) { document.body.innerHTML = '<div style="padding:40px;color:red;">Firebase failed to load.</div>'; return; }
 
   const session = window.BCOT_AUTH?.getSession();

@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // A role is only ever set by server code, so an account someone registers
+    // for themselves through the public API key gets no access.
+    function signedIn() { return request.auth != null && request.auth.token.role is string; }
+    function isAdmin()  { return signedIn() && request.auth.token.role == 'admin'; }
+
+    match /bcot_overtime_secure/{appKey} {
+      // Logged-in users read the user list; only admins and server functions change it.
+      match /app_auth/{doc} {
+        allow read: if signedIn();
+        allow write: if isAdmin();
+      }
+
+      // Server functions only (they bypass these rules).
+      match /private/{doc} {
+        allow read, write: if false;
+      }
+
+      // version-check.js reads this before login.
+      match /app_config/version {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+      match /app_config/{doc} {
+        allow read: if signedIn();
+        allow write: if isAdmin();
+      }
+
+      // MedCheck's scanner deliberately works without a login.
+      match /medcheck_mappings/{doc} {
+        allow read: if true;
+        allow write: if signedIn();
+      }
+      match /medcheck_scans/{doc} {
+        allow read, create, update: if true;
+        allow delete: if signedIn();
+      }
+
+      // Everything else in the app needs a login.
+      match /{collection}/{document=**} {
+        allow read, write: if signedIn()
+          && !(collection in ['app_auth', 'private', 'app_config', 'medcheck_mappings', 'medcheck_scans']);
+      }
+    }
+  }
+}

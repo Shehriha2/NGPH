@@ -60,7 +60,7 @@ function _ccUID() {
 }
 async function _waitFB() {
   let t = 0;
-  while (!window.FB && t++ < 80) await new Promise(r => setTimeout(r, 50));
+  while (!window.FB && t++ < 400) await new Promise(r => setTimeout(r, 50));
   return !!window.FB;
 }
 
